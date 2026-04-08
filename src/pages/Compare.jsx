@@ -7,7 +7,23 @@ import SessionCard from "../components/SessionCard";
 import { GitCompare } from "lucide-react";
 import moment from "moment";
 
+function MetricRow({ label, value, max = 10 }) {
+  const pct = value ? (value / max) * 100 : 0;
+  return (
+    <div>
+      <div className="flex justify-between text-[10px]">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-mono font-bold">{value || "—"}</span>
+      </div>
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-0.5">
+        <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function CompareColumn({ session: s }) {
+  const buildTypeLabel = s.build_type === "Other" && s.custom_build_type ? s.custom_build_type : s.build_type;
   return (
     <div className="bg-card rounded-xl border border-border p-3 flex-1 min-w-[140px] space-y-3">
       <div className="text-center">
@@ -17,10 +33,15 @@ function CompareColumn({ session: s }) {
 
       <div className="space-y-2">
         <MetricRow label="Intensity" value={s.intensity} max={10} />
-        <MetricRow label="Build-up" value={s.buildup_quality} max={10} />
-        <MetricRow label="Control" value={s.control} max={10} />
+        <MetricRow label="Build Quality" value={s.build_quality} max={10} />
         <MetricRow label="Satisfaction" value={s.satisfaction} max={10} />
       </div>
+
+      {buildTypeLabel && (
+        <div className="text-center">
+          <Badge variant="outline" className="text-[9px] py-0">{buildTypeLabel}</Badge>
+        </div>
+      )}
 
       <div className="space-y-1 pt-2 border-t border-border">
         <p className="text-[10px] text-muted-foreground uppercase font-semibold">Heart Rate</p>
@@ -47,21 +68,6 @@ function CompareColumn({ session: s }) {
           <p className="text-xs line-clamp-3">{s.notes}</p>
         </div>
       )}
-    </div>
-  );
-}
-
-function MetricRow({ label, value, max }) {
-  const pct = value ? (value / max) * 100 : 0;
-  return (
-    <div>
-      <div className="flex justify-between text-[10px]">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono font-bold">{value || "—"}</span>
-      </div>
-      <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-0.5">
-        <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
-      </div>
     </div>
   );
 }
@@ -104,16 +110,9 @@ export default function Compare() {
         subtitle={comparing ? `${selected.size} sessions` : "Select sessions to compare"}
         action={
           comparing ? (
-            <Button variant="outline" size="sm" onClick={() => setComparing(false)}>
-              Back
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setComparing(false)}>Back</Button>
           ) : (
-            <Button
-              size="sm"
-              disabled={selected.size < 2}
-              onClick={() => setComparing(true)}
-              className="gap-1.5"
-            >
+            <Button size="sm" disabled={selected.size < 2} onClick={() => setComparing(true)} className="gap-1.5">
               <GitCompare className="w-4 h-4" /> Compare ({selected.size})
             </Button>
           )
@@ -127,21 +126,13 @@ export default function Compare() {
               <p className="text-center text-muted-foreground py-12 text-sm">No sessions to compare</p>
             ) : (
               sessions.map((s) => (
-                <SessionCard
-                  key={s.id}
-                  session={s}
-                  selectable
-                  selected={selected.has(s.id)}
-                  onSelect={toggleSelect}
-                />
+                <SessionCard key={s.id} session={s} selectable selected={selected.has(s.id)} onSelect={toggleSelect} />
               ))
             )}
           </div>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
-            {selectedSessions.map((s) => (
-              <CompareColumn key={s.id} session={s} />
-            ))}
+            {selectedSessions.map((s) => <CompareColumn key={s.id} session={s} />)}
           </div>
         )}
       </div>

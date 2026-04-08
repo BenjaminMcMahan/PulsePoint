@@ -115,9 +115,10 @@ export default function SessionDetail() {
         <div className="bg-card rounded-xl border border-border p-4 space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Metrics</h3>
           <MetricBadge label="Intensity" value={s.intensity} />
-          <MetricBadge label="Build-up" value={s.buildup_quality} />
-          <MetricBadge label="Control" value={s.control} />
+          <MetricBadge label="Build Quality" value={s.build_quality} />
+          <MetricBadge label="Build-up Quality" value={s.buildup_quality} />
           <MetricBadge label="Satisfaction" value={s.satisfaction} />
+          {s.build_type && <InfoRow label="Build Type" value={s.build_type === "Other" && s.custom_build_type ? s.custom_build_type : s.build_type} />}
           {s.climax_duration && (
             <InfoRow label="Climax Duration" value={s.climax_duration} />
           )}

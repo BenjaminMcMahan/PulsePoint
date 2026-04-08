@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PageHeader from "../components/PageHeader";
 import SessionCard from "../components/SessionCard";
-import { PlusCircle, Search, SlidersHorizontal, X, Download } from "lucide-react";
+import { PlusCircle, Search, SlidersHorizontal, Download } from "lucide-react";
 
 const ALL_METHODS = ["Manual", "Silicone Sleeve", "Coyote E-Stim", "TENS", "Foley Catheter"];
+const BUILD_TYPES = ["Gradual", "Stepwise", "Spike", "Plateau-heavy", "Erratic", "Other"];
 
 export default function Sessions() {
   const [sessions, setSessions] = useState([]);
@@ -16,8 +17,13 @@ export default function Sessions() {
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState("");
   const [filterMethod, setFilterMethod] = useState("");
+  const [filterBuildType, setFilterBuildType] = useState("");
   const [filterIntMin, setFilterIntMin] = useState("");
   const [filterIntMax, setFilterIntMax] = useState("");
+  const [filterBQMin, setFilterBQMin] = useState("");
+  const [filterBQMax, setFilterBQMax] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   useEffect(() => {
     loadSessions();
@@ -30,24 +36,36 @@ export default function Sessions() {
   };
 
   const filtered = sessions.filter((s) => {
-    if (filterMethod && !(s.methods || []).includes(filterMethod)) return false;
+    if (filterMethod && filterMethod !== "all_methods" && !(s.methods || []).includes(filterMethod)) return false;
+    if (filterBuildType && filterBuildType !== "all_types" && s.build_type !== filterBuildType) return false;
     if (filterIntMin && s.intensity < Number(filterIntMin)) return false;
     if (filterIntMax && s.intensity > Number(filterIntMax)) return false;
+    if (filterBQMin && (s.build_quality || 0) < Number(filterBQMin)) return false;
+    if (filterBQMax && (s.build_quality || 0) > Number(filterBQMax)) return false;
+    if (filterDateFrom && s.date < filterDateFrom) return false;
+    if (filterDateTo && s.date > filterDateTo + "T23:59:59") return false;
     if (search) {
       const q = search.toLowerCase();
-      const text = [s.notes, s.unusual_sensations, ...(s.methods || []), ...(s.tags || [])].join(" ").toLowerCase();
+      const text = [s.notes, s.unusual_sensations, ...(s.methods || []), ...(s.tags || []), s.build_type].join(" ").toLowerCase();
       if (!text.includes(q)) return false;
     }
     return true;
   });
 
+  const clearFilters = () => {
+    setFilterMethod(""); setFilterBuildType("");
+    setFilterIntMin(""); setFilterIntMax("");
+    setFilterBQMin(""); setFilterBQMax("");
+    setFilterDateFrom(""); setFilterDateTo("");
+  };
+
   const exportCSV = () => {
-    const headers = ["Date","Start","End","Duration","Avg HR","Max HR","HR at Climax","Methods","Intensity","Build-up","Control","Satisfaction","Climax Duration","Mood","Environment","Tags"];
+    const headers = ["Date","Duration","Avg HR","Max HR","HR at Climax","Methods","Intensity","Build Quality","Build Type","Satisfaction","Climax Duration","Mood","Environment","Tags"];
     const rows = filtered.map((s) => [
-      s.date?.split("T")[0], s.start_time, s.end_time, s.duration_minutes,
+      s.date?.split("T")[0], s.duration_minutes,
       s.avg_hr, s.max_hr, s.hr_at_climax, (s.methods || []).join(";"),
-      s.intensity, s.buildup_quality, s.control, s.satisfaction,
-      s.climax_duration, s.mood, s.environment, (s.tags || []).join(";")
+      s.intensity, s.build_quality, s.build_type,
+      s.satisfaction, s.climax_duration, s.mood, s.environment, (s.tags || []).join(";")
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -88,19 +106,9 @@ export default function Sessions() {
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search sessions..."
-              className="pl-9 h-10"
-            />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search sessions..." className="pl-9 h-10" />
           </div>
-          <Button
-            variant={showFilters ? "secondary" : "outline"}
-            size="icon"
-            className="h-10 w-10"
-            onClick={() => setShowFilters(!showFilters)}
-          >
+          <Button variant={showFilters ? "secondary" : "outline"} size="icon" className="h-10 w-10" onClick={() => setShowFilters(!showFilters)}>
             <SlidersHorizontal className="w-4 h-4" />
           </Button>
         </div>
@@ -109,35 +117,42 @@ export default function Sessions() {
           <div className="bg-card rounded-xl border border-border p-3 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase text-muted-foreground">Filters</span>
-              <button
-                onClick={() => { setFilterMethod(""); setFilterIntMin(""); setFilterIntMax(""); }}
-                className="text-xs text-primary"
-              >
-                Clear all
-              </button>
+              <button onClick={clearFilters} className="text-xs text-primary">Clear all</button>
             </div>
-            <Select value={filterMethod} onValueChange={setFilterMethod}>
-              <SelectTrigger className="h-10"><SelectValue placeholder="Method" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all_methods">All Methods</SelectItem>
-                {ALL_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
+
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="number"
-                placeholder="Min intensity"
-                value={filterIntMin}
-                onChange={(e) => setFilterIntMin(e.target.value)}
-                className="h-10"
-              />
-              <Input
-                type="number"
-                placeholder="Max intensity"
-                value={filterIntMax}
-                onChange={(e) => setFilterIntMax(e.target.value)}
-                className="h-10"
-              />
+              <Select value={filterMethod} onValueChange={setFilterMethod}>
+                <SelectTrigger className="h-10"><SelectValue placeholder="Method" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all_methods">All Methods</SelectItem>
+                  {ALL_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filterBuildType} onValueChange={setFilterBuildType}>
+                <SelectTrigger className="h-10"><SelectValue placeholder="Build Type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all_types">All Types</SelectItem>
+                  {BUILD_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <p className="text-[10px] text-muted-foreground uppercase font-semibold">Intensity Range</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="number" placeholder="Min" value={filterIntMin} onChange={(e) => setFilterIntMin(e.target.value)} className="h-9" />
+              <Input type="number" placeholder="Max" value={filterIntMax} onChange={(e) => setFilterIntMax(e.target.value)} className="h-9" />
+            </div>
+
+            <p className="text-[10px] text-muted-foreground uppercase font-semibold">Build Quality Range</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="number" placeholder="Min" value={filterBQMin} onChange={(e) => setFilterBQMin(e.target.value)} className="h-9" />
+              <Input type="number" placeholder="Max" value={filterBQMax} onChange={(e) => setFilterBQMax(e.target.value)} className="h-9" />
+            </div>
+
+            <p className="text-[10px] text-muted-foreground uppercase font-semibold">Date Range</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="h-9" />
+              <Input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="h-9" />
             </div>
           </div>
         )}

@@ -4,10 +4,10 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import PageHeader from "../components/PageHeader";
 import StatCard from "../components/StatCard";
-import { Activity, Heart, Zap, Target, PlusCircle } from "lucide-react";
+import { Activity, Heart, Zap, Target, PlusCircle, TrendingUp } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import moment from "moment";
 
@@ -37,6 +37,10 @@ export default function Dashboard() {
     const withHR = sessions.filter((s) => s.avg_hr);
     return withHR.length ? (withHR.reduce((a, s) => a + s.avg_hr, 0) / withHR.length).toFixed(0) : "—";
   })();
+  const avgBuildQuality = (() => {
+    const w = sessions.filter((s) => s.build_quality);
+    return w.length ? (w.reduce((a, s) => a + s.build_quality, 0) / w.length).toFixed(1) : "—";
+  })();
   const topMethod = (() => {
     const counts = {};
     sessions.forEach((s) => (s.methods || []).forEach((m) => { counts[m] = (counts[m] || 0) + 1; }));
@@ -44,13 +48,16 @@ export default function Dashboard() {
     return sorted[0]?.[0] || "—";
   })();
 
-  const intensityOverTime = sessions
-    .slice().reverse()
-    .map((s) => ({ date: moment(s.date).format("M/D"), intensity: s.intensity }));
+  const chronological = sessions.slice().reverse();
 
-  const hrOverTime = sessions
+  const intensityOverTime = chronological.map((s) => ({
+    date: moment(s.date).format("M/D"),
+    intensity: s.intensity,
+    build_quality: s.build_quality,
+  }));
+
+  const hrOverTime = chronological
     .filter((s) => s.max_hr)
-    .slice().reverse()
     .map((s) => ({ date: moment(s.date).format("M/D"), hr: s.max_hr }));
 
   const methodCounts = {};
@@ -59,9 +66,30 @@ export default function Dashboard() {
     .sort((a, b) => b[1] - a[1])
     .map(([name, count]) => ({ name: name.length > 10 ? name.slice(0, 10) + "…" : name, count }));
 
-  const scatterData = sessions
+  // Build Quality by method
+  const methodBQ = {};
+  sessions.forEach((s) => {
+    if (!s.build_quality) return;
+    (s.methods || []).forEach((m) => {
+      if (!methodBQ[m]) methodBQ[m] = { total: 0, count: 0 };
+      methodBQ[m].total += s.build_quality;
+      methodBQ[m].count++;
+    });
+  });
+  const methodBQData = Object.entries(methodBQ)
+    .filter(([_, v]) => v.count >= 1)
+    .map(([name, v]) => ({ name: name.length > 10 ? name.slice(0, 10) + "…" : name, avg: parseFloat((v.total / v.count).toFixed(1)) }))
+    .sort((a, b) => b.avg - a.avg);
+
+  const scatterHRvsInt = sessions
     .filter((s) => s.max_hr && s.intensity)
-    .map((s) => ({ hr: s.max_hr, intensity: s.intensity }));
+    .map((s) => ({ hr: s.max_hr, intensity: s.intensity, bq: s.build_quality }));
+
+  const scatterBQvsInt = sessions
+    .filter((s) => s.build_quality && s.intensity)
+    .map((s) => ({ bq: s.build_quality, intensity: s.intensity }));
+
+  const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 };
 
   return (
     <div>
@@ -82,21 +110,27 @@ export default function Dashboard() {
           <StatCard label="Total Sessions" value={total} icon={Activity} />
           <StatCard label="Avg Intensity" value={avgIntensity} icon={Zap} />
           <StatCard label="Avg HR" value={avgHR} icon={Heart} />
+          <StatCard label="Avg Build Quality" value={avgBuildQuality} icon={TrendingUp} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <StatCard label="Top Method" value={topMethod} icon={Target} />
         </div>
 
         {total > 0 && (
           <>
+            {/* Intensity + Build Quality over time */}
             <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Intensity Over Time</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Intensity & Build Quality Over Time</h3>
               <div className="h-44">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={intensityOverTime}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis domain={[0, 10]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                    <Line type="monotone" dataKey="intensity" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 3 }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Line type="monotone" dataKey="intensity" name="Intensity" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 2 }} />
+                    <Line type="monotone" dataKey="build_quality" name="Build Quality" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={{ r: 2 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -111,8 +145,8 @@ export default function Dashboard() {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                       <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                      <Line type="monotone" dataKey="hr" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={{ r: 3 }} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Line type="monotone" dataKey="hr" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={{ r: 2 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -127,14 +161,48 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+                    <Tooltip contentStyle={tooltipStyle} />
                     <Bar dataKey="count" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {scatterData.length > 1 && (
+            {methodBQData.length > 0 && (
+              <div className="bg-card rounded-xl border border-border p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Avg Build Quality by Method</h3>
+                <div className="h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={methodBQData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" tick={{ fontSize: 9 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis domain={[0, 10]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Bar dataKey="avg" name="Avg Build Quality" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {scatterBQvsInt.length > 1 && (
+              <div className="bg-card rounded-xl border border-border p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Build Quality vs Intensity</h3>
+                <div className="h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis type="number" dataKey="bq" name="Build Quality" domain={[0, 10]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" label={{ value: "Build Quality", position: "insideBottom", offset: -2, fontSize: 10 }} />
+                      <YAxis type="number" dataKey="intensity" name="Intensity" domain={[0, 10]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Scatter data={scatterBQvsInt} fill="hsl(var(--chart-2))" />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {scatterHRvsInt.length > 1 && (
               <div className="bg-card rounded-xl border border-border p-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">HR vs Intensity</h3>
                 <div className="h-44">
@@ -143,8 +211,8 @@ export default function Dashboard() {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis type="number" dataKey="hr" name="Max HR" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                       <YAxis type="number" dataKey="intensity" name="Intensity" domain={[0, 10]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                      <Scatter data={scatterData} fill="hsl(var(--chart-4))" />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Scatter data={scatterHRvsInt} fill="hsl(var(--chart-4))" />
                     </ScatterChart>
                   </ResponsiveContainer>
                 </div>

@@ -2,15 +2,15 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import PageHeader from "../components/PageHeader";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Heart, TrendingUp, TrendingDown, AlertTriangle, Star } from "lucide-react";
+import { Trophy, Heart, TrendingUp, TrendingDown, AlertTriangle, Star, Layers } from "lucide-react";
 import moment from "moment";
 import { Link } from "react-router-dom";
 
 function InsightCard({ icon: Icon, color, title, description, sessionId }) {
   const content = (
     <div className="bg-card rounded-xl border border-border p-4 flex gap-3 items-start">
-      <div className={`w-9 h-9 rounded-lg bg-${color}/10 flex items-center justify-center flex-shrink-0`}>
-        <Icon className={`w-5 h-5 text-${color}`} />
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted`}>
+        <Icon className="w-5 h-5 text-primary" />
       </div>
       <div className="min-w-0">
         <p className="text-sm font-semibold">{title}</p>
@@ -18,10 +18,7 @@ function InsightCard({ icon: Icon, color, title, description, sessionId }) {
       </div>
     </div>
   );
-  
-  if (sessionId) {
-    return <Link to={`/sessions/${sessionId}`}>{content}</Link>;
-  }
+  if (sessionId) return <Link to={`/sessions/${sessionId}`}>{content}</Link>;
   return content;
 }
 
@@ -45,8 +42,6 @@ export default function Insights() {
     );
   }
 
-  const insights = [];
-
   if (sessions.length === 0) {
     return (
       <div>
@@ -58,15 +53,27 @@ export default function Insights() {
     );
   }
 
+  const insights = [];
+
   // Highest intensity
   const maxIntensity = sessions.reduce((best, s) => (!best || s.intensity > best.intensity ? s : best), null);
   if (maxIntensity) {
     insights.push({
       icon: Trophy,
-      color: "chart-4",
       title: `Peak Intensity: ${maxIntensity.intensity}/10`,
       description: `Achieved on ${moment(maxIntensity.date).format("MMM D, YYYY")} using ${(maxIntensity.methods || []).join(", ")}`,
       sessionId: maxIntensity.id,
+    });
+  }
+
+  // Highest Build Quality
+  const maxBQ = sessions.filter((s) => s.build_quality).reduce((best, s) => (!best || s.build_quality > best.build_quality ? s : best), null);
+  if (maxBQ) {
+    insights.push({
+      icon: TrendingUp,
+      title: `Peak Build Quality: ${maxBQ.build_quality}/10`,
+      description: `On ${moment(maxBQ.date).format("MMM D, YYYY")}${maxBQ.build_type ? ` — ${maxBQ.build_type} build` : ""}`,
+      sessionId: maxBQ.id,
     });
   }
 
@@ -75,51 +82,124 @@ export default function Insights() {
   if (maxHRSession) {
     insights.push({
       icon: Heart,
-      color: "chart-3",
       title: `Peak HR: ${maxHRSession.max_hr} bpm`,
       description: `Recorded on ${moment(maxHRSession.date).format("MMM D, YYYY")}`,
       sessionId: maxHRSession.id,
     });
   }
 
-  // Trend detection (last 5 vs previous 5)
+  // Intensity trend
   if (sessions.length >= 6) {
     const recent5 = sessions.slice(0, 5);
     const prev5 = sessions.slice(5, 10);
     const recentAvg = recent5.reduce((a, s) => a + (s.intensity || 0), 0) / recent5.length;
     const prevAvg = prev5.reduce((a, s) => a + (s.intensity || 0), 0) / prev5.length;
     const diff = recentAvg - prevAvg;
-    
     if (Math.abs(diff) >= 0.5) {
       insights.push({
         icon: diff > 0 ? TrendingUp : TrendingDown,
-        color: diff > 0 ? "chart-1" : "chart-3",
-        title: `Intensity ${diff > 0 ? "Trending Up" : "Trending Down"}`,
+        title: `Intensity ${diff > 0 ? "Trending Up ↑" : "Trending Down ↓"}`,
         description: `Recent avg: ${recentAvg.toFixed(1)} vs previous: ${prevAvg.toFixed(1)} (${diff > 0 ? "+" : ""}${diff.toFixed(1)})`,
       });
     }
   }
 
-  // Most effective method
-  const methodStats = {};
+  // Build Quality trend
+  const bqSessions = sessions.filter((s) => s.build_quality);
+  if (bqSessions.length >= 6) {
+    const r5 = bqSessions.slice(0, 5);
+    const p5 = bqSessions.slice(5, 10);
+    const rAvg = r5.reduce((a, s) => a + s.build_quality, 0) / r5.length;
+    const pAvg = p5.reduce((a, s) => a + s.build_quality, 0) / p5.length;
+    const d = rAvg - pAvg;
+    if (Math.abs(d) >= 0.5) {
+      insights.push({
+        icon: d > 0 ? TrendingUp : TrendingDown,
+        title: `Build Quality ${d > 0 ? "Improving ↑" : "Declining ↓"}`,
+        description: `Recent avg: ${rAvg.toFixed(1)} vs previous: ${pAvg.toFixed(1)} (${d > 0 ? "+" : ""}${d.toFixed(1)})`,
+      });
+    }
+  }
+
+  // BQ vs Intensity correlation
+  const paired = sessions.filter((s) => s.build_quality && s.intensity);
+  if (paired.length >= 3) {
+    const highBQ = paired.filter((s) => s.build_quality >= 7);
+    const lowBQ = paired.filter((s) => s.build_quality <= 4);
+    if (highBQ.length >= 2 && lowBQ.length >= 2) {
+      const highAvgInt = highBQ.reduce((a, s) => a + s.intensity, 0) / highBQ.length;
+      const lowAvgInt = lowBQ.reduce((a, s) => a + s.intensity, 0) / lowBQ.length;
+      if (highAvgInt - lowAvgInt > 0.5) {
+        insights.push({
+          icon: TrendingUp,
+          title: "Higher Build Quality → Higher Intensity",
+          description: `Sessions with BQ ≥7 avg intensity ${highAvgInt.toFixed(1)} vs BQ ≤4 avg ${lowAvgInt.toFixed(1)}`,
+        });
+      }
+    }
+  }
+
+  // Best method for Build Quality
+  const methodBQ = {};
   sessions.forEach((s) => {
+    if (!s.build_quality) return;
     (s.methods || []).forEach((m) => {
-      if (!methodStats[m]) methodStats[m] = { total: 0, count: 0 };
-      methodStats[m].total += s.intensity || 0;
-      methodStats[m].count++;
+      if (!methodBQ[m]) methodBQ[m] = { total: 0, count: 0 };
+      methodBQ[m].total += s.build_quality;
+      methodBQ[m].count++;
     });
   });
-  const methodAvgs = Object.entries(methodStats)
+  const methodBQAvgs = Object.entries(methodBQ)
     .filter(([_, v]) => v.count >= 2)
     .map(([name, v]) => ({ name, avg: v.total / v.count, count: v.count }))
     .sort((a, b) => b.avg - a.avg);
-
-  if (methodAvgs.length > 0) {
+  if (methodBQAvgs.length > 0) {
     insights.push({
       icon: Star,
-      color: "chart-2",
-      title: `Best Method: ${methodAvgs[0].name}`,
-      description: `Avg intensity ${methodAvgs[0].avg.toFixed(1)}/10 across ${methodAvgs[0].count} sessions`,
+      title: `Best Method for Build Quality: ${methodBQAvgs[0].name}`,
+      description: `Avg BQ ${methodBQAvgs[0].avg.toFixed(1)}/10 across ${methodBQAvgs[0].count} sessions`,
+    });
+  }
+
+  // Build Type vs Max HR
+  const buildTypeHR = {};
+  sessions.forEach((s) => {
+    if (!s.build_type || !s.max_hr) return;
+    const key = s.build_type === "Other" && s.custom_build_type ? s.custom_build_type : s.build_type;
+    if (!buildTypeHR[key]) buildTypeHR[key] = { total: 0, count: 0 };
+    buildTypeHR[key].total += s.max_hr;
+    buildTypeHR[key].count++;
+  });
+  const buildTypeHRAvgs = Object.entries(buildTypeHR)
+    .filter(([_, v]) => v.count >= 2)
+    .sort((a, b) => (b[1].total / b[1].count) - (a[1].total / a[1].count));
+  if (buildTypeHRAvgs.length > 0) {
+    const [topType, topStats] = buildTypeHRAvgs[0];
+    insights.push({
+      icon: Layers,
+      title: `"${topType}" builds → Highest Avg HR`,
+      description: `Avg max HR of ${(topStats.total / topStats.count).toFixed(0)} bpm across ${topStats.count} sessions`,
+    });
+  }
+
+  // Build Type vs Satisfaction
+  const buildTypeSat = {};
+  sessions.forEach((s) => {
+    if (!s.build_type || !s.satisfaction) return;
+    const key = s.build_type === "Other" && s.custom_build_type ? s.custom_build_type : s.build_type;
+    if (!buildTypeSat[key]) buildTypeSat[key] = { total: 0, count: 0 };
+    buildTypeSat[key].total += s.satisfaction;
+    buildTypeSat[key].count++;
+  });
+  const satAvgs = Object.entries(buildTypeSat)
+    .filter(([_, v]) => v.count >= 2)
+    .sort((a, b) => (b[1].total / b[1].count) - (a[1].total / a[1].count));
+  if (satAvgs.length > 0) {
+    const [topType, stats] = satAvgs[0];
+    insights.push({
+      icon: Star,
+      title: `Best Satisfaction: "${topType}" builds`,
+      description: `Avg satisfaction ${(stats.total / stats.count).toFixed(1)}/10 across ${stats.count} sessions`,
     });
   }
 
@@ -129,51 +209,47 @@ export default function Insights() {
     const pct = ((discomfortSessions.length / sessions.length) * 100).toFixed(0);
     insights.push({
       icon: AlertTriangle,
-      color: "destructive",
       title: `${discomfortSessions.length} sessions with discomfort`,
       description: `${pct}% of all sessions reported discomfort`,
     });
   }
 
-  // Favorites count
-  const favorites = sessions.filter((s) => s.is_favorite);
-  if (favorites.length > 0) {
-    const avgFavInt = (favorites.reduce((a, s) => a + (s.intensity || 0), 0) / favorites.length).toFixed(1);
-    insights.push({
-      icon: Star,
-      color: "chart-4",
-      title: `${favorites.length} Favorite Sessions`,
-      description: `Average intensity of favorites: ${avgFavInt}/10`,
+  // Method BQ rankings
+  const methodAvgs = [];
+  sessions.forEach((s) => {
+    if (!s.build_quality) return;
+    (s.methods || []).forEach((m) => {
+      const existing = methodAvgs.find((x) => x.name === m);
+      if (existing) { existing.total += s.build_quality; existing.count++; }
+      else methodAvgs.push({ name: m, total: s.build_quality, count: 1 });
     });
-  }
+  });
+  const rankedMethods = methodAvgs
+    .filter((m) => m.count >= 1)
+    .map((m) => ({ name: m.name, avg: m.total / m.count, count: m.count }))
+    .sort((a, b) => b.avg - a.avg);
 
   return (
     <div>
       <PageHeader title="Insights" subtitle={`Based on ${sessions.length} sessions`} />
 
       <div className="px-4 space-y-3 pb-6">
-        {/* Summary badges */}
         <div className="flex flex-wrap gap-2 mb-2">
           <Badge variant="outline" className="py-1">{sessions.length} sessions</Badge>
-          {sessions.length > 0 && (
-            <Badge variant="outline" className="py-1">
-              Since {moment(sessions[sessions.length - 1].date).format("MMM YYYY")}
-            </Badge>
-          )}
+          <Badge variant="outline" className="py-1">
+            Since {moment(sessions[sessions.length - 1].date).format("MMM YYYY")}
+          </Badge>
         </div>
 
-        {insights.map((insight, i) => (
-          <InsightCard key={i} {...insight} />
-        ))}
+        {insights.map((insight, i) => <InsightCard key={i} {...insight} />)}
 
-        {/* Method breakdown */}
-        {methodAvgs.length > 1 && (
+        {rankedMethods.length > 1 && (
           <div className="bg-card rounded-xl border border-border p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              Method Rankings by Avg Intensity
+              Build Quality Rankings by Method
             </h3>
             <div className="space-y-2">
-              {methodAvgs.map((m, i) => (
+              {rankedMethods.map((m, i) => (
                 <div key={m.name} className="flex items-center gap-3">
                   <span className="text-xs font-bold font-mono w-5 text-muted-foreground">{i + 1}</span>
                   <div className="flex-1">
