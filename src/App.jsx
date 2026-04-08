@@ -5,7 +5,14 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-// Add page imports here
+import Layout from './components/Layout';
+import Dashboard from './pages/Dashboard';
+import Sessions from './pages/Sessions';
+import SessionDetail from './pages/SessionDetail';
+import NewSession from './pages/NewSession';
+import QuickEntry from './pages/QuickEntry';
+import Compare from './pages/Compare';
+import Insights from './pages/Insights';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -33,8 +40,16 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
-      {/* Add your page Route elements here */}
-      <Route path="*" element={<PageNotFound />} />
+      <Route element={<Layout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/sessions" element={<Sessions />} />
+        <Route path="/sessions/:id" element={<SessionDetail />} />
+        <Route path="/new" element={<NewSession />} />
+        <Route path="/new/quick" element={<QuickEntry />} />
+        <Route path="/compare" element={<Compare />} />
+        <Route path="/insights" element={<Insights />} />
+        <Route path="*" element={<PageNotFound />} />
+      </Route>
     </Routes>
   );
 };

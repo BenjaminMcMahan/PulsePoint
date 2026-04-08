@@ -1,0 +1,223 @@
+{
+  "name": "Session",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Session date"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Start time HH:MM"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "End time HH:MM"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Duration in minutes (auto-calculated)"
+    },
+    "avg_hr": {
+      "type": "number",
+      "description": "Average heart rate"
+    },
+    "max_hr": {
+      "type": "number",
+      "description": "Maximum heart rate"
+    },
+    "hr_at_climax": {
+      "type": "number",
+      "description": "Heart rate at climax"
+    },
+    "hr_data_file": {
+      "type": "string",
+      "description": "URL to uploaded HR CSV file"
+    },
+    "hr_timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "minute": {
+            "type": "number"
+          },
+          "hr": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "Manual HR timeline entries"
+    },
+    "methods": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Methods/aids used"
+    },
+    "custom_methods": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Custom method entries"
+    },
+    "foley_size": {
+      "type": "string",
+      "description": "Foley catheter size (Fr)"
+    },
+    "foley_type": {
+      "type": "string",
+      "description": "Foley catheter type"
+    },
+    "estim_screenshot": {
+      "type": "string",
+      "description": "URL to e-stim settings screenshot"
+    },
+    "estim_notes": {
+      "type": "string",
+      "description": "E-stim waveform/intensity notes"
+    },
+    "sleeve_type": {
+      "type": "string",
+      "description": "Sleeve type/brand"
+    },
+    "tens_placement": {
+      "type": "string",
+      "description": "TENS pad placement"
+    },
+    "intensity": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Intensity of climax (1-10)"
+    },
+    "buildup_quality": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Build-up quality (1-10)"
+    },
+    "climax_duration": {
+      "type": "string",
+      "enum": [
+        "short",
+        "medium",
+        "long"
+      ],
+      "description": "Duration of climax"
+    },
+    "control": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Control (1-10)"
+    },
+    "satisfaction": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Satisfaction (1-10)"
+    },
+    "unusual_sensations": {
+      "type": "string",
+      "description": "Any unusual sensations"
+    },
+    "refractory_notes": {
+      "type": "string",
+      "description": "Refractory period notes"
+    },
+    "ejaculate_volume": {
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "high"
+      ],
+      "description": "Ejaculate volume"
+    },
+    "discomfort": {
+      "type": "boolean",
+      "description": "Any discomfort"
+    },
+    "discomfort_notes": {
+      "type": "string",
+      "description": "Discomfort details"
+    },
+    "mood": {
+      "type": "string",
+      "enum": [
+        "relaxed",
+        "stressed",
+        "neutral",
+        "excited",
+        "tired",
+        "anxious"
+      ],
+      "description": "Mood before session"
+    },
+    "environment": {
+      "type": "string",
+      "enum": [
+        "private",
+        "clinical",
+        "experimental",
+        "other"
+      ],
+      "description": "Environment"
+    },
+    "substances": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Substances used"
+    },
+    "hydration": {
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "high"
+      ],
+      "description": "Hydration level"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Freeform notes"
+    },
+    "media_images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Uploaded image URLs"
+    },
+    "video_link": {
+      "type": "string",
+      "description": "Video reference link"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Session tags"
+    },
+    "is_favorite": {
+      "type": "boolean",
+      "description": "Favorite session"
+    },
+    "is_quick_entry": {
+      "type": "boolean",
+      "description": "Whether this was a quick entry"
+    }
+  },
+  "required": [
+    "date",
+    "intensity",
+    "methods"
+  ]
+}
