@@ -66,11 +66,6 @@ export default function SubjectiveSection({ data, onChange }) {
         )}
       </div>
 
-      <SliderField
-        label="Build-up Quality (legacy)"
-        value={data.buildup_quality}
-        onChange={(v) => update("buildup_quality", v)}
-      />
 
       <div>
         <Label className="text-xs text-muted-foreground">Climax Duration</Label>
