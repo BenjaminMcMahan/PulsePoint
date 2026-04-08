@@ -32,7 +32,7 @@ export default function QuickEntry() {
     }
     setSaving(true);
     await base44.entities.Session.create(data);
-    toast({ title: "Quick entry saved!" });
+    toast({ title: "Quick entry saved!", duration: 2000 });
     navigate("/sessions");
   };
 

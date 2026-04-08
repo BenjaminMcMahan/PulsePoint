@@ -70,7 +70,7 @@ export default function NewSession() {
       ...data,
       duration_minutes: duration,
     });
-    toast({ title: "Session saved!" });
+    toast({ title: "Session saved!", duration: 2000 });
     navigate("/sessions");
   };
 

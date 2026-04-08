@@ -20,7 +20,7 @@ export default function HeartRateSection({ data, onChange }) {
 
   const addTimelineEntry = () => {
     const timeline = data.hr_timeline || [];
-    update("hr_timeline", [...timeline, { minute: timeline.length, hr: 70 }]);
+    update("hr_timeline", [...timeline, { minute: "", hr: "" }]);
   };
 
   const updateTimeline = (index, field, value) => {
