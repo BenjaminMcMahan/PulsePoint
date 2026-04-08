@@ -4,10 +4,17 @@ import { Label } from "@/components/ui/label";
 export default function SessionInfoSection({ data, onChange }) {
   const update = (field, value) => onChange({ ...data, [field]: value });
 
+  const handleDurationChange = (field, value) => {
+    const hours = field === "dur_hours" ? Number(value) : (data.dur_hours || 0);
+    const minutes = field === "dur_minutes" ? Number(value) : (data.dur_minutes || 0);
+    const totalMinutes = (field === "dur_hours" ? Number(value) : hours) * 60 + (field === "dur_minutes" ? Number(value) : minutes);
+    onChange({ ...data, [field]: Number(value), duration_minutes: totalMinutes });
+  };
+
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-primary">Session Info</h3>
-      
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label className="text-xs text-muted-foreground">Date</Label>
@@ -21,40 +28,40 @@ export default function SessionInfoSection({ data, onChange }) {
         <div />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs text-muted-foreground">Start Time</Label>
-          <Input
-            type="time"
-            value={data.start_time || ""}
-            onChange={(e) => update("start_time", e.target.value)}
-            className="h-12 mt-1"
-          />
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Duration</Label>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <Input
+              type="number"
+              min="0"
+              max="23"
+              placeholder="0"
+              value={data.dur_hours ?? ""}
+              onChange={(e) => handleDurationChange("dur_hours", e.target.value)}
+              className="h-12 font-mono text-center"
+            />
+            <span className="text-sm text-muted-foreground font-medium">hr</span>
+          </div>
+          <div className="flex items-center gap-2 flex-1">
+            <Input
+              type="number"
+              min="0"
+              max="59"
+              placeholder="0"
+              value={data.dur_minutes ?? ""}
+              onChange={(e) => handleDurationChange("dur_minutes", e.target.value)}
+              className="h-12 font-mono text-center"
+            />
+            <span className="text-sm text-muted-foreground font-medium">min</span>
+          </div>
         </div>
-        <div>
-          <Label className="text-xs text-muted-foreground">End Time</Label>
-          <Input
-            type="time"
-            value={data.end_time || ""}
-            onChange={(e) => update("end_time", e.target.value)}
-            className="h-12 mt-1"
-          />
-        </div>
+        {data.duration_minutes > 0 && (
+          <div className="bg-muted rounded-lg px-3 py-2 text-sm font-mono">
+            Duration: <span className="text-primary font-bold">{data.duration_minutes} min</span>
+          </div>
+        )}
       </div>
-
-      {data.start_time && data.end_time && (
-        <div className="bg-muted rounded-lg px-3 py-2 text-sm font-mono">
-          Duration: <span className="text-primary font-bold">{calcDuration(data.start_time, data.end_time)} min</span>
-        </div>
-      )}
     </div>
   );
-}
-
-function calcDuration(start, end) {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let diff = (eh * 60 + em) - (sh * 60 + sm);
-  if (diff < 0) diff += 1440;
-  return diff;
 }
