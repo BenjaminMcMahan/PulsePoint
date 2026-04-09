@@ -66,10 +66,16 @@ export default function NewSession() {
     }
     setSaving(true);
     const duration = calcDuration(data.start_time, data.end_time);
-    await base44.entities.Session.create({
-      ...data,
-      duration_minutes: duration,
+    const { _csv_rows, ...sessionData } = data;
+    const session = await base44.entities.Session.create({
+      ...sessionData,
+      duration_minutes: duration || data.duration_minutes,
     });
+    // Bulk-create HeartRateTimeline rows if CSV was imported
+    if (_csv_rows && _csv_rows.length > 0) {
+      const rows = _csv_rows.map((r) => ({ ...r, session: session.id }));
+      await base44.entities.HeartRateTimeline.bulkCreate(rows);
+    }
     toast({ title: "Session saved!", duration: 2000 });
     navigate("/sessions");
   };

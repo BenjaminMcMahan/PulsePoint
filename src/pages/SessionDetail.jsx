@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import PageHeader from "../components/PageHeader";
 import { ArrowLeft, Star, Trash2, Heart, Clock, Zap } from "lucide-react";
 import moment from "moment";
+import HRTimelineChart from "../components/HRTimelineChart";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -42,12 +43,15 @@ export default function SessionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
+  const [timelineRows, setTimelineRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       const all = await base44.entities.Session.filter({ id });
       setSession(all[0]);
+      const rows = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 2000);
+      setTimelineRows(rows);
       setLoading(false);
     })();
   }, [id]);
@@ -116,7 +120,7 @@ export default function SessionDetail() {
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Metrics</h3>
           <MetricBadge label="Intensity" value={s.intensity} />
           <MetricBadge label="Build Quality" value={s.build_quality} />
-          <MetricBadge label="Build-up Quality" value={s.buildup_quality} />
+
           <MetricBadge label="Satisfaction" value={s.satisfaction} />
           {s.build_type && <InfoRow label="Build Type" value={s.build_type === "Other" && s.custom_build_type ? s.custom_build_type : s.build_type} />}
           {s.climax_duration && (
@@ -137,7 +141,8 @@ export default function SessionDetail() {
               </div>
             ))}
           </div>
-          {s.hr_timeline?.length > 0 && (
+          {timelineRows.length > 0 && <HRTimelineChart rows={timelineRows} />}
+          {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
             <div className="h-32">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={s.hr_timeline}>
