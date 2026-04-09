@@ -46,6 +46,16 @@ export default function SessionDetail() {
   const [timelineRows, setTimelineRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const elevatedTime = timelineRows.length > 1
+    ? timelineRows.reduce((total, row, i) => {
+        if (i === 0) return total;
+        const delta = Number(row.elevated_delta);
+        if (isNaN(delta) || delta <= 8) return total;
+        const dt = Number(row.time_offset_s) - Number(timelineRows[i - 1].time_offset_s);
+        return total + (dt > 0 ? dt : 0);
+      }, 0)
+    : null;
+
   useEffect(() => {
     (async () => {
       const all = await base44.entities.Session.filter({ id });
@@ -141,6 +151,12 @@ export default function SessionDetail() {
               </div>
             ))}
           </div>
+          {elevatedTime != null && elevatedTime > 0 && (
+            <div className="flex items-center justify-between rounded-lg bg-chart-3/10 px-3 py-2">
+              <span className="text-xs text-muted-foreground">Elevated Time <span className="text-[10px]">(Δ &gt; 8)</span></span>
+              <span className="text-sm font-mono font-bold text-chart-3">{Math.round(elevatedTime)}s</span>
+            </div>
+          )}
           {timelineRows.length > 0 && <HRTimelineChart rows={timelineRows} />}
           {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
             <div className="h-32">
