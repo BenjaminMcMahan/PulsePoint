@@ -71,8 +71,10 @@ export default function NewSession() {
       ...sessionData,
       duration_minutes: duration || data.duration_minutes,
     });
-    // Bulk-create HeartRateTimeline rows if CSV was imported
+    // Import HeartRateTimeline rows — delete any existing first, then bulk-create
     if (_csv_rows && _csv_rows.length > 0) {
+      const existing = await base44.entities.HeartRateTimeline.filter({ session: session.id });
+      await Promise.all(existing.map((r) => base44.entities.HeartRateTimeline.delete(r.id)));
       const rows = _csv_rows.map((r) => ({ ...r, session: session.id }));
       await base44.entities.HeartRateTimeline.bulkCreate(rows);
     }
