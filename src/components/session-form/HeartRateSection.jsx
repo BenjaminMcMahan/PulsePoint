@@ -47,67 +47,66 @@ export default function HeartRateSection({ data, onChange }) {
     setImportResult(null);
     setDerived(null);
 
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-
-    const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-      file_url,
-      json_schema: {
-        type: "object",
-        properties: {
-          rows: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                timestamp: { type: "string" },
-                time_offset_ms: { type: "string" },
-                time_offset_s: { type: "string" },
-                hr: { type: "string" },
-                hr_smoothed: { type: "string" },
-                baseline_hr: { type: "string" },
-                elevated_delta: { type: "string" },
-                marker: { type: "string" },
-                note: { type: "string" }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (result.status !== "success" || !result.output?.rows) {
-      setImportResult({ error: "Could not parse CSV. Ensure it has columns: timestamp, time_offset_s, hr." });
+    // Parse CSV directly in browser
+    const text = await file.text();
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) {
+      setImportResult({ error: "CSV appears empty or has no data rows." });
       setUploading(false);
       return;
     }
 
-    const allRows = result.output.rows;
+    const headers = lines[0].split(",").map((h) => h.trim());
+    const hrIdx = headers.indexOf("hr");
+    const offsetIdx = headers.indexOf("time_offset_s");
+    const timestampIdx = headers.indexOf("timestamp");
+    const offsetMsIdx = headers.indexOf("time_offset_ms");
+    const smoothedIdx = headers.indexOf("hr_smoothed");
+    const baselineIdx = headers.indexOf("baseline_hr");
+    const deltaIdx = headers.indexOf("elevated_delta");
+    const markerIdx = headers.indexOf("marker");
+    const noteIdx = headers.indexOf("note");
+
+    if (hrIdx === -1) {
+      setImportResult({ error: "Could not find 'hr' column. Ensure the CSV header row is present." });
+      setUploading(false);
+      return;
+    }
+
     const skipReasons = [];
     let lastOffset = -Infinity;
+    const allRows = lines.slice(1);
 
-    const validRows = allRows.filter((r, i) => {
-      if (r.hr == null || r.hr === "" || isNaN(Number(r.hr))) {
-        skipReasons.push(`Row ${i + 1}: missing or non-numeric hr`);
-        return false;
-      }
-      const offset = Number(r.time_offset_s);
-      if (!isNaN(offset) && offset < lastOffset) {
-        skipReasons.push(`Row ${i + 1}: time_offset_s not increasing`);
-        return false;
-      }
-      if (!isNaN(offset)) lastOffset = offset;
-      return true;
-    }).map((r) => ({
-      ...r,
-      time_offset_ms: r.time_offset_ms !== "" ? Number(r.time_offset_ms) : null,
-      time_offset_s: r.time_offset_s !== "" ? Number(r.time_offset_s) : null,
-      hr: Number(r.hr),
-      hr_smoothed: r.hr_smoothed !== "" ? Number(r.hr_smoothed) : null,
-      baseline_hr: r.baseline_hr !== "" ? Number(r.baseline_hr) : null,
-      elevated_delta: r.elevated_delta !== "" ? Number(r.elevated_delta) : null,
-      marker: r.marker || null,
-      note: r.note || null,
-    }));
+    const validRows = allRows
+      .map((line, i) => {
+        const cols = line.split(",");
+        return { cols, rowNum: i + 2 };
+      })
+      .filter(({ cols, rowNum }) => {
+        const hrVal = cols[hrIdx]?.trim();
+        if (!hrVal || isNaN(Number(hrVal))) {
+          skipReasons.push(`Row ${rowNum}: missing or non-numeric hr`);
+          return false;
+        }
+        const offset = offsetIdx !== -1 ? Number(cols[offsetIdx]?.trim()) : NaN;
+        if (!isNaN(offset) && offset < lastOffset) {
+          skipReasons.push(`Row ${rowNum}: time_offset_s not increasing`);
+          return false;
+        }
+        if (!isNaN(offset)) lastOffset = offset;
+        return true;
+      })
+      .map(({ cols }) => ({
+        timestamp: timestampIdx !== -1 ? cols[timestampIdx]?.trim() || null : null,
+        time_offset_ms: offsetMsIdx !== -1 && cols[offsetMsIdx]?.trim() !== "" ? Number(cols[offsetMsIdx].trim()) : null,
+        time_offset_s: offsetIdx !== -1 && cols[offsetIdx]?.trim() !== "" ? Number(cols[offsetIdx].trim()) : null,
+        hr: Number(cols[hrIdx].trim()),
+        hr_smoothed: smoothedIdx !== -1 && cols[smoothedIdx]?.trim() !== "" ? Number(cols[smoothedIdx].trim()) : null,
+        baseline_hr: baselineIdx !== -1 && cols[baselineIdx]?.trim() !== "" ? Number(cols[baselineIdx].trim()) : null,
+        elevated_delta: deltaIdx !== -1 && cols[deltaIdx]?.trim() !== "" ? Number(cols[deltaIdx].trim()) : null,
+        marker: markerIdx !== -1 && cols[markerIdx]?.trim() !== "" ? cols[markerIdx].trim() : null,
+        note: noteIdx !== -1 && cols[noteIdx]?.trim() !== "" ? cols[noteIdx].trim() : null,
+      }));
 
     const skipped = allRows.length - validRows.length;
 
@@ -117,11 +116,14 @@ export default function HeartRateSection({ data, onChange }) {
       return;
     }
 
+    // Upload file for storage reference
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+
     // Auto-populate summary fields
-    const hrs = validRows.map((r) => Number(r.hr));
+    const hrs = validRows.map((r) => r.hr);
     const avgHr = Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length);
     const maxHr = Math.max(...hrs);
-    const maxOffsetS = Math.max(...validRows.map((r) => Number(r.time_offset_s) || 0));
+    const maxOffsetS = Math.max(...validRows.map((r) => r.time_offset_s || 0));
     const durationMins = Math.round(maxOffsetS / 60);
     const timestamps = validRows.map((r) => r.timestamp).filter(Boolean).sort();
     const firstTimestamp = timestamps[0] ? new Date(timestamps[0]).toISOString() : data.date;
