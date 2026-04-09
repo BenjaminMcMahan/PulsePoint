@@ -60,12 +60,12 @@ export default function HeartRateSection({ data, onChange }) {
               type: "object",
               properties: {
                 timestamp: { type: "string" },
-                time_offset_ms: { type: "number" },
-                time_offset_s: { type: "number" },
-                hr: { type: "number" },
-                hr_smoothed: { type: "number" },
-                baseline_hr: { type: "number" },
-                elevated_delta: { type: "number" },
+                time_offset_ms: { type: "string" },
+                time_offset_s: { type: "string" },
+                hr: { type: "string" },
+                hr_smoothed: { type: "string" },
+                baseline_hr: { type: "string" },
+                elevated_delta: { type: "string" },
                 marker: { type: "string" },
                 note: { type: "string" }
               }
@@ -86,7 +86,7 @@ export default function HeartRateSection({ data, onChange }) {
     let lastOffset = -Infinity;
 
     const validRows = allRows.filter((r, i) => {
-      if (r.hr == null || isNaN(Number(r.hr))) {
+      if (r.hr == null || r.hr === "" || isNaN(Number(r.hr))) {
         skipReasons.push(`Row ${i + 1}: missing or non-numeric hr`);
         return false;
       }
@@ -97,7 +97,17 @@ export default function HeartRateSection({ data, onChange }) {
       }
       if (!isNaN(offset)) lastOffset = offset;
       return true;
-    });
+    }).map((r) => ({
+      ...r,
+      time_offset_ms: r.time_offset_ms !== "" ? Number(r.time_offset_ms) : null,
+      time_offset_s: r.time_offset_s !== "" ? Number(r.time_offset_s) : null,
+      hr: Number(r.hr),
+      hr_smoothed: r.hr_smoothed !== "" ? Number(r.hr_smoothed) : null,
+      baseline_hr: r.baseline_hr !== "" ? Number(r.baseline_hr) : null,
+      elevated_delta: r.elevated_delta !== "" ? Number(r.elevated_delta) : null,
+      marker: r.marker || null,
+      note: r.note || null,
+    }));
 
     const skipped = allRows.length - validRows.length;
 
