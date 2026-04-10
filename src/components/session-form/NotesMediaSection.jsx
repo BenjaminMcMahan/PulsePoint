@@ -9,6 +9,7 @@ import { Upload, X, Star, StarOff, Plus } from "lucide-react";
 
 export default function NotesMediaSection({ data, onChange }) {
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const update = (field, value) => onChange({ ...data, [field]: value });
 
@@ -19,6 +20,19 @@ export default function NotesMediaSection({ data, onChange }) {
     const { file_url } = await base44.integrations.Core.UploadFile({ file });
     update("media_images", [...(data.media_images || []), file_url]);
     setUploading(false);
+  };
+
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingVideo(true);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    update("media_videos", [...(data.media_videos || []), file_url]);
+    setUploadingVideo(false);
+  };
+
+  const removeVideo = (index) => {
+    update("media_videos", (data.media_videos || []).filter((_, i) => i !== index));
   };
 
   const removeImage = (index) => {
@@ -74,7 +88,34 @@ export default function NotesMediaSection({ data, onChange }) {
       </div>
 
       <div>
-        <Label className="text-xs text-muted-foreground">Video Link</Label>
+        <Label className="text-xs text-muted-foreground">Videos (MP4)</Label>
+        <div className="space-y-2 mt-1">
+          {(data.media_videos || []).map((url, i) => (
+            <div key={i} className="relative rounded-lg overflow-hidden border border-border bg-black">
+              <video src={url} controls className="w-full max-h-40 rounded-lg" />
+              <button
+                type="button"
+                onClick={() => removeVideo(i)}
+                className="absolute top-1 right-1 bg-black/60 rounded-full p-1"
+              >
+                <X className="w-3 h-3 text-white" />
+              </button>
+            </div>
+          ))}
+          <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-border rounded-lg px-3 py-2 hover:border-primary/50">
+            {uploadingVideo ? (
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4 text-muted-foreground" />
+            )}
+            <span className="text-xs text-muted-foreground">{uploadingVideo ? "Uploading..." : "Upload MP4 (max 50MB)"}</span>
+            <input type="file" accept="video/mp4" className="hidden" onChange={handleVideoUpload} />
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-xs text-muted-foreground">Video Link (URL)</Label>
         <Input
           value={data.video_link || ""}
           onChange={(e) => update("video_link", e.target.value)}

@@ -273,13 +273,20 @@ export default function SessionDetail() {
         )}
 
         {/* Media */}
-        {((s.media_images || []).length > 0 || s.video_link) && (
+        {((s.media_images || []).length > 0 || (s.media_videos || []).length > 0 || s.video_link) && (
           <div className="bg-card rounded-xl border border-border p-4 space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Media</h3>
             {s.media_images?.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
                 {s.media_images.map((url, i) => (
                   <img key={i} src={url} alt="" className="rounded-lg w-full aspect-square object-cover" />
+                ))}
+              </div>
+            )}
+            {(s.media_videos || []).length > 0 && (
+              <div className="space-y-2">
+                {s.media_videos.map((url, i) => (
+                  <video key={i} src={url} controls className="w-full rounded-lg bg-black" />
                 ))}
               </div>
             )}

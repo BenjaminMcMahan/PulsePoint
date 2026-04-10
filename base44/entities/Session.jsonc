@@ -196,6 +196,13 @@
         "type": "string"
       }
     },
+    "media_videos": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Uploaded MP4 video URLs"
+    },
     "video_link": {
       "type": "string"
     },
