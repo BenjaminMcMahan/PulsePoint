@@ -59,9 +59,32 @@ export default function SessionDetail() {
   useEffect(() => {
     (async () => {
       const all = await base44.entities.Session.filter({ id });
-      setSession(all[0]);
+      const s = all[0];
+      setSession(s);
       const rows = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 2000);
       setTimelineRows(rows);
+
+      // Auto-compute phase HR metrics for existing sessions that have markers but no computed values
+      if (rows.length > 0 && s && (!s.hr_avg_pre_to_climax || !s.hr_avg_at_climax_window)) {
+        const updates = {};
+        if (s.pre_climax_offset_s != null && s.climax_offset_s != null && !s.hr_avg_pre_to_climax) {
+          const lo = Math.min(s.pre_climax_offset_s, s.climax_offset_s);
+          const hi = Math.max(s.pre_climax_offset_s, s.climax_offset_s);
+          const seg = rows.filter((r) => Number(r.time_offset_s) >= lo && Number(r.time_offset_s) <= hi);
+          if (seg.length > 0)
+            updates.hr_avg_pre_to_climax = Math.round(seg.reduce((a, r) => a + Number(r.hr), 0) / seg.length);
+        }
+        if (s.climax_offset_s != null && !s.hr_avg_at_climax_window) {
+          const win = rows.filter((r) => Math.abs(Number(r.time_offset_s) - s.climax_offset_s) <= 30);
+          if (win.length > 0)
+            updates.hr_avg_at_climax_window = Math.round(win.reduce((a, r) => a + Number(r.hr), 0) / win.length);
+        }
+        if (Object.keys(updates).length > 0) {
+          await base44.entities.Session.update(id, updates);
+          setSession((prev) => ({ ...prev, ...updates }));
+        }
+      }
+
       setLoading(false);
     })();
   }, [id]);
