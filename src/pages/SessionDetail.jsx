@@ -158,7 +158,20 @@ export default function SessionDetail() {
               <span className="text-sm font-mono font-bold text-chart-3">{Math.round(elevatedTime)}s</span>
             </div>
           )}
-          {timelineRows.length > 0 && <HRTimelineChart rows={timelineRows} />}
+          {timelineRows.length > 0 && (
+            <HRTimelineChart
+              rows={timelineRows}
+              savedMarkers={{
+                pre_climax_offset_s: s.pre_climax_offset_s,
+                climax_offset_s: s.climax_offset_s,
+                recovery_offset_s: s.recovery_offset_s,
+              }}
+              onMarkersChange={async (markers) => {
+                await base44.entities.Session.update(id, markers);
+                setSession((prev) => ({ ...prev, ...markers }));
+              }}
+            />
+          )}
           {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
             <div className="h-32">
               <ResponsiveContainer width="100%" height="100%">

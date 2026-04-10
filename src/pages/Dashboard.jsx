@@ -93,7 +93,7 @@ export default function Dashboard() {
     .filter((s) => s.build_quality && s.intensity)
     .map((s) => ({ bq: s.build_quality, intensity: s.intensity }));
 
-  const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 };
+  const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" };
 
   return (
     <div>

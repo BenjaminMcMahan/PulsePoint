@@ -41,6 +41,18 @@
         }
       }
     },
+    "pre_climax_offset_s": {
+      "type": "number",
+      "description": "Time offset (seconds) of pre-climax marker"
+    },
+    "climax_offset_s": {
+      "type": "number",
+      "description": "Time offset (seconds) of climax marker"
+    },
+    "recovery_offset_s": {
+      "type": "number",
+      "description": "Time offset (seconds) of recovery marker"
+    },
     "methods": {
       "type": "array",
       "items": {
