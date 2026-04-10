@@ -101,6 +101,7 @@ export default function SessionDetail() {
           <p className="text-xs text-muted-foreground flex items-center gap-1">
             {s.start_time && <><Clock className="w-3 h-3" />{s.start_time}</>}
             {s.end_time && ` – ${s.end_time}`}
+            {s.duration_minutes && <> · <strong>{s.duration_minutes}m</strong></>}
             {s.is_quick_entry && <><Zap className="w-3 h-3 ml-1" /> Quick</>}
           </p>
         </div>

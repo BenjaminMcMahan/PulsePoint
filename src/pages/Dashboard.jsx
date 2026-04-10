@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import PageHeader from "../components/PageHeader";
 import StatCard from "../components/StatCard";
-import { Activity, Heart, Zap, Target, PlusCircle, TrendingUp } from "lucide-react";
+import { Activity, Heart, Zap, Target, PlusCircle, TrendingUp, Clock } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
@@ -40,6 +40,10 @@ export default function Dashboard() {
   const avgBuildQuality = (() => {
     const w = sessions.filter((s) => s.build_quality);
     return w.length ? (w.reduce((a, s) => a + s.build_quality, 0) / w.length).toFixed(1) : "—";
+  })();
+  const avgDuration = (() => {
+    const w = sessions.filter((s) => s.duration_minutes);
+    return w.length ? Math.round(w.reduce((a, s) => a + s.duration_minutes, 0) / w.length) + "m" : "—";
   })();
   const topMethod = (() => {
     const counts = {};
@@ -114,6 +118,7 @@ export default function Dashboard() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Top Method" value={topMethod} icon={Target} />
+          <StatCard label="Avg Duration" value={avgDuration} icon={Clock} />
         </div>
 
         {total > 0 && (

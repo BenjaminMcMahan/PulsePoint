@@ -29,7 +29,10 @@ function CompareColumn({ session: s }) {
     <div className="bg-card rounded-xl border border-border p-3 flex-1 min-w-[140px] space-y-3">
       <div className="text-center">
         <p className="text-sm font-bold">{moment(s.date).format("M/D/YY")}</p>
-        <p className="text-[10px] text-muted-foreground">{s.start_time || ""}</p>
+        <p className="text-[10px] text-muted-foreground">
+          {s.start_time || ""}
+          {s.duration_minutes ? ` · ${s.duration_minutes}m` : ""}
+        </p>
       </div>
 
       <div className="space-y-2">

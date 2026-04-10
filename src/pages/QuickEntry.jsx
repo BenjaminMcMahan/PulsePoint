@@ -69,6 +69,21 @@ export default function QuickEntry() {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Duration (min)</Label>
+              <Input
+                type="number"
+                placeholder="30"
+                min="1"
+                value={data.duration_minutes || ""}
+                onChange={(e) => update("duration_minutes", Number(e.target.value))}
+                className="h-12 mt-1 font-mono text-center"
+              />
+            </div>
+            <div />
+          </div>
+
           <SliderField
             label="Intensity"
             value={data.intensity}
