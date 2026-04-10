@@ -12,6 +12,13 @@ const COLORS = [
 ];
 
 const PHASE_COLORS = { pre_climax: "#a855f7", climax: "#ef4444", recovery: "#3b82f6" };
+
+function fmtSec(v) {
+  const total = Math.round(Number(v));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 const PHASE_LABELS = { pre_climax: "PreClx", climax: "Clx", recovery: "Rec" };
 
 export default function CompareHRTimelineChart({ timelines, sessions = [] }) {
@@ -53,10 +60,10 @@ export default function CompareHRTimelineChart({ timelines, sessions = [] }) {
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={merged} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-            <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={(v) => `${Math.round(v)}s`} />
+            <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtSec} />
             <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
             <Tooltip
-              labelFormatter={(v) => `${v}s`}
+              labelFormatter={(v) => fmtSec(v)}
               formatter={(val, name) => {
                 const idx = parseInt(name.replace("s", ""));
                 return [`${val} bpm`, labels[idx]];
