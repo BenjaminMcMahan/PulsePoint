@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PageHeader from "../components/PageHeader";
 import SessionCard from "../components/SessionCard";
+import CompareHRTimelineChart from "../components/CompareHRTimelineChart";
 import { GitCompare } from "lucide-react";
 import moment from "moment";
 
@@ -77,6 +78,8 @@ export default function Compare() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(new Set());
   const [comparing, setComparing] = useState(false);
+  const [timelines, setTimelines] = useState([]);
+  const [loadingTimelines, setLoadingTimelines] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -86,10 +89,26 @@ export default function Compare() {
     })();
   }, []);
 
+  // Fetch HR timelines when entering compare mode
+  useEffect(() => {
+    if (!comparing) return;
+    (async () => {
+      setLoadingTimelines(true);
+      const results = await Promise.all(
+        selectedSessions.map((s) =>
+          base44.entities.HeartRateTimeline.filter({ session: s.id }, "time_offset_s", 2000)
+            .then((rows) => ({ label: moment(s.date).format("M/D/YY"), rows }))
+        )
+      );
+      setTimelines(results.filter((r) => r.rows.length > 0));
+      setLoadingTimelines(false);
+    })();
+  }, [comparing]);
+
   const toggleSelect = (id) => {
     const next = new Set(selected);
     if (next.has(id)) next.delete(id);
-    else next.add(id);
+    else if (next.size < 5) next.add(id);
     setSelected(next);
   };
 
@@ -131,8 +150,17 @@ export default function Compare() {
             )}
           </div>
         ) : (
-          <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
-            {selectedSessions.map((s) => <CompareColumn key={s.id} session={s} />)}
+          <div className="space-y-4">
+            {loadingTimelines ? (
+              <div className="flex items-center justify-center h-20">
+                <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : timelines.length > 0 ? (
+              <CompareHRTimelineChart timelines={timelines} />
+            ) : null}
+            <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
+              {selectedSessions.map((s) => <CompareColumn key={s.id} session={s} />)}
+            </div>
           </div>
         )}
       </div>

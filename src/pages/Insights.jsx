@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import PageHeader from "../components/PageHeader";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Heart, TrendingUp, TrendingDown, AlertTriangle, Star, Layers } from "lucide-react";
+import { Trophy, Heart, TrendingUp, TrendingDown, AlertTriangle, Star, Layers, Brain, Activity } from "lucide-react";
 import moment from "moment";
 import { Link } from "react-router-dom";
 
@@ -202,6 +202,28 @@ export default function Insights() {
     });
   }
 
+  // Mood vs satisfaction correlation
+  const moodSat = {};
+  sessions.forEach((s) => {
+    if (!s.mood || !s.satisfaction) return;
+    if (!moodSat[s.mood]) moodSat[s.mood] = { total: 0, count: 0 };
+    moodSat[s.mood].total += s.satisfaction;
+    moodSat[s.mood].count++;
+  });
+  const moodSatAvgs = Object.entries(moodSat)
+    .filter(([_, v]) => v.count >= 2)
+    .map(([mood, v]) => ({ mood, avg: v.total / v.count, count: v.count }))
+    .sort((a, b) => b.avg - a.avg);
+  if (moodSatAvgs.length >= 2) {
+    const best = moodSatAvgs[0];
+    const worst = moodSatAvgs[moodSatAvgs.length - 1];
+    insights.push({
+      icon: Brain,
+      title: `Best mood for satisfaction: "${best.mood}"`,
+      description: `Avg satisfaction ${best.avg.toFixed(1)}/10 vs "${worst.mood}" at ${worst.avg.toFixed(1)}/10`,
+    });
+  }
+
   // Discomfort warning
   const discomfortSessions = sessions.filter((s) => s.discomfort);
   if (discomfortSessions.length > 0) {
@@ -210,6 +232,27 @@ export default function Insights() {
       icon: AlertTriangle,
       title: `${discomfortSessions.length} sessions with discomfort`,
       description: `${pct}% of all sessions reported discomfort`,
+    });
+  }
+
+  // Combo vs avg satisfaction
+  const comboSat = {};
+  sessions.forEach((s) => {
+    if (!s.satisfaction || !(s.methods || []).length) return;
+    const key = [...(s.methods || [])].sort().join(" + ");
+    if (!comboSat[key]) comboSat[key] = { total: 0, count: 0 };
+    comboSat[key].total += s.satisfaction;
+    comboSat[key].count++;
+  });
+  const comboSatAvgs = Object.entries(comboSat)
+    .filter(([_, v]) => v.count >= 2)
+    .map(([name, v]) => ({ name, avg: v.total / v.count, count: v.count }))
+    .sort((a, b) => b.avg - a.avg);
+  if (comboSatAvgs.length > 0) {
+    insights.push({
+      icon: Activity,
+      title: `Highest Satisfaction Combo: ${comboSatAvgs[0].name}`,
+      description: `Avg satisfaction ${comboSatAvgs[0].avg.toFixed(1)}/10 across ${comboSatAvgs[0].count} sessions`,
     });
   }
 
