@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import PageHeader from "../components/PageHeader";
 import SessionCard from "../components/SessionCard";
 import CompareHRTimelineChart from "../components/CompareHRTimelineChart";
+import CompareStats from "../components/CompareStats";
 import { GitCompare } from "lucide-react";
 import moment from "moment";
 
@@ -184,8 +185,9 @@ export default function Compare() {
                 <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : timelines.length > 0 ? (
-              <CompareHRTimelineChart timelines={timelines} />
+              <CompareHRTimelineChart timelines={timelines} sessions={selectedSessions} />
             ) : null}
+            <CompareStats sessions={selectedSessions} />
             <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
               {selectedSessions.map((s) => <CompareColumn key={s.id} session={s} />)}
             </div>
