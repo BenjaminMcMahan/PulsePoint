@@ -41,11 +41,11 @@ export default function CompareHRTimelineChart({ timelines, sessions = [] }) {
     const lines = [];
     sessions.forEach((s, idx) => {
       if (s.pre_climax_offset_s != null)
-        lines.push({ x: s.pre_climax_offset_s, phase: "pre_climax", idx });
+        lines.push({ x: Math.round(Number(s.pre_climax_offset_s)), phase: "pre_climax", idx });
       if (s.climax_offset_s != null)
-        lines.push({ x: s.climax_offset_s, phase: "climax", idx });
+        lines.push({ x: Math.round(Number(s.climax_offset_s)), phase: "climax", idx });
       if (s.recovery_offset_s != null)
-        lines.push({ x: s.recovery_offset_s, phase: "recovery", idx });
+        lines.push({ x: Math.round(Number(s.recovery_offset_s)), phase: "recovery", idx });
     });
     return lines;
   }, [sessions]);
@@ -75,13 +75,14 @@ export default function CompareHRTimelineChart({ timelines, sessions = [] }) {
                 key={`phase-${i}`}
                 x={pl.x}
                 stroke={PHASE_COLORS[pl.phase]}
-                strokeDasharray="3 2"
-                strokeWidth={1.5}
+                strokeWidth={2}
+                isFront={true}
+                ifOverflow="extendDomain"
                 label={{
                   value: `${PHASE_LABELS[pl.phase]}${sessions.length > 1 ? pl.idx + 1 : ""}`,
-                  fontSize: 8,
+                  fontSize: 9,
                   fill: PHASE_COLORS[pl.phase],
-                  position: "insideTopLeft",
+                  position: "insideTopRight",
                 }}
               />
             ))}
