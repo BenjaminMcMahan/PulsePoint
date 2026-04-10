@@ -89,6 +89,7 @@ export default function SessionDetail() {
   }
 
   const s = session;
+  const cap = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
 
   return (
     <div>
@@ -135,7 +136,7 @@ export default function SessionDetail() {
           <MetricBadge label="Satisfaction" value={s.satisfaction} />
           {s.build_type && <InfoRow label="Build Type" value={s.build_type === "Other" && s.custom_build_type ? s.custom_build_type : s.build_type} />}
           {s.climax_duration && (
-            <InfoRow label="Climax Duration" value={s.climax_duration} />
+            <InfoRow label="Climax Duration" value={cap(s.climax_duration)} />
           )}
         </div>
 
@@ -205,16 +206,16 @@ export default function SessionDetail() {
         {/* Context */}
         <div className="bg-card rounded-xl border border-border p-4 space-y-1">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">Context</h3>
-          <InfoRow label="Mood" value={s.mood} />
-          <InfoRow label="Environment" value={s.environment} />
-          <InfoRow label="Substances" value={(s.substances || []).join(", ")} />
-          <InfoRow label="Hydration" value={s.hydration} />
+          <InfoRow label="Mood" value={cap(s.mood)} />
+          <InfoRow label="Environment" value={cap(s.environment)} />
+          <InfoRow label="Substances" value={(s.substances || []).map(cap).join(", ")} />
+          <InfoRow label="Hydration" value={cap(s.hydration)} />
         </div>
 
         {/* Physiological */}
         <div className="bg-card rounded-xl border border-border p-4 space-y-1">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">Physiological</h3>
-          <InfoRow label="Ejaculate Volume" value={s.ejaculate_volume} />
+          <InfoRow label="Ejaculate Volume" value={cap(s.ejaculate_volume)} />
           <InfoRow label="Discomfort" value={s.discomfort ? "Yes" : "No"} />
           {s.discomfort_notes && <InfoRow label="Discomfort Notes" value={s.discomfort_notes} />}
           {s.unusual_sensations && <InfoRow label="Unusual Sensations" value={s.unusual_sensations} />}

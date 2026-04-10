@@ -219,8 +219,8 @@ export default function Insights() {
     const worst = moodSatAvgs[moodSatAvgs.length - 1];
     insights.push({
       icon: Brain,
-      title: `Best mood for satisfaction: "${best.mood}"`,
-      description: `Avg satisfaction ${best.avg.toFixed(1)}/10 vs "${worst.mood}" at ${worst.avg.toFixed(1)}/10`,
+      title: `Best Mood for Satisfaction: "${best.mood.charAt(0).toUpperCase() + best.mood.slice(1)}"`,
+      description: `Avg satisfaction ${best.avg.toFixed(1)}/10 vs "${worst.mood.charAt(0).toUpperCase() + worst.mood.slice(1)}" at ${worst.avg.toFixed(1)}/10`,
     });
   }
 
@@ -232,6 +232,37 @@ export default function Insights() {
       icon: AlertTriangle,
       title: `${discomfortSessions.length} sessions with discomfort`,
       description: `${pct}% of all sessions reported discomfort`,
+    });
+  }
+
+  // Climax duration insight (longer pre→climax gap = more powerful)
+  const climaxSessions = sessions.filter((s) => s.pre_climax_offset_s != null && s.climax_offset_s != null);
+  if (climaxSessions.length >= 2) {
+    const durations = climaxSessions.map((s) => ({
+      dur: Math.abs(s.climax_offset_s - s.pre_climax_offset_s),
+      s,
+    }));
+    const avgDur = durations.reduce((a, d) => a + d.dur, 0) / durations.length;
+    const longest = durations.reduce((best, d) => d.dur > best.dur ? d : best, durations[0]);
+    const fmtS = (v) => { const m = Math.floor(v / 60); const s = Math.round(v % 60); return m > 0 ? `${m}m ${s}s` : `${s}s`; };
+    insights.push({
+      icon: TrendingUp,
+      title: `Avg Climax Build Duration: ${fmtS(avgDur)}`,
+      description: `Longest: ${fmtS(longest.dur)} on ${moment(longest.s.date).format("MMM D, YYYY")} — longer durations indicate stronger climax events`,
+      sessionId: longest.s.id,
+    });
+  }
+
+  // Climax → Recovery duration (recovery speed)
+  const recSessions = sessions.filter((s) => s.climax_offset_s != null && s.recovery_offset_s != null);
+  if (recSessions.length >= 2) {
+    const recDurs = recSessions.map((s) => Math.abs(s.recovery_offset_s - s.climax_offset_s));
+    const avgRec = recDurs.reduce((a, d) => a + d, 0) / recDurs.length;
+    const fmtS = (v) => { const m = Math.floor(v / 60); const sec = Math.round(v % 60); return m > 0 ? `${m}m ${sec}s` : `${sec}s`; };
+    insights.push({
+      icon: Activity,
+      title: `Avg Recovery Time After Climax: ${fmtS(avgRec)}`,
+      description: `Based on ${recSessions.length} sessions with marked recovery points`,
     });
   }
 

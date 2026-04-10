@@ -199,8 +199,8 @@ export default function Dashboard() {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis type="number" dataKey="bq" name="Build Quality" domain={[0, 10]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" label={{ value: "Build Quality", position: "insideBottom", offset: -2, fontSize: 10 }} />
                       <YAxis type="number" dataKey="intensity" name="Intensity" domain={[0, 10]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip contentStyle={tooltipStyle} />
-                      <Scatter data={scatterBQvsInt} fill="hsl(var(--chart-2))" />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} itemStyle={{ color: "hsl(var(--foreground))" }} />
+                       <Scatter data={scatterBQvsInt} fill="hsl(var(--chart-2))" />
                     </ScatterChart>
                   </ResponsiveContainer>
                 </div>
@@ -216,8 +216,8 @@ export default function Dashboard() {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis type="number" dataKey="hr" name="Max HR" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                       <YAxis type="number" dataKey="intensity" name="Intensity" domain={[0, 10]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip contentStyle={tooltipStyle} />
-                      <Scatter data={scatterHRvsInt} fill="hsl(var(--chart-4))" />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} itemStyle={{ color: "hsl(var(--foreground))" }} />
+                       <Scatter data={scatterHRvsInt} fill="hsl(var(--chart-4))" />
                     </ScatterChart>
                   </ResponsiveContainer>
                 </div>

@@ -23,8 +23,23 @@ function MetricRow({ label, value, max = 10 }) {
   );
 }
 
+function fmtSec(v) {
+  if (v == null) return null;
+  const total = Math.round(Number(v));
+  const m = Math.floor(total / 60);
+  const sec = total % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
 function CompareColumn({ session: s }) {
   const buildTypeLabel = s.build_type === "Other" && s.custom_build_type ? s.custom_build_type : s.build_type;
+  const preClimax = fmtSec(s.pre_climax_offset_s);
+  const climaxT = fmtSec(s.climax_offset_s);
+  const recovery = fmtSec(s.recovery_offset_s);
+  const buildToClimax = (s.pre_climax_offset_s != null && s.climax_offset_s != null)
+    ? fmtSec(Math.abs(s.climax_offset_s - s.pre_climax_offset_s)) : null;
+  const climaxToRec = (s.climax_offset_s != null && s.recovery_offset_s != null)
+    ? fmtSec(Math.abs(s.recovery_offset_s - s.climax_offset_s)) : null;
   return (
     <div className="bg-card rounded-xl border border-border p-3 flex-1 min-w-[140px] space-y-3">
       <div className="text-center">
@@ -66,6 +81,16 @@ function CompareColumn({ session: s }) {
         </div>
       </div>
 
+      {(preClimax || climaxT || recovery) && (
+        <div className="pt-2 border-t border-border space-y-1">
+          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Phase Times</p>
+          {preClimax && <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Pre-Climax</span><span className="font-mono">{preClimax}</span></div>}
+          {climaxT && <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Climax</span><span className="font-mono">{climaxT}</span></div>}
+          {recovery && <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Recovery</span><span className="font-mono">{recovery}</span></div>}
+          {buildToClimax && <div className="flex justify-between text-[10px] pt-1 border-t border-border"><span className="text-muted-foreground">Pre→Climax</span><span className="font-mono font-bold text-destructive">{buildToClimax}</span></div>}
+          {climaxToRec && <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Climax→Rec</span><span className="font-mono font-bold text-chart-5">{climaxToRec}</span></div>}
+        </div>
+      )}
       {s.notes && (
         <div className="pt-2 border-t border-border">
           <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1">Notes</p>
