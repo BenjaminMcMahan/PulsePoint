@@ -13,6 +13,7 @@ import NewSession from './pages/NewSession';
 import QuickEntry from './pages/QuickEntry';
 import Compare from './pages/Compare';
 import Insights from './pages/Insights';
+import EditSession from './pages/EditSession';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -44,6 +45,7 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Dashboard />} />
         <Route path="/sessions" element={<Sessions />} />
         <Route path="/sessions/:id" element={<SessionDetail />} />
+        <Route path="/sessions/:id/edit" element={<EditSession />} />
         <Route path="/new" element={<NewSession />} />
         <Route path="/new/quick" element={<QuickEntry />} />
         <Route path="/compare" element={<Compare />} />

@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PageHeader from "../components/PageHeader";
-import { ArrowLeft, Star, Trash2, Heart, Clock, Zap } from "lucide-react";
+import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil } from "lucide-react";
 import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -106,6 +106,9 @@ export default function SessionDetail() {
             {s.is_quick_entry && <><Zap className="w-3 h-3 ml-1" /> Quick</>}
           </p>
         </div>
+        <Button variant="ghost" size="icon" onClick={() => navigate(`/sessions/${id}/edit`)}>
+          <Pencil className="w-5 h-5 text-muted-foreground" />
+        </Button>
         <Button variant="ghost" size="icon" onClick={toggleFav}>
           <Star className={`w-5 h-5 ${s.is_favorite ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
         </Button>
