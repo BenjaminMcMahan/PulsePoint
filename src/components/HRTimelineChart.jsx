@@ -52,6 +52,8 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
   const defaultWindow = durationMins > 10 ? 5 : "full";
   const [window, setWindow] = useState(defaultWindow);
   const [showBuild, setShowBuild] = useState(false);
+  const [visibleLines, setVisibleLines] = useState({ hr: true, smoothed: true, baseline: true });
+  const toggleLine = (key) => setVisibleLines((v) => ({ ...v, [key]: !v[key] }));
   const [markingPhase, setMarkingPhase] = useState(null); // null | 'pre_climax' | 'climax' | 'recovery'
   const [localMarkers, setLocalMarkers] = useState({
     pre_climax: savedMarkers.pre_climax_offset_s ?? null,
@@ -232,13 +234,15 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
               ) : null
             )}
 
-            {hasBaseline && (
+            {hasBaseline && visibleLines.baseline && (
               <Line type="monotone" dataKey="baseline_hr" stroke="#6b7280" strokeWidth={1} strokeDasharray="6 3" dot={false} />
             )}
-            {hasSmoothed && (
+            {hasSmoothed && visibleLines.smoothed && (
               <Line type="monotone" dataKey="hr_smoothed" stroke="hsl(var(--chart-2))" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
             )}
-            <Line type="monotone" dataKey="hr" stroke="hsl(var(--primary))" strokeWidth={2} dot={<MarkerDot />} activeDot={{ r: 4 }} />
+            {visibleLines.hr && (
+              <Line type="monotone" dataKey="hr" stroke="hsl(var(--primary))" strokeWidth={2} dot={<MarkerDot />} activeDot={{ r: 4 }} />
+            )}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -263,9 +267,28 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 mt-1 px-1">
-        <span className="text-[10px] text-muted-foreground flex items-center gap-1"><span className="w-4 h-0.5 bg-primary inline-block" /> HR</span>
-        {hasSmoothed && <span className="text-[10px] text-muted-foreground flex items-center gap-1"><span className="w-4 h-0.5 inline-block" style={{ borderTop: "2px dashed hsl(var(--chart-2))" }} /> Smoothed</span>}
-        {hasBaseline && <span className="text-[10px] text-muted-foreground flex items-center gap-1"><span className="w-4 h-0.5 inline-block" style={{ borderTop: "2px dashed #6b7280" }} /> Baseline</span>}
+        <button
+          onClick={() => toggleLine("hr")}
+          className={`text-[10px] flex items-center gap-1 transition-opacity ${visibleLines.hr ? "" : "opacity-40"}`}
+        >
+          <span className="w-4 h-0.5 bg-primary inline-block" /> HR
+        </button>
+        {hasSmoothed && (
+          <button
+            onClick={() => toggleLine("smoothed")}
+            className={`text-[10px] flex items-center gap-1 transition-opacity ${visibleLines.smoothed ? "" : "opacity-40"}`}
+          >
+            <span className="w-4 h-0.5 inline-block" style={{ borderTop: "2px dashed hsl(var(--chart-2))" }} /> Smoothed
+          </button>
+        )}
+        {hasBaseline && (
+          <button
+            onClick={() => toggleLine("baseline")}
+            className={`text-[10px] flex items-center gap-1 transition-opacity ${visibleLines.baseline ? "" : "opacity-40"}`}
+          >
+            <span className="w-4 h-0.5 inline-block" style={{ borderTop: "2px dashed #6b7280" }} /> Baseline
+          </button>
+        )}
         {showBuild && <span className="text-[10px] text-muted-foreground flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: MARKER_COLORS.build }} />build</span>}
         {Object.entries(PHASE_COLORS).map(([k, v]) => (
           <span key={k} className="text-[10px] text-muted-foreground flex items-center gap-1">
