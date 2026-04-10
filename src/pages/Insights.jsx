@@ -139,25 +139,24 @@ export default function Insights() {
     }
   }
 
-  // Best method for Build Quality
-  const methodBQ = {};
+  // Best method combo for Build Quality (combinations counted together)
+  const comboBQ = {};
   sessions.forEach((s) => {
-    if (!s.build_quality) return;
-    (s.methods || []).forEach((m) => {
-      if (!methodBQ[m]) methodBQ[m] = { total: 0, count: 0 };
-      methodBQ[m].total += s.build_quality;
-      methodBQ[m].count++;
-    });
+    if (!s.build_quality || !(s.methods || []).length) return;
+    const key = [...(s.methods || [])].sort().join(" + ");
+    if (!comboBQ[key]) comboBQ[key] = { total: 0, count: 0 };
+    comboBQ[key].total += s.build_quality;
+    comboBQ[key].count++;
   });
-  const methodBQAvgs = Object.entries(methodBQ)
+  const comboBQAvgs = Object.entries(comboBQ)
     .filter(([_, v]) => v.count >= 2)
     .map(([name, v]) => ({ name, avg: v.total / v.count, count: v.count }))
     .sort((a, b) => b.avg - a.avg);
-  if (methodBQAvgs.length > 0) {
+  if (comboBQAvgs.length > 0) {
     insights.push({
       icon: Star,
-      title: `Best Method for Build Quality: ${methodBQAvgs[0].name}`,
-      description: `Avg BQ ${methodBQAvgs[0].avg.toFixed(1)}/10 across ${methodBQAvgs[0].count} sessions`,
+      title: `Best Combo for Build Quality: ${comboBQAvgs[0].name}`,
+      description: `Avg BQ ${comboBQAvgs[0].avg.toFixed(1)}/10 across ${comboBQAvgs[0].count} sessions`,
     });
   }
 
@@ -214,20 +213,11 @@ export default function Insights() {
     });
   }
 
-  // Method BQ rankings
-  const methodAvgs = [];
-  sessions.forEach((s) => {
-    if (!s.build_quality) return;
-    (s.methods || []).forEach((m) => {
-      const existing = methodAvgs.find((x) => x.name === m);
-      if (existing) { existing.total += s.build_quality; existing.count++; }
-      else methodAvgs.push({ name: m, total: s.build_quality, count: 1 });
-    });
-  });
-  const rankedMethods = methodAvgs
-    .filter((m) => m.count >= 1)
-    .map((m) => ({ name: m.name, avg: m.total / m.count, count: m.count }))
+  // Method combo BQ rankings
+  const comboAvgs = Object.entries(comboBQ)
+    .map(([name, v]) => ({ name, avg: v.total / v.count, count: v.count }))
     .sort((a, b) => b.avg - a.avg);
+  const rankedMethods = comboAvgs;
 
   return (
     <div>
@@ -243,10 +233,10 @@ export default function Insights() {
 
         {insights.map((insight, i) => <InsightCard key={i} {...insight} />)}
 
-        {rankedMethods.length > 1 && (
+        {rankedMethods.length > 0 && (
           <div className="bg-card rounded-xl border border-border p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              Build Quality Rankings by Method
+              Build Quality Rankings by Method Combination
             </h3>
             <div className="space-y-2">
               {rankedMethods.map((m, i) => (
