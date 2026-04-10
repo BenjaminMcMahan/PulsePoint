@@ -73,6 +73,22 @@ function CompareColumn({ session: s }) {
             </div>
           ))}
         </div>
+        {(s.hr_avg_pre_to_climax || s.hr_avg_at_climax_window) && (
+          <div className="space-y-1 pt-1">
+            {s.hr_avg_pre_to_climax && (
+              <div className="flex justify-between text-[10px]">
+                <span className="text-muted-foreground">Pre→Clx Avg</span>
+                <span className="font-mono font-bold">{s.hr_avg_pre_to_climax} bpm</span>
+              </div>
+            )}
+            {s.hr_avg_at_climax_window && (
+              <div className="flex justify-between text-[10px]">
+                <span className="text-muted-foreground">±30s Clx Avg</span>
+                <span className="font-mono font-bold">{s.hr_avg_at_climax_window} bpm</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="pt-2 border-t border-border">

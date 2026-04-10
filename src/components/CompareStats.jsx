@@ -57,10 +57,12 @@ export default function CompareStats({ sessions }) {
     const satisfactions = sessions.map((s) => s.satisfaction).filter(Boolean);
     const avgHRs = sessions.map((s) => s.avg_hr).filter(Boolean);
     const maxHRs = sessions.map((s) => s.max_hr).filter(Boolean);
+    const hrPreToClimax = sessions.map((s) => s.hr_avg_pre_to_climax).filter(Boolean);
+    const hrAtClimaxWindow = sessions.map((s) => s.hr_avg_at_climax_window).filter(Boolean);
     const buildDurs = sessions
       .filter((s) => s.pre_climax_offset_s != null && s.climax_offset_s != null)
       .map((s) => Math.round(Math.abs(s.climax_offset_s - s.pre_climax_offset_s)));
-    return { intensities, bqs, satisfactions, avgHRs, maxHRs, buildDurs };
+    return { intensities, bqs, satisfactions, avgHRs, maxHRs, hrPreToClimax, hrAtClimaxWindow, buildDurs };
   }, [sessions]);
 
   return (
@@ -74,6 +76,12 @@ export default function CompareStats({ sessions }) {
         <StatBlock label="Satisfaction" values={stats.satisfactions} />
         <StatBlock label="Avg HR (bpm)" values={stats.avgHRs} />
         <StatBlock label="Max HR (bpm)" values={stats.maxHRs} />
+        {stats.hrPreToClimax.length > 0 && (
+          <StatBlock label="Avg HR Pre→Climax" values={stats.hrPreToClimax} />
+        )}
+        {stats.hrAtClimaxWindow.length > 0 && (
+          <StatBlock label="Avg HR ±30s Climax" values={stats.hrAtClimaxWindow} />
+        )}
         {stats.buildDurs.length > 0 && (
           <StatBlock label="Build→Climax (s)" values={stats.buildDurs} />
         )}

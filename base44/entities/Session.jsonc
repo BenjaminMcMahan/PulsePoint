@@ -24,6 +24,14 @@
     "hr_at_climax": {
       "type": "number"
     },
+    "hr_avg_pre_to_climax": {
+      "type": "number",
+      "description": "Average HR between pre-climax and climax markers"
+    },
+    "hr_avg_at_climax_window": {
+      "type": "number",
+      "description": "Average HR in a \u00b130s window around climax marker"
+    },
     "hr_data_file": {
       "type": "string"
     },

@@ -156,6 +156,22 @@ export default function SessionDetail() {
               </div>
             ))}
           </div>
+          {(s.hr_avg_pre_to_climax || s.hr_avg_at_climax_window) && (
+            <div className="grid grid-cols-2 gap-2">
+              {s.hr_avg_pre_to_climax && (
+                <div className="flex items-center justify-between rounded-lg bg-chart-2/10 px-3 py-2">
+                  <span className="text-xs text-muted-foreground">Avg HR Pre→Climax</span>
+                  <span className="text-sm font-mono font-bold text-chart-2">{s.hr_avg_pre_to_climax} bpm</span>
+                </div>
+              )}
+              {s.hr_avg_at_climax_window && (
+                <div className="flex items-center justify-between rounded-lg bg-chart-3/10 px-3 py-2">
+                  <span className="text-xs text-muted-foreground">Avg HR ±30s Climax</span>
+                  <span className="text-sm font-mono font-bold text-chart-3">{s.hr_avg_at_climax_window} bpm</span>
+                </div>
+              )}
+            </div>
+          )}
           {elevatedTime != null && elevatedTime > 0 && (
             <div className="flex items-center justify-between rounded-lg bg-chart-3/10 px-3 py-2">
               <span className="text-xs text-muted-foreground">Elevated Time <span className="text-[10px]">(Δ &gt; 8)</span></span>

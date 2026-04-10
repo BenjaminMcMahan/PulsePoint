@@ -83,6 +83,25 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
     }
   });
 
+  const calcHRMetrics = (markers) => {
+    const extra = {};
+    if (markers.pre_climax != null && markers.climax != null) {
+      const lo = Math.min(markers.pre_climax, markers.climax);
+      const hi = Math.max(markers.pre_climax, markers.climax);
+      const segment = rows.filter((r) => Number(r.time_offset_s) >= lo && Number(r.time_offset_s) <= hi);
+      if (segment.length > 0) {
+        extra.hr_avg_pre_to_climax = Math.round(segment.reduce((a, r) => a + Number(r.hr), 0) / segment.length);
+      }
+    }
+    if (markers.climax != null) {
+      const window = rows.filter((r) => Math.abs(Number(r.time_offset_s) - markers.climax) <= 30);
+      if (window.length > 0) {
+        extra.hr_avg_at_climax_window = Math.round(window.reduce((a, r) => a + Number(r.hr), 0) / window.length);
+      }
+    }
+    return extra;
+  };
+
   const handleChartClick = (data) => {
     if (!markingPhase || !data?.activeLabel) return;
     const offset = Number(data.activeLabel);
@@ -94,10 +113,12 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
     setMarkingPhase(idx < MARKING_PHASES.length - 1 ? MARKING_PHASES[idx + 1] : null);
 
     if (onMarkersChange) {
+      const extra = calcHRMetrics(updated);
       onMarkersChange({
         pre_climax_offset_s: updated.pre_climax,
         climax_offset_s: updated.climax,
         recovery_offset_s: updated.recovery,
+        ...extra,
       });
     }
   };
