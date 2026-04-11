@@ -194,18 +194,26 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
       }
     }
     const preClimaxOffset = Number(rows[valleyIdx].time_offset_s);
-    // Recovery: first point after peak with 4 consecutive drops AND at least 2% fall from peak
-    // (marks the end of the post-climax plateau, just as sustained descent begins)
+    // Recovery: skip the post-climax dip/rebound by finding the next local high after peak,
+    // then detect where the sustained descent begins from there (5 consecutive drops, 3% fall)
     const peakHr = Number(rows[peakIdx].hr);
-    let recoveryIdx = Math.min(peakIdx + 4, rows.length - 1);
-    for (let i = peakIdx + 1; i <= rows.length - 4; i++) {
+    // Find local post-peak high (the rebound after initial dip, within 60s of peak)
+    let searchStart = peakIdx + 1;
+    const peakTime = Number(rows[peakIdx].time_offset_s);
+    for (let i = peakIdx + 1; i < rows.length; i++) {
+      if (Number(rows[i].time_offset_s) > peakTime + 60) break;
+      if (Number(rows[i].hr) >= Number(rows[i - 1].hr)) searchStart = i;
+    }
+    let recoveryIdx = Math.min(searchStart + 1, rows.length - 1);
+    for (let i = searchStart; i <= rows.length - 5; i++) {
       const hr = Number(rows[i].hr);
       if (
         hr < Number(rows[i - 1].hr) &&
         Number(rows[i + 1].hr) < hr &&
         Number(rows[i + 2].hr) < Number(rows[i + 1].hr) &&
         Number(rows[i + 3].hr) < Number(rows[i + 2].hr) &&
-        hr <= peakHr * 0.98
+        Number(rows[i + 4].hr) < Number(rows[i + 3].hr) &&
+        hr <= peakHr * 0.97
       ) {
         recoveryIdx = i;
         break;
