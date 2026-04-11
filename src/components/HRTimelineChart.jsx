@@ -36,48 +36,7 @@ function MarkerDot(props) {
   return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
 }
 
-function ManualTimeInput({ phase, color, label, currentOffset, maxOffset, onSet }) {
-  const [min, setMin] = useState("");
-  const [sec, setSec] = useState("");
 
-  const handleSet = () => {
-    const totalS = (parseInt(min) || 0) * 60 + (parseInt(sec) || 0);
-    if (totalS >= 0 && totalS <= maxOffset) onSet(totalS);
-  };
-
-  // Pre-fill when currentOffset changes
-  const displayMin = currentOffset != null ? Math.floor(currentOffset / 60) : "";
-  const displaySec = currentOffset != null ? currentOffset % 60 : "";
-
-  return (
-    <div className="flex items-center gap-1 bg-muted rounded-lg px-2 py-1">
-      <span className="text-[10px] font-semibold w-16 shrink-0" style={{ color }}>{label}</span>
-      {currentOffset != null && (
-        <span className="text-[10px] font-mono text-foreground mr-1 font-semibold">{Math.floor(Math.round(currentOffset)/60)}:{String(Math.round(currentOffset)%60).padStart(2,"0")}</span>
-      )}
-      <input
-        type="number" min={0}
-        placeholder="m"
-        value={min}
-        onChange={(e) => setMin(e.target.value)}
-        className="w-8 text-[10px] bg-background border border-border rounded px-1 py-0.5 font-mono text-center"
-      />
-      <span className="text-[10px] text-muted-foreground">:</span>
-      <input
-        type="number" min={0} max={59}
-        placeholder="s"
-        value={sec}
-        onChange={(e) => setSec(e.target.value)}
-        className="w-8 text-[10px] bg-background border border-border rounded px-1 py-0.5 font-mono text-center"
-      />
-      <button
-        onClick={handleSet}
-        className="text-[10px] px-1.5 py-0.5 rounded font-semibold text-white"
-        style={{ background: color }}
-      >Set</button>
-    </div>
-  );
-}
 
 const WINDOWS = [
   { label: "Full", value: "full" },
@@ -98,11 +57,16 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
   const [showBuild, setShowBuild] = useState(false);
   const [visibleLines, setVisibleLines] = useState({ hr: true, smoothed: true, baseline: true });
   const toggleLine = (key) => setVisibleLines((v) => ({ ...v, [key]: !v[key] }));
-  const [markingPhase, setMarkingPhase] = useState(null); // null | 'pre_climax' | 'climax' | 'recovery'
+  const [markingPhase, setMarkingPhase] = useState(null);
   const [localMarkers, setLocalMarkers] = useState({
     pre_climax: savedMarkers.pre_climax_offset_s ?? null,
     climax: savedMarkers.climax_offset_s ?? null,
     recovery: savedMarkers.recovery_offset_s ?? null,
+  });
+  const [inputVals, setInputVals] = useState({
+    pre_climax: { min: "", sec: "" },
+    climax: { min: "", sec: "" },
+    recovery: { min: "", sec: "" },
   });
 
   const visibleRows = useMemo(() => {
@@ -150,16 +114,9 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
     return extra;
   };
 
-  const handleChartClick = (data) => {
-    if (!markingPhase || !data?.activeLabel) return;
-    const offset = Math.round(Number(data.activeLabel));
-    const updated = { ...localMarkers, [markingPhase]: offset };
+  const applyMarker = (phase, offset) => {
+    const updated = { ...localMarkers, [phase]: offset };
     setLocalMarkers(updated);
-
-    // advance to next phase or end
-    const idx = MARKING_PHASES.indexOf(markingPhase);
-    setMarkingPhase(idx < MARKING_PHASES.length - 1 ? MARKING_PHASES[idx + 1] : null);
-
     if (onMarkersChange) {
       const extra = calcHRMetrics(updated);
       onMarkersChange({
@@ -169,6 +126,20 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
         ...extra,
       });
     }
+  };
+
+  const handleManualSet = (phase) => {
+    const { min, sec } = inputVals[phase];
+    const totalS = (parseInt(min) || 0) * 60 + (parseInt(sec) || 0);
+    if (totalS >= 0 && totalS <= maxOffsetS) applyMarker(phase, totalS);
+  };
+
+  const handleChartClick = (data) => {
+    if (!markingPhase || !data?.activeLabel) return;
+    const offset = Math.round(Number(data.activeLabel));
+    applyMarker(markingPhase, offset);
+    const idx = MARKING_PHASES.indexOf(markingPhase);
+    setMarkingPhase(idx < MARKING_PHASES.length - 1 ? MARKING_PHASES[idx + 1] : null);
   };
 
   const clearMarkers = () => {
@@ -232,31 +203,37 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
       )}
 
       {/* Manual time inputs */}
-      <div className="flex flex-wrap gap-2 mb-2">
+      <div className="flex flex-col gap-1.5 mb-2">
         {MARKING_PHASES.map((phase) => (
-          <ManualTimeInput
-            key={phase}
-            phase={phase}
-            color={PHASE_COLORS[phase]}
-            label={PHASE_LABELS[phase]}
-            currentOffset={localMarkers[phase]}
-            maxOffset={maxOffsetS}
-            onSet={(offset) => {
-              setLocalMarkers((prev) => {
-                const updated = { ...prev, [phase]: offset };
-                if (onMarkersChange) {
-                  const extra = calcHRMetrics(updated);
-                  onMarkersChange({
-                    pre_climax_offset_s: updated.pre_climax,
-                    climax_offset_s: updated.climax,
-                    recovery_offset_s: updated.recovery,
-                    ...extra,
-                  });
-                }
-                return updated;
-              });
-            }}
-          />
+          <div key={phase} className="flex items-center gap-1 bg-muted rounded-lg px-2 py-1">
+            <span className="text-[10px] font-semibold w-16 shrink-0" style={{ color: PHASE_COLORS[phase] }}>{PHASE_LABELS[phase]}</span>
+            {localMarkers[phase] != null && (
+              <span className="text-[10px] font-mono text-foreground font-semibold mr-1">
+                {Math.floor(Math.round(localMarkers[phase]) / 60)}:{String(Math.round(localMarkers[phase]) % 60).padStart(2, "0")}
+              </span>
+            )}
+            <input
+              type="number" min={0}
+              placeholder="m"
+              value={inputVals[phase].min}
+              onChange={(e) => setInputVals((v) => ({ ...v, [phase]: { ...v[phase], min: e.target.value } }))}
+              className="w-10 text-[10px] bg-background border border-border rounded px-1 py-0.5 font-mono text-center"
+            />
+            <span className="text-[10px] text-muted-foreground">:</span>
+            <input
+              type="number" min={0} max={59}
+              placeholder="s"
+              value={inputVals[phase].sec}
+              onChange={(e) => setInputVals((v) => ({ ...v, [phase]: { ...v[phase], sec: e.target.value } }))}
+              className="w-10 text-[10px] bg-background border border-border rounded px-1 py-0.5 font-mono text-center"
+            />
+            <button
+              type="button"
+              onClick={() => handleManualSet(phase)}
+              className="text-[10px] px-2 py-0.5 rounded font-semibold text-white ml-1"
+              style={{ background: PHASE_COLORS[phase] }}
+            >Set</button>
+          </div>
         ))}
       </div>
 
