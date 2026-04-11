@@ -7,6 +7,7 @@ import PageHeader from "../components/PageHeader";
 import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil } from "lucide-react";
 import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
+import HRZoneAnalysis from "../components/HRZoneAnalysis";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -214,6 +215,9 @@ export default function SessionDetail() {
                 setSession((prev) => ({ ...prev, ...markers }));
               }}
             />
+          )}
+          {timelineRows.length > 0 && (
+            <HRZoneAnalysis rows={timelineRows} sessionMaxHR={s.max_hr} />
           )}
           {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
             <div className="h-32">
