@@ -152,7 +152,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
 
   const handleChartClick = (data) => {
     if (!markingPhase || !data?.activeLabel) return;
-    const offset = Number(data.activeLabel);
+    const offset = Math.round(Number(data.activeLabel));
     const updated = { ...localMarkers, [markingPhase]: offset };
     setLocalMarkers(updated);
 
@@ -242,17 +242,19 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
             currentOffset={localMarkers[phase]}
             maxOffset={maxOffsetS}
             onSet={(offset) => {
-              const updated = { ...localMarkers, [phase]: offset };
-              setLocalMarkers(updated);
-              if (onMarkersChange) {
-                const extra = calcHRMetrics(updated);
-                onMarkersChange({
-                  pre_climax_offset_s: updated.pre_climax,
-                  climax_offset_s: updated.climax,
-                  recovery_offset_s: updated.recovery,
-                  ...extra,
-                });
-              }
+              setLocalMarkers((prev) => {
+                const updated = { ...prev, [phase]: offset };
+                if (onMarkersChange) {
+                  const extra = calcHRMetrics(updated);
+                  onMarkersChange({
+                    pre_climax_offset_s: updated.pre_climax,
+                    climax_offset_s: updated.climax,
+                    recovery_offset_s: updated.recovery,
+                    ...extra,
+                  });
+                }
+                return updated;
+              });
             }}
           />
         ))}
@@ -273,12 +275,12 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
             <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
             <Tooltip
               formatter={(val, name) => {
-                if (name === "hr") return [`${val} bpm`, "HR"];
-                if (name === "hr_smoothed") return [`${val} bpm`, "Smoothed"];
-                if (name === "baseline_hr") return [`${val} bpm`, "Baseline"];
+                if (name === "hr") return [`${Math.round(val)} bpm`, "HR"];
+                if (name === "hr_smoothed") return [`${Math.round(val)} bpm`, "Smoothed"];
+                if (name === "baseline_hr") return [`${Math.round(val)} bpm`, "Baseline"];
                 return [val, name];
               }}
-              labelFormatter={(v) => fmtSec(v)}
+              labelFormatter={(v) => `Time: ${fmtSec(Math.round(Number(v)))}`}
               contentStyle={{ fontSize: 11 }}
             />
 
