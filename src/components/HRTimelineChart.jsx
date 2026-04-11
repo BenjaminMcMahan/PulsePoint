@@ -179,12 +179,19 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
       if (Number(rows[i].hr) > Number(rows[peakIdx].hr)) peakIdx = i;
     }
     const climaxOffset = Number(rows[peakIdx].time_offset_s);
-    // Pre-climax: last local minimum before peak (within 600s lookback)
-    const lookbackS = climaxOffset - 600;
+    // Pre-climax: lowest HR point within 5 min before climax (start of final ascent)
+    const windowStart = climaxOffset - 300;
+    const windowEnd = climaxOffset - 15;
     let valleyIdx = peakIdx;
-    for (let i = peakIdx - 1; i >= 0; i--) {
-      if (Number(rows[i].time_offset_s) < lookbackS) break;
-      if (Number(rows[i].hr) < Number(rows[valleyIdx].hr)) valleyIdx = i;
+    let foundInWindow = false;
+    for (let i = 0; i < rows.length; i++) {
+      const t = Number(rows[i].time_offset_s);
+      if (t < windowStart) continue;
+      if (t > windowEnd) break;
+      if (!foundInWindow || Number(rows[i].hr) < Number(rows[valleyIdx].hr)) {
+        valleyIdx = i;
+        foundInWindow = true;
+      }
     }
     const preClimaxOffset = Number(rows[valleyIdx].time_offset_s);
     // Recovery: first point after peak where HR drops ~8% from peak
