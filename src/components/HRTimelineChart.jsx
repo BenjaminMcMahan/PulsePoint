@@ -267,6 +267,8 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
           >
             <XAxis
               dataKey="time_offset_s"
+              type="number"
+              domain={["dataMin", "dataMax"]}
               tick={{ fontSize: 9 }}
               tickFormatter={fmtSec}
             />
