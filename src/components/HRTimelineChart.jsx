@@ -30,9 +30,53 @@ function deltaSec(a, b) {
 
 function MarkerDot(props) {
   const { cx, cy, payload } = props;
-  if (!payload?.marker || payload.marker === "build") return null;
-  const color = MARKER_COLORS[payload.marker] || "#9ca3af";
+  if (!payload?.marker || payload.marker === "build") return <g />;
+  const color = MARKER_COLORS[payload.marker];
+  if (!color) return <g />;
   return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
+}
+
+function ManualTimeInput({ phase, color, label, currentOffset, maxOffset, onSet }) {
+  const [min, setMin] = useState("");
+  const [sec, setSec] = useState("");
+
+  const handleSet = () => {
+    const totalS = (parseInt(min) || 0) * 60 + (parseInt(sec) || 0);
+    if (totalS >= 0 && totalS <= maxOffset) onSet(totalS);
+  };
+
+  // Pre-fill when currentOffset changes
+  const displayMin = currentOffset != null ? Math.floor(currentOffset / 60) : "";
+  const displaySec = currentOffset != null ? currentOffset % 60 : "";
+
+  return (
+    <div className="flex items-center gap-1 bg-muted rounded-lg px-2 py-1">
+      <span className="text-[10px] font-semibold w-16 shrink-0" style={{ color }}>{label}</span>
+      {currentOffset != null && (
+        <span className="text-[10px] font-mono text-muted-foreground mr-1">{Math.floor(currentOffset/60)}:{String(currentOffset%60).padStart(2,"0")}</span>
+      )}
+      <input
+        type="number" min={0}
+        placeholder="m"
+        value={min}
+        onChange={(e) => setMin(e.target.value)}
+        className="w-8 text-[10px] bg-background border border-border rounded px-1 py-0.5 font-mono text-center"
+      />
+      <span className="text-[10px] text-muted-foreground">:</span>
+      <input
+        type="number" min={0} max={59}
+        placeholder="s"
+        value={sec}
+        onChange={(e) => setSec(e.target.value)}
+        className="w-8 text-[10px] bg-background border border-border rounded px-1 py-0.5 font-mono text-center"
+      />
+      <button
+        onClick={handleSet}
+        className="text-[10px] px-1.5 py-0.5 rounded font-semibold text-white"
+        style={{ background: color }}
+      >Set</button>
+    </div>
+  );
 }
 
 const WINDOWS = [
@@ -72,11 +116,13 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
   const hasSmoothed = rows.some((r) => r.hr_smoothed != null && r.hr_smoothed !== "");
   const hasBaseline = rows.some((r) => r.baseline_hr != null && r.baseline_hr !== "");
 
-  // Build ref lines from data markers (only if showBuild or non-build)
+  // Build ref lines from data markers — only known types
+  const KNOWN_DATA_MARKERS = new Set(["build", "climax", "recovery"]);
   const markerLines = [];
   const seen = new Set();
   visibleRows.forEach((r) => {
     if (!r.marker) return;
+    if (!KNOWN_DATA_MARKERS.has(r.marker)) return; // skip unknown/gray markers
     if (r.marker === "build" && !showBuild) return;
     const key = `${r.marker}-${r.time_offset_s}`;
     if (!seen.has(key)) {
@@ -181,9 +227,36 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
 
       {markingPhase && (
         <p className="text-[10px] text-muted-foreground mb-1 italic">
-          Click a point on the chart to mark <span style={{ color: PHASE_COLORS[markingPhase] }} className="font-semibold">{PHASE_LABELS[markingPhase]}</span>
+          Click the chart <span className="font-semibold">or enter time below</span> to mark <span style={{ color: PHASE_COLORS[markingPhase] }} className="font-semibold">{PHASE_LABELS[markingPhase]}</span>
         </p>
       )}
+
+      {/* Manual time inputs */}
+      <div className="flex flex-wrap gap-2 mb-2">
+        {MARKING_PHASES.map((phase) => (
+          <ManualTimeInput
+            key={phase}
+            phase={phase}
+            color={PHASE_COLORS[phase]}
+            label={PHASE_LABELS[phase]}
+            currentOffset={localMarkers[phase]}
+            maxOffset={maxOffsetS}
+            onSet={(offset) => {
+              const updated = { ...localMarkers, [phase]: offset };
+              setLocalMarkers(updated);
+              if (onMarkersChange) {
+                const extra = calcHRMetrics(updated);
+                onMarkersChange({
+                  pre_climax_offset_s: updated.pre_climax,
+                  climax_offset_s: updated.climax,
+                  recovery_offset_s: updated.recovery,
+                  ...extra,
+                });
+              }
+            }}
+          />
+        ))}
+      </div>
 
       <div className={`h-44 ${markingPhase ? "cursor-crosshair" : ""}`}>
         <ResponsiveContainer width="100%" height="100%">
@@ -241,7 +314,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
               <Line type="monotone" dataKey="hr_smoothed" stroke="hsl(var(--chart-2))" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
             )}
             {visibleLines.hr && (
-              <Line type="monotone" dataKey="hr" stroke="hsl(var(--primary))" strokeWidth={2} dot={<MarkerDot />} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="hr" stroke="hsl(var(--primary))" strokeWidth={2} dot={<MarkerDot />} activeDot={{ r: 4 }} isAnimationActive={false} />
             )}
           </LineChart>
         </ResponsiveContainer>
