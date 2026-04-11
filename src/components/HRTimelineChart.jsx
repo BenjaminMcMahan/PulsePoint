@@ -194,11 +194,17 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
       }
     }
     const preClimaxOffset = Number(rows[valleyIdx].time_offset_s);
-    // Recovery: first point after peak where HR drops ~8% from peak
-    const peakHr = Number(rows[peakIdx].hr);
-    let recoveryIdx = Math.min(peakIdx + 3, rows.length - 1);
-    for (let i = peakIdx + 1; i < rows.length; i++) {
-      if (Number(rows[i].hr) <= peakHr * 0.92) { recoveryIdx = i; break; }
+    // Recovery: first point after peak where HR is consistently falling (3 consecutive drops)
+    let recoveryIdx = Math.min(peakIdx + 1, rows.length - 1);
+    for (let i = peakIdx + 1; i <= rows.length - 3; i++) {
+      if (
+        Number(rows[i].hr) < Number(rows[i - 1].hr) &&
+        Number(rows[i + 1].hr) < Number(rows[i].hr) &&
+        Number(rows[i + 2].hr) < Number(rows[i + 1].hr)
+      ) {
+        recoveryIdx = i;
+        break;
+      }
     }
     const recoveryOffset = Number(rows[recoveryIdx].time_offset_s);
     const updated = { pre_climax: preClimaxOffset, climax: climaxOffset, recovery: recoveryOffset };
