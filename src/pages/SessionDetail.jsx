@@ -250,7 +250,6 @@ export default function SessionDetail() {
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">Context</h3>
           <InfoRow label="Mood" value={cap(s.mood)} />
           <InfoRow label="Environment" value={cap(s.environment)} />
-          <InfoRow label="Substances" value={(s.substances || []).map(cap).join(", ")} />
           <InfoRow label="Hydration" value={cap(s.hydration)} />
         </div>
 
