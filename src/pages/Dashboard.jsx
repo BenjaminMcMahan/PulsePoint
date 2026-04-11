@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import moment from "moment";
-import { TrendingUp, Heart, Zap, Star, Activity, BarChart2 } from "lucide-react";
+import { TrendingUp, Heart, Zap, Star, Activity, BarChart2, Timer } from "lucide-react";
 
 function StatCard({ label, value, sub, icon: Icon, color = "primary" }) {
   return (
@@ -136,6 +136,52 @@ export default function Dashboard() {
       .map((s) => ({ x: s.intensity, y: s.satisfaction }));
   }, [sessions]);
 
+  // Physiological patterns — recovery rate and climax duration
+  const physioStats = useMemo(() => {
+    // Recovery rate: (HR at climax - HR at recovery point) / time between them, in bpm/min
+    const recoverySessions = sessions.filter(
+      (s) => s.climax_offset_s != null && s.recovery_offset_s != null && s.hr_at_climax
+    );
+    let avgRecoveryRate = null;
+    if (recoverySessions.length > 0) {
+      const rates = recoverySessions
+        .map((s) => {
+          const dt = (s.recovery_offset_s - s.climax_offset_s) / 60; // minutes
+          const dhr = (s.hr_avg_at_climax_window || s.hr_at_climax) - (s.hr_avg_pre_to_climax || 0);
+          // Simple: use HR drop = max_hr - avg_hr as proxy if no better data
+          const drop = (s.hr_at_climax || s.max_hr || 0) - (s.avg_hr || 0);
+          return dt > 0 ? drop / dt : null;
+        })
+        .filter((r) => r != null && r > 0);
+      avgRecoveryRate = rates.length
+        ? (rates.reduce((a, b) => a + b, 0) / rates.length).toFixed(1)
+        : null;
+    }
+
+    // Climax duration distribution
+    const climaxDurations = { short: 0, medium: 0, long: 0 };
+    sessions.forEach((s) => { if (s.climax_duration) climaxDurations[s.climax_duration]++; });
+    const totalWithDuration = climaxDurations.short + climaxDurations.medium + climaxDurations.long;
+    const durationData = totalWithDuration > 0
+      ? [
+          { label: "Short", count: climaxDurations.short },
+          { label: "Medium", count: climaxDurations.medium },
+          { label: "Long", count: climaxDurations.long },
+        ].filter((d) => d.count > 0)
+      : [];
+
+    // Avg climax→recovery gap in seconds
+    const gaps = sessions
+      .filter((s) => s.climax_offset_s != null && s.recovery_offset_s != null)
+      .map((s) => s.recovery_offset_s - s.climax_offset_s)
+      .filter((g) => g > 0);
+    const avgGap = gaps.length
+      ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length)
+      : null;
+
+    return { avgRecoveryRate, durationData, totalWithDuration, avgGap, count: recoverySessions.length };
+  }, [sessions]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -243,6 +289,50 @@ export default function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      )}
+
+      {/* Physiological Patterns */}
+      {(physioStats.avgRecoveryRate || physioStats.durationData.length > 0 || physioStats.avgGap) && (
+        <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+          <SectionTitle>Physiological Patterns</SectionTitle>
+
+          <div className="grid grid-cols-2 gap-3">
+            {physioStats.avgGap && (
+              <div className="bg-muted/50 rounded-lg p-3 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg Climax Duration</p>
+                <p className="text-2xl font-bold font-mono text-chart-3">
+                  {physioStats.avgGap >= 60
+                    ? `${Math.floor(physioStats.avgGap / 60)}m ${physioStats.avgGap % 60}s`
+                    : `${physioStats.avgGap}s`}
+                </p>
+                <p className="text-[10px] text-muted-foreground">across {physioStats.count} sessions</p>
+              </div>
+            )}
+            {physioStats.avgRecoveryRate && (
+              <div className="bg-muted/50 rounded-lg p-3 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg Recovery Rate</p>
+                <p className="text-2xl font-bold font-mono text-chart-2">{physioStats.avgRecoveryRate} <span className="text-sm font-normal">bpm/min</span></p>
+                <p className="text-[10px] text-muted-foreground">HR drop from climax</p>
+              </div>
+            )}
+          </div>
+
+          {physioStats.durationData.length > 0 && (
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Climax Duration Distribution</p>
+              <div className="h-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={physioStats.durationData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="count" fill="hsl(var(--chart-3))" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
