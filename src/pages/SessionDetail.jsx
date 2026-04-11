@@ -62,7 +62,7 @@ export default function SessionDetail() {
       const all = await base44.entities.Session.filter({ id });
       const s = all[0];
       setSession(s);
-      const rows = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 2000);
+      const rows = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
       setTimelineRows(rows);
 
       // Auto-compute phase HR metrics for existing sessions that have markers but no computed values

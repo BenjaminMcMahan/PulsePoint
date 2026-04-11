@@ -69,7 +69,7 @@ export default function EditSession() {
       duration_minutes: duration || data.duration_minutes,
     });
     if (_csv_rows && _csv_rows.length > 0) {
-      const existing = await base44.entities.HeartRateTimeline.filter({ session: id });
+      const existing = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
       await Promise.all(existing.map((r) => base44.entities.HeartRateTimeline.delete(r.id)));
       const rows = _csv_rows.map((r) => ({ ...r, session: id }));
       await base44.entities.HeartRateTimeline.bulkCreate(rows);
