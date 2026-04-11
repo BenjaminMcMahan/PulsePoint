@@ -53,7 +53,7 @@ function ManualTimeInput({ phase, color, label, currentOffset, maxOffset, onSet 
     <div className="flex items-center gap-1 bg-muted rounded-lg px-2 py-1">
       <span className="text-[10px] font-semibold w-16 shrink-0" style={{ color }}>{label}</span>
       {currentOffset != null && (
-        <span className="text-[10px] font-mono text-muted-foreground mr-1">{Math.floor(currentOffset/60)}:{String(currentOffset%60).padStart(2,"0")}</span>
+        <span className="text-[10px] font-mono text-foreground mr-1 font-semibold">{Math.floor(Math.round(currentOffset)/60)}:{String(Math.round(currentOffset)%60).padStart(2,"0")}</span>
       )}
       <input
         type="number" min={0}
@@ -282,6 +282,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
               }}
               labelFormatter={(v) => `Time: ${fmtSec(Math.round(Number(v)))}`}
               contentStyle={{ fontSize: 11 }}
+              labelStyle={{ color: '#111827', fontWeight: 600 }}
             />
 
             {/* Data-driven marker lines */}
