@@ -45,34 +45,33 @@ function ManualTimeInput({ phase, color, label, currentOffset, maxOffset, onSet 
     if (totalS >= 0 && totalS <= maxOffset) onSet(totalS);
   };
 
-  // Pre-fill when currentOffset changes
-  const displayMin = currentOffset != null ? Math.floor(currentOffset / 60) : "";
-  const displaySec = currentOffset != null ? currentOffset % 60 : "";
-
   return (
-    <div className="flex items-center gap-1 bg-muted rounded-lg px-2 py-1">
-      <span className="text-[10px] font-semibold w-16 shrink-0" style={{ color }}>{label}</span>
+    <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 flex-1 min-w-0">
+      <span className="text-xs font-semibold w-20 shrink-0" style={{ color }}>{label}</span>
       {currentOffset != null && (
-        <span className="text-[10px] font-mono text-foreground mr-1 font-semibold">{Math.floor(Math.round(currentOffset)/60)}:{String(Math.round(currentOffset)%60).padStart(2,"0")}</span>
+        <span className="text-xs font-mono text-foreground font-semibold w-12 shrink-0">
+          {Math.floor(Math.round(currentOffset)/60)}:{String(Math.round(currentOffset)%60).padStart(2,"0")}
+        </span>
       )}
+      {currentOffset == null && <span className="w-12 shrink-0" />}
       <input
         type="number" min={0}
         placeholder="m"
         value={min}
         onChange={(e) => setMin(e.target.value)}
-        className="w-8 text-[10px] bg-background border border-border rounded px-1 py-0.5 font-mono text-center"
+        className="w-14 text-xs bg-background border border-border rounded px-2 py-1 font-mono text-center"
       />
-      <span className="text-[10px] text-muted-foreground">:</span>
+      <span className="text-xs text-muted-foreground">:</span>
       <input
         type="number" min={0} max={59}
         placeholder="s"
         value={sec}
         onChange={(e) => setSec(e.target.value)}
-        className="w-8 text-[10px] bg-background border border-border rounded px-1 py-0.5 font-mono text-center"
+        className="w-14 text-xs bg-background border border-border rounded px-2 py-1 font-mono text-center"
       />
       <button
         onClick={handleSet}
-        className="text-[10px] px-1.5 py-0.5 rounded font-semibold text-white"
+        className="text-xs px-3 py-1 rounded font-semibold text-white shrink-0"
         style={{ background: color }}
       >Set</button>
     </div>
@@ -171,6 +170,43 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
     }
   };
 
+  const autoDetectMarkers = () => {
+    if (!rows || rows.length < 10) return;
+    // Climax: peak HR in last 60% of session
+    const startIdx = Math.floor(rows.length * 0.25);
+    let peakIdx = startIdx;
+    for (let i = startIdx; i < rows.length; i++) {
+      if (Number(rows[i].hr) > Number(rows[peakIdx].hr)) peakIdx = i;
+    }
+    const climaxOffset = Number(rows[peakIdx].time_offset_s);
+    // Pre-climax: last local minimum before peak (within 600s lookback)
+    const lookbackS = climaxOffset - 600;
+    let valleyIdx = peakIdx;
+    for (let i = peakIdx - 1; i >= 0; i--) {
+      if (Number(rows[i].time_offset_s) < lookbackS) break;
+      if (Number(rows[i].hr) < Number(rows[valleyIdx].hr)) valleyIdx = i;
+    }
+    const preClimaxOffset = Number(rows[valleyIdx].time_offset_s);
+    // Recovery: first point after peak where HR drops ~8% from peak
+    const peakHr = Number(rows[peakIdx].hr);
+    let recoveryIdx = Math.min(peakIdx + 3, rows.length - 1);
+    for (let i = peakIdx + 1; i < rows.length; i++) {
+      if (Number(rows[i].hr) <= peakHr * 0.92) { recoveryIdx = i; break; }
+    }
+    const recoveryOffset = Number(rows[recoveryIdx].time_offset_s);
+    const updated = { pre_climax: preClimaxOffset, climax: climaxOffset, recovery: recoveryOffset };
+    setLocalMarkers(updated);
+    if (onMarkersChange) {
+      const extra = calcHRMetrics(updated);
+      onMarkersChange({
+        pre_climax_offset_s: updated.pre_climax,
+        climax_offset_s: updated.climax,
+        recovery_offset_s: updated.recovery,
+        ...extra,
+      });
+    }
+  };
+
   const clearMarkers = () => {
     setLocalMarkers({ pre_climax: null, climax: null, recovery: null });
     setMarkingPhase(null);
@@ -220,6 +256,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
             {PHASE_LABELS[phase]}{localMarkers[phase] != null ? ` ✓` : ""}
           </Button>
         ))}
+        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-primary border-primary" onClick={autoDetectMarkers}>Auto-detect</Button>
         {(localMarkers.pre_climax != null || localMarkers.climax != null || localMarkers.recovery != null) && (
           <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-destructive" onClick={clearMarkers}>Clear</Button>
         )}
@@ -232,7 +269,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
       )}
 
       {/* Manual time inputs */}
-      <div className="flex flex-wrap gap-2 mb-2">
+      <div className="flex flex-col sm:flex-row gap-2 mb-2">
         {MARKING_PHASES.map((phase) => (
           <ManualTimeInput
             key={phase}

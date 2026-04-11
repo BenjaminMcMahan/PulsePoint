@@ -222,7 +222,10 @@ export default function HeartRateSection({ data, onChange }) {
         <>
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">HR Timeline Preview</Label>
-            <HRTimelineChart rows={csvRows} />
+            <HRTimelineChart
+              rows={csvRows}
+              onMarkersChange={(markers) => update(markers)}
+            />
           </div>
 
           {/* Derived metrics */}
