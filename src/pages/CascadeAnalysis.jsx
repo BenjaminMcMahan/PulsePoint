@@ -145,8 +145,9 @@ Be specific, concise, and use physiological research language.`,
     });
 
     console.log("AI Cascade result:", res);
-    // InvokeLLM sometimes returns a string even with response_json_schema
-    const parsed = typeof res === "string" ? JSON.parse(res) : res;
+    // InvokeLLM wraps the result in a `response` key
+    const raw = typeof res === "string" ? JSON.parse(res) : res;
+    const parsed = raw?.response ?? raw;
     setResult(parsed);
     setLoading(false);
   };
