@@ -76,6 +76,16 @@ function Item({ text }) {
 function AIInsightPanel({ sessions }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [savedId, setSavedId] = useState(null);
+
+  useEffect(() => {
+    base44.entities.CascadeAnalysisResult.list("-updated_date", 1).then((rows) => {
+      if (rows[0]) {
+        setResult(rows[0].result);
+        setSavedId(rows[0].id);
+      }
+    });
+  }, []);
 
   const analyze = async () => {
     setLoading(true);
@@ -145,10 +155,15 @@ Be specific, concise, and use physiological research language.`,
     });
 
     console.log("AI Cascade result:", res);
-    // InvokeLLM wraps the result in a `response` key
     const raw = typeof res === "string" ? JSON.parse(res) : res;
     const parsed = raw?.response ?? raw;
     setResult(parsed);
+    if (savedId) {
+      await base44.entities.CascadeAnalysisResult.update(savedId, { result: parsed, session_count: sessions.length });
+    } else {
+      const created = await base44.entities.CascadeAnalysisResult.create({ result: parsed, session_count: sessions.length });
+      setSavedId(created.id);
+    }
     setLoading(false);
   };
 

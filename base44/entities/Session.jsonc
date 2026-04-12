@@ -217,6 +217,10 @@
     },
     "is_quick_entry": {
       "type": "boolean"
+    },
+    "ai_analysis": {
+      "type": "object",
+      "description": "Stored AI session analysis result"
     }
   },
   "required": [

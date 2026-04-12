@@ -33,7 +33,7 @@ function Item({ text }) {
 
 export default function SessionAIPanel({ session, timelineRows }) {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(session.ai_analysis ?? null);
 
   const analyze = async () => {
     setLoading(true);
@@ -96,7 +96,9 @@ Provide a thorough physiological analysis of this individual session. Be specifi
     });
 
     const raw = typeof res === "string" ? JSON.parse(res) : res;
-    setResult(raw?.response ?? raw);
+    const parsed = raw?.response ?? raw;
+    setResult(parsed);
+    await base44.entities.Session.update(session.id, { ai_analysis: parsed });
     setLoading(false);
   };
 
