@@ -144,6 +144,7 @@ Be specific, concise, and use physiological research language.`,
       },
     });
 
+    console.log("AI Cascade result:", res);
     setResult(res);
     setLoading(false);
   };
@@ -175,8 +176,10 @@ Be specific, concise, and use physiological research language.`,
 
       {result && (
         <div className="space-y-4 text-xs">
-          {result.summary && (
+          {result.summary ? (
             <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">Analysis complete — no summary returned.</p>
           )}
           {result.common_signatures?.length > 0 && (
             <Section icon={<Activity className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-1"] }} />} title="Common Signatures" color="chart-1">
@@ -202,6 +205,10 @@ Be specific, concise, and use physiological research language.`,
             <Section icon={<AlertCircle className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["destructive"] }} />} title="Anomalies" color="destructive">
               {result.anomalies.map((a, i) => <Item key={i} text={`${a.session_date}: ${a.finding}`} />)}
             </Section>
+          )}
+          {/* Fallback: dump raw if everything is empty */}
+          {!result.summary && !result.common_signatures?.length && !result.predictive_insights?.length && (
+            <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap bg-muted/40 rounded p-2 overflow-auto">{JSON.stringify(result, null, 2)}</pre>
           )}
         </div>
       )}
