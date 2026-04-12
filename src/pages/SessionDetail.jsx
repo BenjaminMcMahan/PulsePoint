@@ -8,6 +8,7 @@ import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil } from "lucide-react
 import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
 import HRZoneAnalysis from "../components/HRZoneAnalysis";
+import SessionAIPanel from "../components/SessionAIPanel";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -301,10 +302,13 @@ export default function SessionDetail() {
           </div>
         )}
 
+        {/* AI Analysis */}
+        <SessionAIPanel session={s} timelineRows={timelineRows} />
+
         {/* Tags */}
         {(s.tags || []).length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {s.tags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
+          {s.tags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
           </div>
         )}
       </div>
