@@ -7,6 +7,7 @@ import SessionCard from "../components/SessionCard";
 import CompareHRTimelineChart from "../components/CompareHRTimelineChart";
 import CompareStats from "../components/CompareStats";
 import { GitCompare } from "lucide-react";
+import CompareAIPanel from "../components/CompareAIPanel";
 import moment from "moment";
 
 function MetricRow({ label, value, max = 10 }) {
@@ -204,6 +205,7 @@ export default function Compare() {
               <CompareHRTimelineChart timelines={timelines} sessions={selectedSessions} />
             ) : null}
             <CompareStats sessions={selectedSessions} />
+            <CompareAIPanel sessions={selectedSessions} />
             <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
               {selectedSessions.map((s) => <CompareColumn key={s.id} session={s} />)}
             </div>
