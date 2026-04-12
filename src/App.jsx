@@ -14,6 +14,7 @@ import QuickEntry from './pages/QuickEntry';
 import Compare from './pages/Compare';
 import Insights from './pages/Insights';
 import EditSession from './pages/EditSession';
+import CascadeAnalysis from './pages/CascadeAnalysis';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -50,6 +51,7 @@ const AuthenticatedApp = () => {
         <Route path="/new/quick" element={<QuickEntry />} />
         <Route path="/compare" element={<Compare />} />
         <Route path="/insights" element={<Insights />} />
+        <Route path="/cascade" element={<CascadeAnalysis />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>
