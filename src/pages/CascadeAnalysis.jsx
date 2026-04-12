@@ -145,7 +145,9 @@ Be specific, concise, and use physiological research language.`,
     });
 
     console.log("AI Cascade result:", res);
-    setResult(res);
+    // InvokeLLM sometimes returns a string even with response_json_schema
+    const parsed = typeof res === "string" ? JSON.parse(res) : res;
+    setResult(parsed);
     setLoading(false);
   };
 
@@ -206,9 +208,8 @@ Be specific, concise, and use physiological research language.`,
               {result.anomalies.map((a, i) => <Item key={i} text={`${a.session_date}: ${a.finding}`} />)}
             </Section>
           )}
-          {/* Fallback: dump raw if everything is empty */}
           {!result.summary && !result.common_signatures?.length && !result.predictive_insights?.length && (
-            <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap bg-muted/40 rounded p-2 overflow-auto">{JSON.stringify(result, null, 2)}</pre>
+            <p className="text-xs text-muted-foreground italic">Analysis returned no content. Please try again.</p>
           )}
         </div>
       )}
