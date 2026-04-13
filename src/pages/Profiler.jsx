@@ -108,7 +108,7 @@ function ClusterCard({ cluster, index }) {
           {cluster.build_type_tendency || "Mixed"}
         </Badge>
       </div>
-      <p className="text-xs text-muted-foreground leading-relaxed">{cluster.description}</p>
+      <p className="text-sm text-foreground/85 leading-relaxed">{cluster.description}</p>
       {cluster.defining_methods?.length > 0 && (
         <div>
           <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Key Methods</p>
@@ -120,11 +120,11 @@ function ClusterCard({ cluster, index }) {
         </div>
       )}
       {cluster.physiological_signature && (
-        <p className="text-[11px] text-muted-foreground border-l-2 border-border pl-2 italic">{cluster.physiological_signature}</p>
+        <p className="text-sm text-foreground/75 border-l-2 border-border pl-2 italic leading-relaxed">{cluster.physiological_signature}</p>
       )}
       {cluster.recommendation && (
-        <div className="bg-muted/40 rounded-lg p-2">
-          <p className="text-[11px] text-foreground">{cluster.recommendation}</p>
+        <div className="bg-muted/60 rounded-lg p-3">
+          <p className="text-sm text-foreground leading-relaxed">{cluster.recommendation}</p>
         </div>
       )}
     </div>
@@ -275,46 +275,46 @@ Be interpretive, insightful, and research-oriented. Reference specific sessions 
       {result && (
         <div className="space-y-3 pt-1">
           {result.summary && (
-            <p className="text-sm text-foreground leading-relaxed border-l-2 border-chart-3 pl-3">{result.summary}</p>
+            <p className="text-base text-foreground leading-relaxed border-l-2 border-chart-3 pl-3 font-medium">{result.summary}</p>
           )}
           {result.physiological_interpretation && (
-            <div className="bg-muted/40 rounded-lg p-3">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Physiological Interpretation</p>
-              <p className="text-xs leading-relaxed">{result.physiological_interpretation}</p>
+            <div className="bg-muted/60 rounded-lg p-3">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Physiological Interpretation</p>
+              <p className="text-sm text-foreground leading-relaxed">{result.physiological_interpretation}</p>
             </div>
           )}
           {result.pattern_analysis?.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5">Pattern Analysis</p>
-              <ul className="space-y-1">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Pattern Analysis</p>
+              <ul className="space-y-2">
                 {result.pattern_analysis.map((s, i) => (
-                  <li key={i} className="text-xs text-muted-foreground pl-3 border-l-2 border-border leading-snug">• {s}</li>
+                  <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
                 ))}
               </ul>
             </div>
           )}
           {result.contextual_triggers?.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5">Contextual Triggers</p>
-              <ul className="space-y-1">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Contextual Triggers</p>
+              <ul className="space-y-2">
                 {result.contextual_triggers.map((s, i) => (
-                  <li key={i} className="text-xs text-muted-foreground pl-3 border-l-2 border-border leading-snug">• {s}</li>
+                  <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
                 ))}
               </ul>
             </div>
           )}
           {result.role_in_arousal_arc && (
-            <div className="bg-muted/40 rounded-lg p-3">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Role in Arousal Arc</p>
-              <p className="text-xs leading-relaxed">{result.role_in_arousal_arc}</p>
+            <div className="bg-muted/60 rounded-lg p-3">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Role in Arousal Arc</p>
+              <p className="text-sm text-foreground leading-relaxed">{result.role_in_arousal_arc}</p>
             </div>
           )}
           {result.recommendations?.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5">Recommendations</p>
-              <ul className="space-y-1">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Recommendations</p>
+              <ul className="space-y-2">
                 {result.recommendations.map((s, i) => (
-                  <li key={i} className="text-xs text-muted-foreground pl-3 border-l-2 border-border leading-snug">• {s}</li>
+                  <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
                 ))}
               </ul>
             </div>
@@ -454,7 +454,7 @@ Be interpretive and insightful — not just descriptive.`,
       {result && (
         <div className="space-y-4">
           {result.overview && (
-            <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">{result.overview}</p>
+            <p className="text-base text-foreground leading-relaxed border-l-2 border-primary pl-3 font-medium">{result.overview}</p>
           )}
           {result.clusters?.length > 0 && (
             <div className="space-y-3">
@@ -462,18 +462,18 @@ Be interpretive and insightful — not just descriptive.`,
             </div>
           )}
           {result.method_build_correlations?.length > 0 && (
-            <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1"><TrendingUp className="w-3 h-3" />Method → Build Type Correlations</p>
+            <div className="bg-muted/60 rounded-lg p-3 space-y-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1 tracking-wider"><TrendingUp className="w-3 h-3" />Method → Build Type Correlations</p>
               {result.method_build_correlations.map((s, i) => (
-                <p key={i} className="text-xs text-muted-foreground pl-3 border-l-2 border-border">• {s}</p>
+                <p key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</p>
               ))}
             </div>
           )}
           {result.cross_cluster_insights?.length > 0 && (
-            <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1"><Activity className="w-3 h-3" />Cross-Cluster Insights</p>
+            <div className="bg-muted/60 rounded-lg p-3 space-y-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1 tracking-wider"><Activity className="w-3 h-3" />Cross-Cluster Insights</p>
               {result.cross_cluster_insights.map((s, i) => (
-                <p key={i} className="text-xs text-muted-foreground pl-3 border-l-2 border-border">• {s}</p>
+                <p key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</p>
               ))}
             </div>
           )}
