@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { Brain, TrendingUp, Activity, Lightbulb, Zap, BarChart2, RefreshCw } from "lucide-react";
+import { Brain, TrendingUp, Activity, Lightbulb, Zap, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TTSButton from "../components/TTSButton";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip,
-  CartesianGrid, ScatterChart, Scatter, ZAxis, Legend,
+  CartesianGrid, Legend,
 } from "recharts";
 import moment from "moment";
 
@@ -52,31 +52,56 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 // ─── Data helpers ─────────────────────────────────────────────────────────────
 
-function groupByMonth(sessions) {
-  const map = {};
-  sessions.forEach((s) => {
-    const key = moment(s.date).format("MMM YYYY");
-    if (!map[key]) map[key] = { key, sessions: [], ts: moment(s.date).valueOf() };
-    map[key].sessions.push(s);
-  });
-  return Object.values(map).sort((a, b) => a.ts - b.ts);
-}
-
 function avg(arr) {
   const nums = arr.filter((v) => v != null && !isNaN(v));
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
 }
 
-function buildTrendData(sessions) {
-  return groupByMonth(sessions).map(({ key, sessions: ss }) => ({
-    month: key,
-    satisfaction: avg(ss.map((s) => s.satisfaction)),
-    build_quality: avg(ss.map((s) => s.build_quality)),
-    intensity: avg(ss.map((s) => s.intensity)),
-    avg_hr: avg(ss.map((s) => s.avg_hr)),
-    max_hr: avg(ss.map((s) => s.max_hr)),
-    count: ss.length,
-  }));
+// Returns all ISO week keys (YYYY-[W]WW) that exist in sessions, sorted
+function getWeekKeys(sessions) {
+  const set = new Set(sessions.map((s) => moment(s.date).format("GGGG-[W]WW")));
+  return [...set].sort();
+}
+
+function groupByWeek(sessions) {
+  const map = {};
+  sessions.forEach((s) => {
+    const key = moment(s.date).format("GGGG-[W]WW");
+    if (!map[key]) map[key] = { key, sessions: [], ts: moment(s.date).startOf("isoWeek").valueOf() };
+    map[key].sessions.push(s);
+  });
+  return Object.values(map).sort((a, b) => a.ts - b.ts);
+}
+
+// Build rolling-window trend: for the selected week index, show that week + N surrounding weeks
+function buildWeekTrendData(sessions, weekKeys, centerIdx, windowSize = 8) {
+  const half = Math.floor(windowSize / 2);
+  const start = Math.max(0, centerIdx - half);
+  const end = Math.min(weekKeys.length - 1, centerIdx + half);
+  const visibleKeys = weekKeys.slice(start, end + 1);
+  const byWeek = groupByWeek(sessions);
+  const weekMap = Object.fromEntries(byWeek.map((w) => [w.key, w]));
+  return visibleKeys.map((key) => {
+    const week = weekMap[key];
+    const ss = week?.sessions || [];
+    const weekStart = moment().isoWeek(parseInt(key.split("W")[1])).isoWeekYear(parseInt(key.split("-")[0])).startOf("isoWeek");
+    const label = weekStart.format("MMM D");
+    return {
+      week: label,
+      satisfaction: avg(ss.map((s) => s.satisfaction)),
+      build_quality: avg(ss.map((s) => s.build_quality)),
+      intensity: avg(ss.map((s) => s.intensity)),
+      avg_hr: avg(ss.map((s) => s.avg_hr)),
+      max_hr: avg(ss.map((s) => s.max_hr)),
+      count: ss.length,
+    };
+  });
+}
+
+function weekLabel(key) {
+  const [yearStr, weekStr] = key.split("-W");
+  const d = moment().isoWeekYear(parseInt(yearStr)).isoWeek(parseInt(weekStr)).startOf("isoWeek");
+  return `Week of ${d.format("MMM D, YYYY")}`;
 }
 
 function methodStats(sessions) {
@@ -102,7 +127,7 @@ function methodStats(sessions) {
 }
 
 function buildAggregate(sessions) {
-  const months = groupByMonth(sessions);
+  const weeks = groupByWeek(sessions);
   // Use neutral field names to avoid content filters — map sensitive terms to clinical equivalents
   const peakResponseDist = (() => {
     const cd = {};
@@ -115,8 +140,8 @@ function buildAggregate(sessions) {
       start: sessions[0]?.date?.slice(0, 10),
       end: sessions[sessions.length - 1]?.date?.slice(0, 10),
     },
-    monthly_averages: months.map(({ key, sessions: ss }) => ({
-      period: key,
+    weekly_averages: weeks.map(({ key, sessions: ss }) => ({
+      period: weekLabel(key),
       record_count: ss.length,
       avg_response_quality: avg(ss.map((s) => s.satisfaction))?.toFixed(1),
       avg_buildup_score: avg(ss.map((s) => s.build_quality))?.toFixed(1),
@@ -189,7 +214,7 @@ DATASET:
 ${JSON.stringify(agg, null, 2)}
 
 Analyze this longitudinal biometric data and provide:
-1. Month-over-month trends in cardiac and subjective response metrics — what is improving, plateauing, or declining
+1. Week-over-week trends in cardiac and subjective response metrics — what is improving, plateauing, or declining
 2. Which stimulation protocol combinations consistently yield the highest response quality and buildup scores
 3. Correlations between contextual variables (mood, hydration) and outcome scores
 4. Personalized optimization recommendations based on demonstrated patterns in this individual's data
@@ -286,15 +311,31 @@ Cite actual numbers from the data. Be analytical and specific.`,
 export default function LongTermTrends() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [weekIdx, setWeekIdx] = useState(null); // null = not yet set
 
   useEffect(() => {
     base44.entities.Session.list("date", 500).then((rows) => {
-      setSessions(rows.sort((a, b) => new Date(a.date) - new Date(b.date)));
+      const sorted = rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+      setSessions(sorted);
       setLoading(false);
     });
   }, []);
 
-  const trendData = useMemo(() => buildTrendData(sessions), [sessions]);
+  const weekKeys = useMemo(() => getWeekKeys(sessions), [sessions]);
+
+  // Default to the most recent week
+  useEffect(() => {
+    if (weekKeys.length > 0 && weekIdx === null) setWeekIdx(weekKeys.length - 1);
+  }, [weekKeys]);
+
+  const currentWeekKey = weekIdx !== null ? weekKeys[weekIdx] : null;
+  const currentWeekLabel = currentWeekKey ? weekLabel(currentWeekKey) : "";
+
+  const trendData = useMemo(
+    () => weekIdx !== null ? buildWeekTrendData(sessions, weekKeys, weekIdx) : [],
+    [sessions, weekKeys, weekIdx]
+  );
+
   const methods = useMemo(() => methodStats(sessions), [sessions]);
 
   if (loading) {
@@ -317,16 +358,38 @@ export default function LongTermTrends() {
     <div className="px-4 py-4 space-y-4 pb-10">
       <div>
         <h1 className="text-lg font-bold">Long-Term Trends</h1>
-        <p className="text-xs text-muted-foreground">{sessions.length} sessions analysed</p>
+        <p className="text-xs text-muted-foreground">{sessions.length} sessions total</p>
       </div>
 
-      {/* Satisfaction & Build Quality over time */}
-      <ChartCard title="Satisfaction & Build Quality Over Time">
+      {/* Week navigator */}
+      <div className="flex items-center justify-between bg-card rounded-xl border border-border px-4 py-3">
+        <button
+          onClick={() => setWeekIdx((i) => Math.max(0, i - 1))}
+          disabled={weekIdx === 0}
+          className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="text-center">
+          <p className="text-sm font-semibold">{currentWeekLabel}</p>
+          <p className="text-[10px] text-muted-foreground">{weekIdx + 1} of {weekKeys.length} weeks with sessions</p>
+        </div>
+        <button
+          onClick={() => setWeekIdx((i) => Math.min(weekKeys.length - 1, i + 1))}
+          disabled={weekIdx === weekKeys.length - 1}
+          className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Satisfaction & Build Quality */}
+      <ChartCard title="Satisfaction & Build Quality">
         <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" tick={{ fontSize: 8 }} />
+              <XAxis dataKey="week" tick={{ fontSize: 8 }} />
               <YAxis domain={[0, 10]} tick={{ fontSize: 8 }} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
@@ -338,13 +401,13 @@ export default function LongTermTrends() {
         </div>
       </ChartCard>
 
-      {/* Heart Rate trends */}
-      <ChartCard title="Heart Rate Trends Over Time">
+      {/* Heart Rate */}
+      <ChartCard title="Heart Rate Trends">
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" tick={{ fontSize: 8 }} />
+              <XAxis dataKey="week" tick={{ fontSize: 8 }} />
               <YAxis domain={["auto", "auto"]} tick={{ fontSize: 8 }} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
@@ -355,9 +418,24 @@ export default function LongTermTrends() {
         </div>
       </ChartCard>
 
-      {/* Method performance table */}
+      {/* Session frequency */}
+      <ChartCard title="Session Frequency (±4 weeks)">
+        <div className="h-36">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="week" tick={{ fontSize: 8 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 8 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Line type="monotone" dataKey="count" name="Sessions" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </ChartCard>
+
+      {/* Method performance table (all-time) */}
       {methods.length > 0 && (
-        <ChartCard title="Method Combination Performance">
+        <ChartCard title="Method Combination Performance (All-Time)">
           <div className="space-y-2">
             {methods.map((m, i) => (
               <div key={i} className="bg-muted/50 rounded-lg px-3 py-2 space-y-1">
@@ -390,21 +468,6 @@ export default function LongTermTrends() {
           </div>
         </ChartCard>
       )}
-
-      {/* Session frequency */}
-      <ChartCard title="Session Frequency Per Month">
-        <div className="h-36">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" tick={{ fontSize: 8 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 8 }} />
-              <Tooltip content={<CustomTooltip />} />
-              <Line type="monotone" dataKey="count" name="Sessions" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
 
       {/* AI Panel */}
       <AITrendsPanel sessions={sessions} />
