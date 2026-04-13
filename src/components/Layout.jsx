@@ -20,12 +20,13 @@ export default function Layout() {
   return (
     <div className="dark min-h-screen bg-background text-foreground flex flex-col">
       {/* Top bar */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-12 bg-card border-b border-border flex items-center px-4 gap-3">
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-card border-b border-border flex items-center px-2 gap-2">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+          className="flex items-center justify-center w-12 h-12 rounded-xl hover:bg-muted active:bg-muted transition-colors text-foreground"
+          style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
         >
-          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
         <span className="text-sm font-semibold text-foreground tracking-tight">
           {navItems.find((n) => n.path === "/" ? location.pathname === "/" : location.pathname.startsWith(n.path))?.label ?? "App"}
@@ -74,7 +75,7 @@ export default function Layout() {
         </nav>
       </aside>
 
-      <main className="flex-1 pt-12 overflow-auto">
+      <main className="flex-1 pt-14 overflow-auto">
         <Outlet />
       </main>
     </div>
