@@ -14,7 +14,7 @@ const SECTION_COLORS = {
 
 function Section({ icon, title, color, children }) {
   return (
-    <div className="bg-muted/40 rounded-lg p-3 space-y-2">
+    <div className="bg-muted/60 rounded-lg p-3 space-y-2">
       <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: SECTION_COLORS[color] }}>
         {icon}{title}
       </p>
@@ -25,7 +25,7 @@ function Section({ icon, title, color, children }) {
 
 function Item({ text }) {
   return (
-    <li className="text-xs text-muted-foreground leading-snug pl-3 border-l-2 border-border py-0.5">
+    <li className="text-sm text-foreground leading-relaxed pl-3 border-l-2 border-primary/40 py-1">
       {text}
     </li>
   );
@@ -124,7 +124,7 @@ Provide a thorough physiological analysis of this individual session. Be specifi
       {result && (
         <div className="space-y-3">
           {result.summary && (
-            <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">
+            <p className="text-base text-foreground font-medium leading-relaxed border-l-2 border-primary pl-3">
               {result.summary}
             </p>
           )}
