@@ -12,14 +12,22 @@ export default function MethodsSection({ data, onChange }) {
   const [uploading, setUploading] = useState(false);
   const update = (field, value) => onChange({ ...data, [field]: value });
   const methods = data.methods || [];
+  const estimScreenshots = data.estim_screenshots || (data.estim_screenshot ? [data.estim_screenshot] : []);
 
-  const handleScreenshot = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleScreenshots = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    update("estim_screenshot", file_url);
+    const urls = await Promise.all(files.map(async (file) => {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      return file_url;
+    }));
+    update("estim_screenshots", [...estimScreenshots, ...urls]);
     setUploading(false);
+  };
+
+  const removeScreenshot = (idx) => {
+    update("estim_screenshots", estimScreenshots.filter((_, i) => i !== idx));
   };
 
   return (
@@ -65,12 +73,25 @@ export default function MethodsSection({ data, onChange }) {
       {methods.includes("Coyote E-Stim") && (
         <div className="bg-muted/50 rounded-lg p-3 space-y-3">
           <p className="text-xs font-semibold text-muted-foreground">E-Stim Details</p>
+          {estimScreenshots.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {estimScreenshots.map((url, idx) => (
+                <div key={idx} className="relative">
+                  <img src={url} alt={`E-Stim screenshot ${idx + 1}`} className="w-20 h-20 object-cover rounded-lg border border-border" />
+                  <button
+                    onClick={() => removeScreenshot(idx)}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-bold"
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          )}
           <label className="flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-3 cursor-pointer hover:border-primary/50 transition-colors">
             <Upload className="w-4 h-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              {uploading ? "Uploading..." : data.estim_screenshot ? "Screenshot uploaded ✓" : "Upload settings screenshot"}
+              {uploading ? "Uploading..." : estimScreenshots.length > 0 ? `${estimScreenshots.length} screenshot(s) — add more` : "Upload settings screenshots (multi-select ok)"}
             </span>
-            <input type="file" accept="image/*" className="hidden" onChange={handleScreenshot} />
+            <input type="file" accept="image/*" multiple className="hidden" onChange={handleScreenshots} />
           </label>
           <Textarea
             value={data.estim_notes || ""}

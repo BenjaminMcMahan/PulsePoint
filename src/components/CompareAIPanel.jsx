@@ -24,7 +24,7 @@ function Section({ icon, title, color, children }) {
 
 function Item({ text }) {
   return (
-    <li className="text-xs text-muted-foreground leading-snug pl-3 border-l-2 border-border py-0.5">{text}</li>
+    <li className="text-sm text-foreground/90 leading-relaxed pl-3 border-l-2 border-primary/40 py-0.5">{text}</li>
   );
 }
 

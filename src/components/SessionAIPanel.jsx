@@ -40,6 +40,11 @@ export default function SessionAIPanel({ session, timelineRows }) {
     setLoading(true);
     setResult(null);
 
+    const estimScreenshots = [
+      ...(session.estim_screenshots || []),
+      ...(session.estim_screenshot && !(session.estim_screenshots?.includes(session.estim_screenshot)) ? [session.estim_screenshot] : []),
+    ].filter(Boolean);
+
     const hrSummary = timelineRows.length > 0 ? {
       total_points: timelineRows.length,
       duration_s: Math.round(Math.max(...timelineRows.map(r => Number(r.time_offset_s) || 0))),
@@ -49,7 +54,10 @@ export default function SessionAIPanel({ session, timelineRows }) {
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant analyzing a single sexual response session.
+      ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
+      prompt: `You are a physiological research assistant analyzing a single sexual response session.${estimScreenshots.length > 0 ? `
+
+IMPORTANT: ${estimScreenshots.length} E-Stim settings screenshot(s) from the Howl app are attached. Analyze the visible waveform types, frequencies, pulse widths, channel configurations, and intensity levels shown. Incorporate these E-Stim settings as a key factor in your physiological analysis — note how the specific settings likely contributed to the observed heart rate patterns, build quality, and climax response.` : ""}
 
 Session data:
 ${JSON.stringify({

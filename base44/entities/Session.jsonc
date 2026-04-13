@@ -82,6 +82,13 @@
     "estim_screenshot": {
       "type": "string"
     },
+    "estim_screenshots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Multiple E-Stim settings screenshots (e.g. from Howl app)"
+    },
     "estim_notes": {
       "type": "string"
     },
