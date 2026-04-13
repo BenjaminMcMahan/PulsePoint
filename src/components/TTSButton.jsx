@@ -1,79 +1,90 @@
 import { useState, useEffect, useRef } from "react";
 import { Play, Pause, Square } from "lucide-react";
 
+// Android Chrome silently drops long utterances — split into sentence chunks
+function splitIntoChunks(text, maxLen = 200) {
+  const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+  const chunks = [];
+  let current = "";
+  for (const s of sentences) {
+    if ((current + s).length > maxLen) {
+      if (current.trim()) chunks.push(current.trim());
+      current = s;
+    } else {
+      current += s;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks.length ? chunks : [text];
+}
+
 export default function TTSButton({ getText }) {
   const [state, setState] = useState("idle"); // idle | playing | paused
-  const uttRef = useRef(null);
+  const queueRef = useRef([]);
+  const pausedRef = useRef(false);
 
-  useEffect(() => {
-    return () => {
-      window.speechSynthesis?.cancel();
-    };
-  }, []);
-
-  // iOS heartbeat: keeps speech going if it silently pauses
-  useEffect(() => {
-    if (state !== "playing") return;
-    const interval = setInterval(() => {
-      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-      if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) setState("idle");
-    }, 500);
-    return () => clearInterval(interval);
-  }, [state]);
+  useEffect(() => () => window.speechSynthesis?.cancel(), []);
 
   const stop = () => {
+    queueRef.current = [];
+    pausedRef.current = false;
     window.speechSynthesis.cancel();
-    uttRef.current = null;
     setState("idle");
+  };
+
+  const speakNext = () => {
+    if (pausedRef.current) return;
+    const chunk = queueRef.current.shift();
+    if (!chunk) { setState("idle"); return; }
+
+    const utt = new SpeechSynthesisUtterance(chunk);
+    utt.lang = "en-US";
+    utt.rate = 0.95;
+    utt.volume = 1;
+    utt.onend = () => speakNext();
+    utt.onerror = (e) => {
+      if (e.error === "interrupted") return;
+      speakNext(); // skip bad chunk, continue
+    };
+    window.speechSynthesis.speak(utt);
   };
 
   const handlePress = () => {
     if (state === "playing") {
+      pausedRef.current = true;
       window.speechSynthesis.pause();
       setState("paused");
       return;
     }
+
     if (state === "paused") {
+      pausedRef.current = false;
       window.speechSynthesis.resume();
+      // If resume doesn't work (Android bug), re-speak remaining queue
+      setTimeout(() => {
+        if (!window.speechSynthesis.speaking) speakNext();
+      }, 200);
       setState("playing");
       return;
     }
 
-    // idle → play
+    // idle → start
     const text = getText();
     if (!text?.trim()) return;
 
-    // Cancel any existing speech FIRST
     window.speechSynthesis.cancel();
-
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = "en-US";
-    utt.rate = 0.95;
-    utt.volume = 1;
-    utt.onstart = () => setState("playing");
-    utt.onend = () => setState("idle");
-    utt.onerror = (e) => {
-      // "interrupted" fires when cancel() is called; not a real error
-      if (e.error !== "interrupted") setState("idle");
-    };
-    uttRef.current = utt;
-
-    // Android Chrome: speak() must be called in the SAME synchronous call stack
-    // as the user event (no setTimeout). Call it directly here.
-    window.speechSynthesis.speak(utt);
-
-    // Android fallback: if onstart hasn't fired after 300ms, assume it's speaking
-    const fallback = setTimeout(() => {
-      if (state === "idle") setState("playing");
-    }, 300);
-    utt.onstart = () => { clearTimeout(fallback); setState("playing"); };
+    queueRef.current = splitIntoChunks(text);
+    pausedRef.current = false;
+    setState("playing");
+    // Small delay so cancel() settles before we start speaking
+    setTimeout(() => speakNext(), 100);
   };
 
   if (state === "idle") {
     return (
       <button
         onClick={handlePress}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 active:bg-muted/60 transition-colors text-xs font-medium select-none"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground active:opacity-70 transition-colors text-xs font-medium select-none"
         style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
       >
         <Play className="w-3.5 h-3.5" /> Read
@@ -85,7 +96,7 @@ export default function TTSButton({ getText }) {
     <div className="flex items-center gap-1">
       <button
         onClick={handlePress}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:bg-primary/30 transition-colors text-xs font-medium select-none"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:opacity-70 transition-colors text-xs font-medium select-none"
         style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
       >
         {state === "playing" ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
@@ -93,7 +104,7 @@ export default function TTSButton({ getText }) {
       </button>
       <button
         onClick={stop}
-        className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground active:bg-muted/60 transition-colors select-none"
+        className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground active:opacity-70 transition-colors select-none"
         style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
       >
         <Square className="w-3.5 h-3.5" />
