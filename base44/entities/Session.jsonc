@@ -50,16 +50,13 @@
       }
     },
     "pre_climax_offset_s": {
-      "type": "number",
-      "description": "Time offset (seconds) of pre-climax marker"
+      "type": "number"
     },
     "climax_offset_s": {
-      "type": "number",
-      "description": "Time offset (seconds) of climax marker"
+      "type": "number"
     },
     "recovery_offset_s": {
-      "type": "number",
-      "description": "Time offset (seconds) of recovery marker"
+      "type": "number"
     },
     "event_timeline": {
       "type": "array",
@@ -68,12 +65,10 @@
         "type": "object",
         "properties": {
           "time_s": {
-            "type": "number",
-            "description": "Time offset in seconds from session start"
+            "type": "number"
           },
           "note": {
-            "type": "string",
-            "description": "Description of what happened at this moment"
+            "type": "string"
           }
         },
         "required": [
@@ -108,7 +103,7 @@
       "items": {
         "type": "string"
       },
-      "description": "Multiple E-Stim settings screenshots (e.g. from Howl app)"
+      "description": "Multiple E-Stim settings screenshots"
     },
     "estim_notes": {
       "type": "string"
@@ -181,6 +176,27 @@
     "discomfort_notes": {
       "type": "string"
     },
+    "discomfort_entries": {
+      "type": "array",
+      "description": "Multiple discomfort entries with severity rating and description",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "note"
+        ]
+      }
+    },
     "mood": {
       "type": "string",
       "enum": [
@@ -228,8 +244,7 @@
       "type": "array",
       "items": {
         "type": "string"
-      },
-      "description": "Uploaded MP4 video URLs"
+      }
     },
     "video_link": {
       "type": "string"

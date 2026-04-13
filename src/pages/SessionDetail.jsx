@@ -270,8 +270,18 @@ export default function SessionDetail() {
         <div className="bg-card rounded-xl border border-border p-4 space-y-1">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">Physiological</h3>
           <InfoRow label="Ejaculate Volume" value={cap(s.ejaculate_volume)} />
-          <InfoRow label="Discomfort" value={s.discomfort ? "Yes" : "No"} />
-          {s.discomfort_notes && <InfoRow label="Discomfort Notes" value={s.discomfort_notes} />}
+          {s.discomfort_entries?.length > 0 && (
+            <div className="py-2 border-b border-border space-y-1.5">
+              <span className="text-sm text-muted-foreground">Discomfort Log</span>
+              {s.discomfort_entries.map((e, i) => (
+                <div key={i} className="flex items-start gap-2 bg-muted/50 rounded-lg px-3 py-2">
+                  <span className="text-xs font-bold text-destructive shrink-0 w-16">Sev {e.severity}/10</span>
+                  <span className="text-sm text-foreground leading-snug whitespace-pre-wrap">{e.note}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {!s.discomfort_entries?.length && <InfoRow label="Discomfort" value={s.discomfort ? "Yes" : "No"} />}
           {s.unusual_sensations && <InfoRow label="Unusual Sensations" value={s.unusual_sensations} />}
           {s.refractory_notes && <InfoRow label="Refractory Notes" value={s.refractory_notes} />}
         </div>
