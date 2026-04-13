@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Brain, Activity, TrendingUp, Zap, Lightbulb, AlertCircle } from "lucide-react";
+import TTSButton from "./TTSButton";
 
 const SECTION_COLORS = {
   "chart-1": "hsl(var(--chart-1))",
@@ -116,6 +117,15 @@ Provide a structured comparative analysis.`,
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
           <Brain className="w-4 h-4" /> AI Comparison Analysis
         </h3>
+        <div className="flex items-center gap-2">
+          {result && <TTSButton getText={() => {
+            const parts = [result.summary, result.standout_session];
+            result.key_differences?.forEach(s => parts.push(s));
+            result.hr_comparison?.forEach(s => parts.push(s));
+            result.phase_comparison?.forEach(s => parts.push(s));
+            result.recommendations?.forEach(s => parts.push(s));
+            return parts.filter(Boolean).join('. ');
+          }} />}
         <button
           onClick={() => runAnalysis(savedId)}
           disabled={loading}
@@ -125,6 +135,7 @@ Provide a structured comparative analysis.`,
             ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
             : <><Brain className="w-3 h-3" />Re-analyze</>}
         </button>
+        </div>
       </div>
 
       {loading && !result && (

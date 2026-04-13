@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Activity, TrendingDown, Clock, Zap, AlertCircle } from "lucide-react";
+import TTSButton from "../components/TTSButton";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ function Section({ icon, title, color, children }) {
 
 function Item({ text }) {
   return (
-    <li className="text-muted-foreground leading-snug pl-3 border-l border-border py-0.5">• {text}</li>
+    <li className="text-sm text-foreground/90 leading-relaxed pl-3 border-l-2 border-primary/40 py-0.5">• {text}</li>
   );
 }
 
@@ -173,11 +174,22 @@ Be specific, concise, and use physiological research language.`,
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
           <Brain className="w-4 h-4" /> AI Cascade Analysis
         </h3>
+        <div className="flex items-center gap-2">
+          {result && <TTSButton getText={() => {
+            const parts = [result.summary];
+            result.common_signatures?.forEach(s => parts.push(s));
+            result.marker_refinement?.forEach(s => parts.push(s));
+            result.predictive_insights?.forEach(s => parts.push(s));
+            result.phenotype_clusters?.forEach(s => parts.push(s));
+            result.anomalies?.forEach(a => parts.push(`${a.session_date}: ${a.finding}`));
+            return parts.filter(Boolean).join('. ');
+          }} />}
         <Button size="sm" onClick={analyze} disabled={loading || sessions.length < 2} className="h-7 text-xs gap-1.5">
           {loading
             ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
             : <><Brain className="w-3 h-3" />Analyze</>}
         </Button>
+        </div>
       </div>
 
       {sessions.length < 2 && (
@@ -195,7 +207,7 @@ Be specific, concise, and use physiological research language.`,
       {result && (
         <div className="space-y-4 text-xs">
           {result.summary ? (
-            <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
+            <p className="text-base text-foreground font-medium leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
           ) : (
             <p className="text-xs text-muted-foreground italic">Analysis complete — no summary returned.</p>
           )}

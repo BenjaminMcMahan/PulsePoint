@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Brain, Activity, Layers, AlertCircle, Zap, TrendingUp, Clock } from "lucide-react";
+import TTSButton from "../components/TTSButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -236,11 +237,20 @@ Be interpretive, insightful, and research-oriented. Reference specific sessions 
     <SectionCard icon={<Zap className="w-4 h-4" />} title="Near-Climax Event Analysis" color="hsl(var(--chart-3))">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">Detects erratic HR spikes & reversals that resemble — but don't complete — a climax cascade.</p>
+        <div className="flex items-center gap-2">
+          {result && <TTSButton getText={() => {
+            const parts = [result.summary, result.physiological_interpretation, result.role_in_arousal_arc];
+            result.pattern_analysis?.forEach(s => parts.push(s));
+            result.contextual_triggers?.forEach(s => parts.push(s));
+            result.recommendations?.forEach(s => parts.push(s));
+            return parts.filter(Boolean).join('. ');
+          }} />}
         <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5 shrink-0 ml-2">
           {loading
             ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
             : <><Brain className="w-3 h-3" />{result ? "Re-run" : "Analyze"}</>}
         </Button>
+        </div>
       </div>
 
       {displayStats && (
@@ -438,11 +448,20 @@ Be interpretive and insightful — not just descriptive.`,
     <SectionCard icon={<Layers className="w-4 h-4" />} title="Session Profile Clusters" color="hsl(var(--primary))">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">AI-identified physiological profiles across all sessions, linked to methods and build types.</p>
+        <div className="flex items-center gap-2">
+          {result && <TTSButton getText={() => {
+            const parts = [result.overview];
+            result.clusters?.forEach(c => parts.push(c.name + ': ' + c.description + '. ' + c.recommendation));
+            result.method_build_correlations?.forEach(s => parts.push(s));
+            result.cross_cluster_insights?.forEach(s => parts.push(s));
+            return parts.filter(Boolean).join('. ');
+          }} />}
         <Button size="sm" onClick={analyze} disabled={loading || sessions.length < 4} className="h-7 text-xs gap-1.5 shrink-0 ml-2">
           {loading
             ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
             : <><Brain className="w-3 h-3" />{result ? "Re-run" : "Analyze"}</>}
         </Button>
+        </div>
       </div>
 
       {sessions.length < 4 && (

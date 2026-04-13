@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Brain, AlertCircle, Activity, Lightbulb, TrendingUp, Zap } from "lucide-react";
+import TTSButton from "./TTSButton";
 import { Button } from "@/components/ui/button";
 
 const SECTION_COLORS = {
@@ -108,11 +109,21 @@ Provide a thorough physiological analysis of this individual session. Be specifi
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
           <Brain className="w-4 h-4" /> AI Session Analysis
         </h3>
+        <div className="flex items-center gap-2">
+          {result && <TTSButton getText={() => {
+            const parts = [result.summary];
+            result.hr_analysis?.forEach(s => parts.push(s));
+            result.phase_analysis?.forEach(s => parts.push(s));
+            result.notable_findings?.forEach(s => parts.push(s));
+            result.recommendations?.forEach(s => parts.push(s));
+            return parts.filter(Boolean).join('. ');
+          }} />}
         <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5">
           {loading
             ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
             : <><Brain className="w-3 h-3" />Analyze</>}
         </Button>
+        </div>
       </div>
 
       {!result && !loading && (
