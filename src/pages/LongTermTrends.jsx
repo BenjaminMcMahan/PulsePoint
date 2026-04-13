@@ -73,8 +73,27 @@ function groupByWeek(sessions) {
   return Object.values(map).sort((a, b) => a.ts - b.ts);
 }
 
-// Build rolling-window trend: for the selected week index, show that week + N surrounding weeks
+// Build per-session trend data for the selected week window (center ± windowSize weeks)
 function buildWeekTrendData(sessions, weekKeys, centerIdx, windowSize = 8) {
+  const half = Math.floor(windowSize / 2);
+  const start = Math.max(0, centerIdx - half);
+  const end = Math.min(weekKeys.length - 1, centerIdx + half);
+  const visibleKeys = new Set(weekKeys.slice(start, end + 1));
+
+  return sessions
+    .filter((s) => visibleKeys.has(moment(s.date).format("GGGG-[W]WW")))
+    .map((s) => ({
+      week: moment(s.date).format("MMM D"),
+      satisfaction: s.satisfaction ?? null,
+      build_quality: s.build_quality ?? null,
+      intensity: s.intensity ?? null,
+      avg_hr: s.avg_hr ?? null,
+      max_hr: s.max_hr ?? null,
+    }));
+}
+
+// Aggregate per week for session frequency chart
+function buildWeekFrequencyData(sessions, weekKeys, centerIdx, windowSize = 8) {
   const half = Math.floor(windowSize / 2);
   const start = Math.max(0, centerIdx - half);
   const end = Math.min(weekKeys.length - 1, centerIdx + half);
@@ -85,16 +104,7 @@ function buildWeekTrendData(sessions, weekKeys, centerIdx, windowSize = 8) {
     const week = weekMap[key];
     const ss = week?.sessions || [];
     const weekStart = moment().isoWeek(parseInt(key.split("W")[1])).isoWeekYear(parseInt(key.split("-")[0])).startOf("isoWeek");
-    const label = weekStart.format("MMM D");
-    return {
-      week: label,
-      satisfaction: avg(ss.map((s) => s.satisfaction)),
-      build_quality: avg(ss.map((s) => s.build_quality)),
-      intensity: avg(ss.map((s) => s.intensity)),
-      avg_hr: avg(ss.map((s) => s.avg_hr)),
-      max_hr: avg(ss.map((s) => s.max_hr)),
-      count: ss.length,
-    };
+    return { week: weekStart.format("MMM D"), count: ss.length };
   });
 }
 
@@ -336,6 +346,11 @@ export default function LongTermTrends() {
     [sessions, weekKeys, weekIdx]
   );
 
+  const freqData = useMemo(
+    () => weekIdx !== null ? buildWeekFrequencyData(sessions, weekKeys, weekIdx) : [],
+    [sessions, weekKeys, weekIdx]
+  );
+
   const methods = useMemo(() => methodStats(sessions), [sessions]);
 
   if (loading) {
@@ -422,7 +437,7 @@ export default function LongTermTrends() {
       <ChartCard title="Session Frequency (±4 weeks)">
         <div className="h-36">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
+            <LineChart data={freqData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="week" tick={{ fontSize: 8 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 8 }} />
