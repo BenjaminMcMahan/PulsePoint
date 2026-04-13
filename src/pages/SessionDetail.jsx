@@ -8,6 +8,7 @@ import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil } from "lucide-react
 import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
 import HRZoneAnalysis from "../components/HRZoneAnalysis";
+import HREventOverlayChart from "../components/HREventOverlayChart";
 import SessionAIPanel from "../components/SessionAIPanel";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
@@ -219,6 +220,13 @@ export default function SessionDetail() {
           )}
           {timelineRows.length > 0 && (
             <HRZoneAnalysis rows={timelineRows} sessionMaxHR={s.max_hr} />
+          )}
+          {timelineRows.length > 0 && (s.event_timeline || []).length > 0 && (
+            <HREventOverlayChart
+              timelineRows={timelineRows}
+              events={s.event_timeline}
+              session={s}
+            />
           )}
           {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
             <div className="h-32">

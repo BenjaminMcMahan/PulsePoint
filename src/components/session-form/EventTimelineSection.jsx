@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Clock } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 function parseMmSs(str) {
   const match = str.match(/^(\d{1,2}):(\d{2})$/);
@@ -20,28 +21,32 @@ function fmtMmSs(totalSeconds) {
 
 export default function EventTimelineSection({ data, onChange }) {
   const events = data.event_timeline || [];
-  const [timeInput, setTimeInput] = useState("");
+  const [minutes, setMinutes] = useState("");
+  const [seconds, setSeconds] = useState("");
   const [noteInput, setNoteInput] = useState("");
   const [timeError, setTimeError] = useState(false);
 
   const update = (newEvents) => onChange({ ...data, event_timeline: newEvents });
 
   const addEvent = () => {
-    const seconds = parseMmSs(timeInput.trim());
-    if (seconds === null) { setTimeError(true); return; }
+    const m = parseInt(minutes, 10);
+    const s = parseInt(seconds || "0", 10);
+    if (isNaN(m) || m < 0 || isNaN(s) || s < 0 || s > 59) { setTimeError(true); return; }
     if (!noteInput.trim()) return;
     setTimeError(false);
-    const newEvent = { time_s: seconds, note: noteInput.trim() };
+    const totalSeconds = m * 60 + s;
+    const newEvent = { time_s: totalSeconds, note: noteInput.trim() };
     const sorted = [...events, newEvent].sort((a, b) => a.time_s - b.time_s);
     update(sorted);
-    setTimeInput("");
+    setMinutes("");
+    setSeconds("");
     setNoteInput("");
   };
 
   const removeEvent = (idx) => update(events.filter((_, i) => i !== idx));
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") { e.preventDefault(); addEvent(); }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addEvent(); }
   };
 
   return (
@@ -67,27 +72,45 @@ export default function EventTimelineSection({ data, onChange }) {
       )}
 
       {/* Add new event */}
-      <div className="flex gap-2 items-start">
-        <div className="shrink-0 w-20">
-          <Input
-            value={timeInput}
-            onChange={(e) => { setTimeInput(e.target.value); setTimeError(false); }}
-            onKeyDown={handleKeyDown}
-            placeholder="MM:SS"
-            className={`h-10 font-mono text-center ${timeError ? "border-destructive" : ""}`}
-          />
-          {timeError && <p className="text-[10px] text-destructive mt-0.5">Use MM:SS</p>}
+      <div className="space-y-2">
+        <div className="flex gap-2 items-start">
+          <div className="flex gap-1 items-center shrink-0">
+            <div>
+              <Input
+                type="number"
+                min={0}
+                value={minutes}
+                onChange={(e) => { setMinutes(e.target.value); setTimeError(false); }}
+                placeholder="Min"
+                className={`h-10 w-16 font-mono text-center ${timeError ? "border-destructive" : ""}`}
+              />
+            </div>
+            <span className="text-muted-foreground font-bold text-lg pb-0.5">:</span>
+            <div>
+              <Input
+                type="number"
+                min={0}
+                max={59}
+                value={seconds}
+                onChange={(e) => { setSeconds(e.target.value); setTimeError(false); }}
+                placeholder="Sec"
+                className={`h-10 w-16 font-mono text-center ${timeError ? "border-destructive" : ""}`}
+              />
+            </div>
+          </div>
+          <Button type="button" onClick={addEvent} size="icon" className="h-10 w-10 shrink-0 ml-auto">
+            <Plus className="w-4 h-4" />
+          </Button>
         </div>
-        <Input
+        {timeError && <p className="text-[10px] text-destructive">Enter valid minutes and seconds (0–59)</p>}
+        <Textarea
           value={noteInput}
           onChange={(e) => setNoteInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="What happened? (e.g. channel B moved to suprapubic)"
-          className="h-10 flex-1"
+          placeholder="Describe the event (e.g. channel B positive electrode moved from perineum to suprapubic, stimulation paused, intensity increased...)&#10;Press Enter to add."
+          rows={3}
+          className="resize-none"
         />
-        <Button type="button" onClick={addEvent} size="icon" className="h-10 w-10 shrink-0">
-          <Plus className="w-4 h-4" />
-        </Button>
       </div>
     </div>
   );
