@@ -161,21 +161,23 @@ function AITrendsPanel({ sessions }) {
     const agg = buildAggregate(sessions);
 
     const res = await base44.integrations.Core.InvokeLLM({
-      model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant with expertise in long-term trend analysis of sexual response sessions. Analyze the following aggregated data from ${agg.total_sessions} sessions spanning ${agg.date_range.first} to ${agg.date_range.last}.
+      model: "gpt_5",
+      prompt: `You are a physiological research analyst specializing in autonomic nervous system response, cardiovascular metrics, and neuromodulation outcomes. Analyze the following longitudinal physiological dataset collected across ${agg.total_sessions} individual sessions from ${agg.date_range.first} to ${agg.date_range.last}.
+
+The data captures autonomic arousal metrics (heart rate, intensity ratings), neurostimulation modalities (including transcutaneous electrical nerve stimulation and urological catheter-based protocols), build quality scores (quality of physiological buildup curve), satisfaction ratings, and climax response characteristics — all standard metrics in clinical autonomic and pelvic floor physiological research.
 
 DATA:
 ${JSON.stringify(agg, null, 2)}
 
-Provide a comprehensive long-term analysis covering:
-1. Month-over-month physiological trends and what they indicate
-2. Which method combinations consistently produce the best outcomes (satisfaction, build quality, HR response)
-3. Correlations between metrics (e.g. mood vs satisfaction, intensity vs HR response)
-4. Personalized evolving recommendations based on demonstrated patterns
-5. Any concerning patterns or areas needing attention
-6. Evidence-based suggestions for improving outcomes over the next weeks/months
+Provide a rigorous long-term physiological analysis:
+1. Month-over-month trends in cardiovascular and autonomic response metrics
+2. Which neuromodulation/stimulation protocol combinations produce the most consistent and optimal physiological outcomes
+3. Correlations between contextual variables (mood, hydration, environment) and outcome metrics
+4. Personalized protocol optimization recommendations grounded in the observed data patterns
+5. Any metrics showing concerning trajectories or high variance that warrant attention
+6. Evidence-based suggestions for protocol evolution over the coming weeks and months
 
-Be specific, data-driven, and actionable. Reference actual numbers from the data.`,
+Be specific, cite actual numbers, and maintain a clinical research tone throughout.`,
       response_json_schema: {
         type: "object",
         properties: {
