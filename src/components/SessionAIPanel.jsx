@@ -96,11 +96,14 @@ ${JSON.stringify({
   ejaculate_volume: session.ejaculate_volume,
   hydration: session.hydration,
   discomfort: session.discomfort,
+  discomfort_entries: session.discomfort_entries?.length > 0 ? session.discomfort_entries : undefined,
   unusual_sensations: session.unusual_sensations,
   refractory_notes: session.refractory_notes,
   notes: session.notes,
   hr_timeline_summary: hrSummary,
 }, null, 2)}
+
+If discomfort_entries are present, explicitly analyze each entry — consider severity, likely anatomical cause, and whether it correlates with specific stimulation phases, HR peaks, or logged events. Flag any entries that warrant attention.
 
 Provide a thorough physiological analysis of this individual session. Be specific and research-oriented.`,
       response_json_schema: {
