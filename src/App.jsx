@@ -16,6 +16,7 @@ import Insights from './pages/Insights';
 import EditSession from './pages/EditSession';
 import CascadeAnalysis from './pages/CascadeAnalysis';
 import Profiler from './pages/Profiler';
+import HROverlay from './pages/HROverlay';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -54,6 +55,7 @@ const AuthenticatedApp = () => {
         <Route path="/insights" element={<Insights />} />
         <Route path="/cascade" element={<CascadeAnalysis />} />
         <Route path="/profiler" element={<Profiler />} />
+        <Route path="/overlay" element={<HROverlay />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

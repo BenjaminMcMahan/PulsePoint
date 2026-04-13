@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, List, PlusCircle, GitCompare, TrendingUp, Waves, ScanSearch } from "lucide-react";
+import { LayoutDashboard, List, PlusCircle, GitCompare, TrendingUp, Waves, ScanSearch, GitMerge } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -9,6 +9,7 @@ const navItems = [
   { path: "/insights", icon: TrendingUp, label: "Insights" },
   { path: "/cascade", icon: Waves, label: "Cascade" },
   { path: "/profiler", icon: ScanSearch, label: "Profiler" },
+  { path: "/overlay", icon: GitMerge, label: "Overlay" },
 ];
 
 export default function Layout() {
