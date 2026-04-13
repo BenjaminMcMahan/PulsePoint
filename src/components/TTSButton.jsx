@@ -1,6 +1,48 @@
 import { useState, useEffect, useRef } from "react";
 import { Play, Pause, Square } from "lucide-react";
 
+// Clean text for natural speech — replace symbols and units with spoken equivalents
+function cleanTextForSpeech(text) {
+  return text
+    // Punctuation / bullets first
+    .replace(/•/g, ". ")
+    .replace(/·/g, ". ")
+    .replace(/–|—/g, ", ")
+    // HR / physiological units
+    .replace(/(\d+)\s*bpm/gi, "$1 beats per minute")
+    .replace(/(\d+)\s*m(\d+)s/g, (_, m, s) => `${m} minute${m !== '1' ? 's' : ''} ${s} seconds`)
+    .replace(/(\d+)\s*m(?=\b)/g, "$1 minutes")
+    .replace(/(\d+)\s*s(?=\b)/g, "$1 seconds")
+    // Comparison symbols
+    .replace(/>=/g, " greater than or equal to ")
+    .replace(/<=/g, " less than or equal to ")
+    .replace(/>/g, " greater than ")
+    .replace(/</g, " less than ")
+    // Common symbols
+    .replace(/±/g, " plus or minus ")
+    .replace(/\+/g, " plus ")
+    .replace(/\*/g, " times ")
+    .replace(/%/g, " percent")
+    .replace(/\/(?=\d)/g, " out of ")
+    .replace(/→/g, " to ")
+    .replace(/←/g, " from ")
+    .replace(/≈/g, " approximately ")
+    .replace(/~(\d)/g, "approximately $1")
+    // Abbreviations
+    .replace(/\bHR\b/g, "heart rate")
+    .replace(/\bhr\b/g, "heart rate")
+    .replace(/\bavg\b/gi, "average")
+    .replace(/\bmax\b/gi, "maximum")
+    .replace(/\bmin\b/g, "minimum")
+    .replace(/\bI:(\d+)/g, "intensity $1")
+    .replace(/♥/g, "heart rate")
+    // Remove leftover markdown-ish chars
+    .replace(/[#_*`]/g, "")
+    // Collapse extra whitespace
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 // Android Chrome silently drops long utterances — split into sentence chunks
 function splitIntoChunks(text, maxLen = 200) {
   const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
@@ -69,9 +111,10 @@ export default function TTSButton({ getText }) {
     }
 
     // idle → start
-    const text = getText();
-    if (!text?.trim()) return;
+    const rawText = getText();
+    if (!rawText?.trim()) return;
 
+    const text = cleanTextForSpeech(rawText);
     window.speechSynthesis.cancel();
     queueRef.current = splitIntoChunks(text);
     pausedRef.current = false;
