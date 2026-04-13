@@ -15,6 +15,7 @@ import Compare from './pages/Compare';
 import Insights from './pages/Insights';
 import EditSession from './pages/EditSession';
 import CascadeAnalysis from './pages/CascadeAnalysis';
+import Profiler from './pages/Profiler';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -52,6 +53,7 @@ const AuthenticatedApp = () => {
         <Route path="/compare" element={<Compare />} />
         <Route path="/insights" element={<Insights />} />
         <Route path="/cascade" element={<CascadeAnalysis />} />
+        <Route path="/profiler" element={<Profiler />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>
