@@ -52,10 +52,22 @@ export default function SessionAIPanel({ session, timelineRows }) {
       hr_max: Math.round(Math.max(...timelineRows.map(r => Number(r.hr)))),
     } : null;
 
+    const eventTimeline = (session.event_timeline || []).map(e => {
+      const m = Math.floor(e.time_s / 60);
+      const s = (e.time_s % 60).toString().padStart(2, '0');
+      return `${m}:${s} — ${e.note}`;
+    });
+
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
       prompt: `You are a physiological research assistant analyzing a single sexual response session.${estimScreenshots.length > 0 ? `
+
+IMPORTANT: ${estimScreenshots.length} E-Stim settings screenshot(s) from the Howl app are attached. Analyze the visible waveform types, frequencies, pulse widths, channel configurations, and intensity levels shown. Incorporate these E-Stim settings as a key factor in your physiological analysis — note how the specific settings likely contributed to the observed heart rate patterns, build quality, and climax response.` : ""}${eventTimeline.length > 0 ? `
+
+EVENT TIMELINE (notable moments logged during the session):
+${eventTimeline.join('\n')}
+Incorporate these events into your analysis — note how stimulation changes, pauses, or electrode movements correlate with heart rate changes and the arousal arc.` : ""}${estimScreenshots.length > 0 ? `
 
 IMPORTANT: ${estimScreenshots.length} E-Stim settings screenshot(s) from the Howl app are attached. Analyze the visible waveform types, frequencies, pulse widths, channel configurations, and intensity levels shown. Incorporate these E-Stim settings as a key factor in your physiological analysis — note how the specific settings likely contributed to the observed heart rate patterns, build quality, and climax response.` : ""}
 

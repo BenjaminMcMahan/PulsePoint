@@ -61,6 +61,27 @@
       "type": "number",
       "description": "Time offset (seconds) of recovery marker"
     },
+    "event_timeline": {
+      "type": "array",
+      "description": "User-logged events during the session with timestamps",
+      "items": {
+        "type": "object",
+        "properties": {
+          "time_s": {
+            "type": "number",
+            "description": "Time offset in seconds from session start"
+          },
+          "note": {
+            "type": "string",
+            "description": "Description of what happened at this moment"
+          }
+        },
+        "required": [
+          "time_s",
+          "note"
+        ]
+      }
+    },
     "methods": {
       "type": "array",
       "items": {

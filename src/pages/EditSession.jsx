@@ -11,6 +11,7 @@ import SubjectiveSection from "../components/session-form/SubjectiveSection";
 import PhysiologicalSection from "../components/session-form/PhysiologicalSection";
 import ContextSection from "../components/session-form/ContextSection";
 import NotesMediaSection from "../components/session-form/NotesMediaSection";
+import EventTimelineSection from "../components/session-form/EventTimelineSection";
 import { Save, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 
 const SECTIONS = [
@@ -20,6 +21,7 @@ const SECTIONS = [
   { id: "subjective", label: "Subjective Metrics" },
   { id: "physio", label: "Physiological" },
   { id: "context", label: "Context" },
+  { id: "events", label: "Event Timeline" },
   { id: "notes", label: "Notes & Media" },
 ];
 
@@ -87,6 +89,7 @@ export default function EditSession() {
       case "subjective": return <SubjectiveSection {...props} />;
       case "physio": return <PhysiologicalSection {...props} />;
       case "context": return <ContextSection {...props} />;
+      case "events": return <EventTimelineSection {...props} />;
       case "notes": return <NotesMediaSection {...props} />;
       default: return null;
     }
