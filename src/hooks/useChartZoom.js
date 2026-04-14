@@ -130,6 +130,7 @@ export function useChartZoom(dataMin, dataMax) {
     setZoomDomain(null);
     setSelectRange(null);
     selectStartRef.current = null;
+    isDraggingRef.current = false;
   }, []);
 
   const isSelecting = selectRange != null;
