@@ -133,33 +133,40 @@ export default function HRZoneAnalysis({ rows, sessionMaxHR }) {
 
       {/* Zone distribution pie */}
       {zoneData.length > 1 && (
-        <div className="h-36">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={zoneData}
-                dataKey="seconds"
-                nameKey="label"
-                cx="50%"
-                cy="50%"
-                innerRadius={30}
-                outerRadius={55}
-                paddingAngle={2}
-              >
-                {zoneData.map((z) => (
-                  <Cell key={z.id} fill={z.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(val, name) => [fmt(val), name]}
-                contentStyle={{ fontSize: 11 }}
-              />
-              <Legend
-                wrapperStyle={{ fontSize: 9 }}
-                formatter={(value, entry) => `${value} (${entry.payload.pct}%)`}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+        <div>
+          <div className="h-44">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={zoneData}
+                  dataKey="seconds"
+                  nameKey="label"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={48}
+                  outerRadius={76}
+                  paddingAngle={2}
+                >
+                  {zoneData.map((z) => (
+                    <Cell key={z.id} fill={z.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(val, name) => [fmt(val), name]}
+                  contentStyle={{ fontSize: 11 }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Custom legend — no recharts Legend to avoid overlaps */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 justify-center mt-1">
+            {zoneData.map((z) => (
+              <div key={z.id} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: z.color }} />
+                <span className="text-[10px] text-muted-foreground">{z.label} <span className="font-mono font-semibold text-foreground">{z.pct}%</span></span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

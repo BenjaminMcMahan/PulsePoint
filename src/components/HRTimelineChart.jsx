@@ -319,7 +319,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
         ))}
       </div>
 
-      <div className={`h-44 ${markingPhase ? "cursor-crosshair" : ""}`}>
+      <div className={`h-64 ${markingPhase ? "cursor-crosshair" : ""}`}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleRows}
