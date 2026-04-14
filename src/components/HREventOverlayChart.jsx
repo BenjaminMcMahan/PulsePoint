@@ -3,6 +3,7 @@ import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis,
   Tooltip, CartesianGrid, ReferenceLine, ReferenceArea,
 } from "recharts";
+
 import { ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import { useChartZoom } from "@/hooks/useChartZoom";
 
@@ -18,27 +19,6 @@ const EVENT_COLORS = [
   "#fb923c", "#84cc16", "#e879f9", "#34d399", "#f87171",
 ];
 
-function CustomTooltip({ active, payload, label, events, pinnedLabel }) {
-  const showLabel = pinnedLabel ?? label;
-  const isActive = active || pinnedLabel != null;
-  if (!isActive || !payload?.length) return null;
-  const hrVal = payload.find((p) => p.dataKey === "hr")?.value;
-  const nearby = events.filter((e) => Math.abs(e.time_s - showLabel) <= 10);
-  return (
-    <div className="bg-card border border-border rounded-lg p-2.5 shadow-lg text-xs max-w-[220px]">
-      <p className="font-mono text-muted-foreground mb-1">{fmtMmSs(showLabel)}</p>
-      {hrVal != null && (
-        <p className="font-bold text-primary mb-1">{Math.round(hrVal)} bpm</p>
-      )}
-      {nearby.map((e, i) => (
-        <p key={i} className="text-foreground/90 leading-snug border-l-2 pl-1.5 mt-1" style={{ borderColor: EVENT_COLORS[events.indexOf(e) % EVENT_COLORS.length] }}>
-          {e.note}
-        </p>
-      ))}
-    </div>
-  );
-}
-
 // Find nearest HR value to a given time_s from chartData
 function nearestHR(chartData, time_s) {
   if (!chartData.length) return null;
@@ -53,8 +33,7 @@ function nearestHR(chartData, time_s) {
 
 export default function HREventOverlayChart({ timelineRows, events = [], session }) {
   const [isolatedEvent, setIsolatedEvent] = useState(null);
-  const [pinnedTime, setPinnedTime] = useState(null);
-  const [focusedIdx, setFocusedIdx] = useState(null); // nav bar focus (independent of isolatedEvent)
+  const [focusedIdx, setFocusedIdx] = useState(null);
 
   const chartData = useMemo(() => {
     return timelineRows.map((r) => ({
@@ -83,14 +62,12 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
     const next = isolatedEvent === idx ? null : idx;
     setIsolatedEvent(next);
     setFocusedIdx(next);
-    setPinnedTime(next !== null ? events[next]?.time_s ?? null : null);
     resetZoom();
   };
 
   const navigateTo = (idx) => {
     setFocusedIdx(idx);
     setIsolatedEvent(idx);
-    setPinnedTime(events[idx]?.time_s ?? null);
     resetZoom();
   };
 
@@ -124,7 +101,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h3>
         {isZoomed ? (
           <button
-            onClick={() => { resetZoom(); setIsolatedEvent(null); setPinnedTime(null); setFocusedIdx(null); }}
+            onClick={() => { resetZoom(); setIsolatedEvent(null); setFocusedIdx(null); }}
             className="flex items-center gap-1 text-[10px] text-primary border border-primary rounded px-2 py-0.5"
           >
             <ZoomOut className="w-3 h-3" /> Reset Zoom
@@ -141,8 +118,9 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
             <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtMmSs} tickCount={8} type="number" domain={xDomain} />
             <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
             <Tooltip
-              content={<CustomTooltip events={events} pinnedLabel={pinnedTime} />}
-              defaultIndex={pinnedTime !== null ? chartData.findIndex((d) => d.t >= pinnedTime) : undefined}
+              formatter={(val) => [`${Math.round(val)} bpm`, "HR"]}
+              labelFormatter={(v) => fmtMmSs(Math.round(Number(v)))}
+              contentStyle={{ fontSize: 11 }}
             />
 
             {/* Phase markers */}
@@ -207,20 +185,21 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
         const color = EVENT_COLORS[idx % EVENT_COLORS.length];
         const hr = nearestHR(chartData, ev.time_s);
         return (
-          <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: color + "18", borderLeft: `3px solid ${color}` }}>
-            <button onClick={handlePrev} className="p-0.5 rounded hover:bg-black/10 shrink-0">
-              <ChevronLeft className="w-4 h-4" style={{ color }} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px] font-bold shrink-0" style={{ color }}>E{idx + 1} / {events.length} — {fmtMmSs(ev.time_s)}</span>
-                {hr != null && <span className="font-mono text-[10px] font-bold text-primary/80 shrink-0">{hr} bpm</span>}
+          <div className="rounded-lg px-3 py-3" style={{ background: color + "18", borderLeft: `3px solid ${color}` }}>
+            <div className="flex items-center gap-2 mb-2">
+              <button onClick={handlePrev} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+                <ChevronLeft className="w-4 h-4" style={{ color }} />
+              </button>
+              <div className="flex-1 flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-[11px] font-bold" style={{ color }}>E{idx + 1} / {events.length}</span>
+                <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(ev.time_s)}</span>
+                {hr != null && <span className="font-mono text-[11px] font-bold text-primary">{hr} bpm</span>}
               </div>
-              <p className="text-xs text-foreground/90 leading-snug mt-0.5 truncate">{ev.note}</p>
+              <button onClick={handleNext} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+                <ChevronRight className="w-4 h-4" style={{ color }} />
+              </button>
             </div>
-            <button onClick={handleNext} className="p-0.5 rounded hover:bg-black/10 shrink-0">
-              <ChevronRight className="w-4 h-4" style={{ color }} />
-            </button>
+            <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">{ev.note}</p>
           </div>
         );
       })()}
