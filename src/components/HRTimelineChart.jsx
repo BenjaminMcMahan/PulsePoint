@@ -117,6 +117,14 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
 
   const { zoomDomain, resetZoom, isSelecting, selectRange, chartProps, wrapperProps } = useChartZoom(visibleMin, visibleMax);
 
+  const displayRows = useMemo(() => {
+    if (!zoomDomain) return visibleRows;
+    return visibleRows.filter(r => {
+      const t = Number(r.time_offset_s);
+      return t >= zoomDomain.x1 && t <= zoomDomain.x2;
+    });
+  }, [visibleRows, zoomDomain]);
+
   const xDomain = zoomDomain ? [zoomDomain.x1, zoomDomain.x2] : ["dataMin", "dataMax"];
 
   if (!rows || rows.length === 0) return null;
@@ -347,7 +355,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
       <div className={`h-64 cursor-crosshair`} {...wrapperProps}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
-            data={visibleRows}
+            data={displayRows}
             margin={{ top: 8, right: 4, bottom: 0, left: -20 }}
             onClick={handleChartClick}
             {...chartProps}

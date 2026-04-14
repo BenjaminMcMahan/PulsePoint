@@ -67,6 +67,11 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
 
   const { zoomDomain, resetZoom, isSelecting, selectRange, chartProps, wrapperProps } = useChartZoom(dataMin, dataMax);
 
+  const displayData = useMemo(() => {
+    if (!zoomDomain) return chartData;
+    return chartData.filter(d => d.t >= zoomDomain.x1 && d.t <= zoomDomain.x2);
+  }, [chartData, zoomDomain]);
+
   const phaseMarkers = [
     session?.pre_climax_offset_s != null && { time_s: session.pre_climax_offset_s, label: "Pre-Climax", color: "#a855f7" },
     session?.climax_offset_s != null && { time_s: session.climax_offset_s, label: "Climax", color: "#ef4444" },
@@ -112,7 +117,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
 
       <div className="h-64 cursor-crosshair" {...wrapperProps}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 8, right: 4, bottom: 0, left: -20 }} {...chartProps}>
+          <ComposedChart data={displayData} margin={{ top: 8, right: 4, bottom: 0, left: -20 }} {...chartProps}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtMmSs} tickCount={8} type="number" domain={xDomain} />
             <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
