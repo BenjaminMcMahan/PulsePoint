@@ -1,39 +1,90 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 /**
  * Cross-platform (mouse + touch) drag-to-zoom for recharts.
- * 
- * Usage:
- *   const { zoomDomain, zoomProps, resetZoom, isSelecting, selectRange } = useChartZoom(dataMin, dataMax);
- * 
- * Spread `zoomProps` onto your recharts chart component.
- * Pass `zoomDomain` as the XAxis domain (when non-null).
- * Render a ReferenceArea using selectRange while isSelecting.
+ * Touch listeners are registered as non-passive so preventDefault works on Android.
  */
 export function useChartZoom(dataMin, dataMax) {
   const [zoomDomain, setZoomDomain] = useState(null);
   const [selectRange, setSelectRange] = useState(null); // { x1, x2 }
   const selectStartRef = useRef(null);
   const containerRef = useRef(null);
+  const dataMinRef = useRef(dataMin);
+  const dataMaxRef = useRef(dataMax);
 
-  // Convert a pixel X position (relative to the chart container) to a data value
+  // Keep refs in sync so touch callbacks (registered once) always see latest values
+  useEffect(() => { dataMinRef.current = dataMin; }, [dataMin]);
+  useEffect(() => { dataMaxRef.current = dataMax; }, [dataMax]);
+
+  // Convert a pixel X position to a data value
   const pixelToValue = useCallback((clientX) => {
     const el = containerRef.current;
     if (!el) return null;
     const rect = el.getBoundingClientRect();
-    // Recharts left margin is roughly 10px (we use left: -20 offset but the actual plot area starts ~30px in)
     const MARGIN_LEFT = 30;
     const MARGIN_RIGHT = 10;
     const plotWidth = rect.width - MARGIN_LEFT - MARGIN_RIGHT;
     const relX = clientX - rect.left - MARGIN_LEFT;
     const clamped = Math.max(0, Math.min(relX, plotWidth));
     const frac = clamped / plotWidth;
-    const min = dataMin ?? 0;
-    const max = dataMax ?? 1;
+    const min = dataMinRef.current ?? 0;
+    const max = dataMaxRef.current ?? 1;
     return min + frac * (max - min);
-  }, [dataMin, dataMax]);
+  }, []);
 
-  // Mouse events
+  // Register touch listeners as non-passive so we can call preventDefault
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handleTouchStart = (e) => {
+      if (e.touches.length !== 1) return;
+      const val = pixelToValue(e.touches[0].clientX);
+      if (val == null) return;
+      selectStartRef.current = val;
+      setSelectRange(null);
+    };
+
+    const handleTouchMove = (e) => {
+      if (e.touches.length !== 1 || selectStartRef.current == null) return;
+      const val = pixelToValue(e.touches[0].clientX);
+      if (val == null) return;
+      const diff = Math.abs(val - selectStartRef.current);
+      if (diff > 3) {
+        e.preventDefault(); // works because listener is non-passive
+        setSelectRange({
+          x1: Math.min(selectStartRef.current, val),
+          x2: Math.max(selectStartRef.current, val),
+        });
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      if (selectStartRef.current == null) return;
+      const lastTouch = e.changedTouches[0];
+      const val = pixelToValue(lastTouch.clientX);
+      if (val != null && Math.abs(val - selectStartRef.current) > 5) {
+        setZoomDomain({
+          x1: Math.min(selectStartRef.current, val),
+          x2: Math.max(selectStartRef.current, val),
+        });
+      }
+      selectStartRef.current = null;
+      setSelectRange(null);
+    };
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchmove", handleTouchMove, { passive: false }); // non-passive!
+    el.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [pixelToValue]);
+
+  // Mouse events (recharts synthetic events)
   const onMouseDown = useCallback((e) => {
     if (e?.activeLabel == null) return;
     selectStartRef.current = Number(e.activeLabel);
@@ -56,37 +107,6 @@ export function useChartZoom(dataMin, dataMax) {
     setSelectRange(null);
   }, []);
 
-  // Touch events (attached directly to the container div, not recharts)
-  const onTouchStart = useCallback((e) => {
-    if (e.touches.length !== 1) return;
-    const val = pixelToValue(e.touches[0].clientX);
-    if (val == null) return;
-    selectStartRef.current = val;
-    setSelectRange(null);
-  }, [pixelToValue]);
-
-  const onTouchMove = useCallback((e) => {
-    if (e.touches.length !== 1 || selectStartRef.current == null) return;
-    const val = pixelToValue(e.touches[0].clientX);
-    if (val == null) return;
-    const x1 = Math.min(selectStartRef.current, val);
-    const x2 = Math.max(selectStartRef.current, val);
-    setSelectRange({ x1, x2 });
-    // prevent page scroll while selecting
-    if (Math.abs(val - selectStartRef.current) > 5) e.preventDefault();
-  }, [pixelToValue]);
-
-  const onTouchEnd = useCallback((e) => {
-    if (selectStartRef.current == null) return;
-    const lastTouch = e.changedTouches[0];
-    const val = pixelToValue(lastTouch.clientX);
-    if (val != null && Math.abs(val - selectStartRef.current) > 5) {
-      setZoomDomain({ x1: Math.min(selectStartRef.current, val), x2: Math.max(selectStartRef.current, val) });
-    }
-    selectStartRef.current = null;
-    setSelectRange(null);
-  }, [pixelToValue]);
-
   const resetZoom = useCallback(() => {
     setZoomDomain(null);
     setSelectRange(null);
@@ -95,16 +115,12 @@ export function useChartZoom(dataMin, dataMax) {
 
   const isSelecting = selectRange != null;
 
-  // recharts chart props (mouse only — touch is on the wrapper div)
   const chartProps = { onMouseDown, onMouseMove, onMouseUp };
 
-  // wrapper div props (touch)
+  // Only ref needed on wrapper — touch listeners attached imperatively
   const wrapperProps = {
     ref: containerRef,
-    onTouchStart,
-    onTouchMove,
-    onTouchEnd,
-    style: { touchAction: isSelecting ? "none" : "pan-y" },
+    style: { touchAction: "pan-y" }, // browser handles scroll by default; preventDefault overrides when dragging
   };
 
   return { zoomDomain, resetZoom, isSelecting, selectRange, chartProps, wrapperProps };
