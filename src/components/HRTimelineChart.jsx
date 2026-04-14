@@ -3,6 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { ZoomIn, ZoomOut } from "lucide-react";
 
 const MARKER_COLORS = {
   build: "#f59e0b",
@@ -104,11 +105,54 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
     recovery: savedMarkers.recovery_offset_s ?? null,
   });
 
+  // Zoom state
+  const [zoomDomain, setZoomDomain] = useState(null); // { x1, x2 } in seconds, or null for full view
+  const [selectStart, setSelectStart] = useState(null);
+  const [selectEnd, setSelectEnd] = useState(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+
   const visibleRows = useMemo(() => {
     if (window === "full") return rows;
     const cutoff = maxOffsetS - window * 60;
     return rows.filter((r) => Number(r.time_offset_s) >= cutoff);
   }, [rows, window, maxOffsetS]);
+
+  const xDomain = useMemo(() => {
+    if (zoomDomain) return [zoomDomain.x1, zoomDomain.x2];
+    return ["dataMin", "dataMax"];
+  }, [zoomDomain]);
+
+  const handleMouseDown = (e) => {
+    if (markingPhase) return; // don't zoom when marking
+    if (e?.activeLabel == null) return;
+    setSelectStart(Number(e.activeLabel));
+    setSelectEnd(null);
+    setIsSelecting(true);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isSelecting || e?.activeLabel == null) return;
+    setSelectEnd(Number(e.activeLabel));
+  };
+
+  const handleMouseUp = () => {
+    if (!isSelecting) return;
+    setIsSelecting(false);
+    if (selectStart != null && selectEnd != null && Math.abs(selectEnd - selectStart) > 5) {
+      const x1 = Math.min(selectStart, selectEnd);
+      const x2 = Math.max(selectStart, selectEnd);
+      setZoomDomain({ x1, x2 });
+    }
+    setSelectStart(null);
+    setSelectEnd(null);
+  };
+
+  const resetZoom = () => {
+    setZoomDomain(null);
+    setSelectStart(null);
+    setSelectEnd(null);
+    setIsSelecting(false);
+  };
 
   if (!rows || rows.length === 0) return null;
 
@@ -248,13 +292,28 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
           <Button
             key={label}
             size="sm"
-            variant={window === value ? "default" : "outline"}
+            variant={window === value && !zoomDomain ? "default" : "outline"}
             className="h-6 text-[10px] px-2"
-            onClick={() => setWindow(value)}
+            onClick={() => { setWindow(value); resetZoom(); }}
           >
             {label}
           </Button>
         ))}
+        <div className="w-px h-4 bg-border mx-1" />
+        {zoomDomain ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[10px] px-2 text-primary border-primary gap-1"
+            onClick={resetZoom}
+          >
+            <ZoomOut className="w-3 h-3" /> Reset Zoom
+          </Button>
+        ) : (
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <ZoomIn className="w-3 h-3" /> Drag to zoom
+          </span>
+        )}
         <div className="w-px h-4 bg-border mx-1" />
         <Button
           size="sm"
@@ -319,17 +378,20 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
         ))}
       </div>
 
-      <div className={`h-64 ${markingPhase ? "cursor-crosshair" : ""}`}>
+      <div className={`h-64 ${markingPhase ? "cursor-crosshair" : !zoomDomain ? "cursor-crosshair" : "cursor-default"}`}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleRows}
             margin={{ top: 8, right: 4, bottom: 0, left: -20 }}
             onClick={handleChartClick}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
           >
             <XAxis
               dataKey="time_offset_s"
               type="number"
-              domain={["dataMin", "dataMax"]}
+              domain={xDomain}
               tick={{ fontSize: 9 }}
               tickFormatter={fmtSec}
             />
@@ -345,6 +407,19 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
               contentStyle={{ fontSize: 11 }}
               labelStyle={{ color: '#111827', fontWeight: 600 }}
             />
+
+            {/* Drag-to-zoom selection area */}
+            {isSelecting && selectStart != null && selectEnd != null && (
+              <ReferenceArea
+                x1={Math.min(selectStart, selectEnd)}
+                x2={Math.max(selectStart, selectEnd)}
+                fill="hsl(var(--primary))"
+                fillOpacity={0.15}
+                stroke="hsl(var(--primary))"
+                strokeOpacity={0.5}
+                strokeWidth={1}
+              />
+            )}
 
             {/* Near-climax event highlight */}
             {highlightRange && (
