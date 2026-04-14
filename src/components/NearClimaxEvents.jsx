@@ -19,12 +19,12 @@ export function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
   if (!rows || rows.length < 10) return [];
   const events = [];
 
-  const RISE_THRESHOLD = 12;
-  const RISE_WINDOW_S = 90;
-  const PLATEAU_MIN_S = 10;
-  const DROP_NEEDED = 8;
-  const COOLDOWN_S = 60;
-  const MIN_EVENT_DURATION_S = 15;
+  const RISE_THRESHOLD = 8;
+  const RISE_WINDOW_S = 120;
+  const PLATEAU_MIN_S = 6;
+  const DROP_NEEDED = 6;
+  const COOLDOWN_S = 30;
+  const MIN_EVENT_DURATION_S = 10;
   const MAX_EVENT_DURATION_S = (climaxOffsetS != null && preClimaxOffsetS != null)
     ? Math.max(60, Math.abs(climaxOffsetS - preClimaxOffsetS) * 0.8)
     : 180;
