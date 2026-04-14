@@ -10,6 +10,7 @@ export function useChartZoom(dataMin, dataMax) {
 
   const containerRef = useRef(null);
   const selectStartRef = useRef(null);
+  const isDraggingRef = useRef(false); // true only after drag threshold is crossed
   const dataMinRef = useRef(dataMin);
   const dataMaxRef = useRef(dataMax);
   dataMinRef.current = dataMin;
@@ -38,6 +39,7 @@ export function useChartZoom(dataMin, dataMax) {
     const val = pixelToValue(e.touches[0].clientX);
     if (val == null) return;
     selectStartRef.current = val;
+    isDraggingRef.current = false;
     setSelectRange(null);
   };
 
@@ -45,8 +47,11 @@ export function useChartZoom(dataMin, dataMax) {
     if (e.touches.length !== 1 || selectStartRef.current == null) return;
     const val = pixelToValue(e.touches[0].clientX);
     if (val == null) return;
-    if (Math.abs(val - selectStartRef.current) > 2) {
+    const range = dataMaxRef.current - dataMinRef.current;
+    const minDelta = range * 0.03; // must drag at least 3% of data range
+    if (Math.abs(val - selectStartRef.current) > minDelta) {
       e.preventDefault();
+      isDraggingRef.current = true;
       setSelectRange({
         x1: Math.min(selectStartRef.current, val),
         x2: Math.max(selectStartRef.current, val),
@@ -57,13 +62,14 @@ export function useChartZoom(dataMin, dataMax) {
   touchEndHandler.current = (e) => {
     if (selectStartRef.current == null) return;
     const val = pixelToValue(e.changedTouches[0].clientX);
-    if (val != null && Math.abs(val - selectStartRef.current) > 5) {
+    if (isDraggingRef.current && val != null) {
       setZoomDomain({
         x1: Math.min(selectStartRef.current, val),
         x2: Math.max(selectStartRef.current, val),
       });
     }
     selectStartRef.current = null;
+    isDraggingRef.current = false;
     setSelectRange(null);
   };
 
@@ -90,16 +96,20 @@ export function useChartZoom(dataMin, dataMax) {
   const onMouseDown = useCallback((e) => {
     if (e?.activeLabel == null) return;
     selectStartRef.current = Number(e.activeLabel);
+    isDraggingRef.current = false;
     setSelectRange(null);
 
     const handleGlobalMouseUp = (nativeE) => {
       window.removeEventListener("mouseup", handleGlobalMouseUp);
       if (selectStartRef.current == null) return;
-      const end = pixelToValue(nativeE.clientX);
-      if (end != null && Math.abs(end - selectStartRef.current) > 3) {
-        setZoomDomain({ x1: Math.min(selectStartRef.current, end), x2: Math.max(selectStartRef.current, end) });
+      if (isDraggingRef.current) {
+        const end = pixelToValue(nativeE.clientX);
+        if (end != null) {
+          setZoomDomain({ x1: Math.min(selectStartRef.current, end), x2: Math.max(selectStartRef.current, end) });
+        }
       }
       selectStartRef.current = null;
+      isDraggingRef.current = false;
       setSelectRange(null);
     };
     window.addEventListener("mouseup", handleGlobalMouseUp);
@@ -108,7 +118,12 @@ export function useChartZoom(dataMin, dataMax) {
   const onMouseMove = useCallback((e) => {
     if (selectStartRef.current == null || e?.activeLabel == null) return;
     const cur = Number(e.activeLabel);
-    setSelectRange({ x1: Math.min(selectStartRef.current, cur), x2: Math.max(selectStartRef.current, cur) });
+    const range = dataMaxRef.current - dataMinRef.current;
+    const minDelta = range * 0.03;
+    if (Math.abs(cur - selectStartRef.current) > minDelta) {
+      isDraggingRef.current = true;
+      setSelectRange({ x1: Math.min(selectStartRef.current, cur), x2: Math.max(selectStartRef.current, cur) });
+    }
   }, []);
 
   const resetZoom = useCallback(() => {
