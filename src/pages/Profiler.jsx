@@ -15,14 +15,20 @@ function fmtSec(s) {
 
 // Detect near-climax events in a HR timeline:
 // Erratic rises (>=8 bpm over ≤45s) ending in a drop, not as sustained as a full climax.
-function detectNearClimaxEvents(rows, climaxOffsetS) {
+function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
   if (!rows || rows.length < 10) return [];
   const events = [];
-  const RISE_THRESHOLD = 8;   // bpm
-  const RISE_WINDOW_S = 45;   // seconds
-  const DROP_NEEDED = 5;      // bpm drop to confirm reversal
-  const COOLDOWN_S = 30;      // seconds after event before next can start
-  const MAX_EVENT_DURATION_S = 120; // events shorter than a true climax
+
+  const RISE_THRESHOLD = 12;
+  const RISE_WINDOW_S = 90;
+  const PLATEAU_MIN_S = 10;
+  const DROP_NEEDED = 8;
+  const COOLDOWN_S = 60;
+  const MIN_EVENT_DURATION_S = 15;
+  const MAX_EVENT_DURATION_S = (climaxOffsetS != null && preClimaxOffsetS != null)
+    ? Math.max(60, Math.abs(climaxOffsetS - preClimaxOffsetS) * 0.8)
+    : 180;
+  const climaxExcludeRadius = 90;
 
   let i = 0;
   let lastEventEnd = -Infinity;
@@ -31,11 +37,9 @@ function detectNearClimaxEvents(rows, climaxOffsetS) {
     const t0 = Number(rows[i].time_offset_s);
     const hr0 = Number(rows[i].hr);
 
-    // Skip if within cooldown or too close to actual climax
     if (t0 < lastEventEnd + COOLDOWN_S) { i++; continue; }
-    if (climaxOffsetS != null && Math.abs(t0 - climaxOffsetS) < 60) { i++; continue; }
+    if (climaxOffsetS != null && Math.abs(t0 - climaxOffsetS) < climaxExcludeRadius) { i++; continue; }
 
-    // Look for a rise of RISE_THRESHOLD within RISE_WINDOW_S
     let peakIdx = i;
     let peakHr = hr0;
     for (let j = i + 1; j < rows.length; j++) {
@@ -49,10 +53,19 @@ function detectNearClimaxEvents(rows, climaxOffsetS) {
 
     if (peakHr - hr0 < RISE_THRESHOLD || peakIdx === i) { i++; continue; }
 
-    // Look for a drop after the peak
+    const peakTime = Number(rows[peakIdx].time_offset_s);
+
+    let plateauEnd = peakIdx;
+    for (let j = peakIdx; j < rows.length; j++) {
+      if (Number(rows[j].time_offset_s) - peakTime > PLATEAU_MIN_S) break;
+      if (Number(rows[j].hr) >= peakHr - DROP_NEEDED / 2) plateauEnd = j;
+    }
+    const plateauDuration = Number(rows[plateauEnd].time_offset_s) - peakTime;
+    if (plateauDuration < PLATEAU_MIN_S * 0.5) { i = peakIdx + 1; continue; }
+
     let dropped = false;
-    let dropIdx = peakIdx;
-    for (let j = peakIdx + 1; j < rows.length && j < peakIdx + 20; j++) {
+    let dropIdx = plateauEnd;
+    for (let j = plateauEnd + 1; j < rows.length && j < plateauEnd + 40; j++) {
       if (Number(rows[j].hr) <= peakHr - DROP_NEEDED) {
         dropped = true;
         dropIdx = j;
@@ -63,11 +76,11 @@ function detectNearClimaxEvents(rows, climaxOffsetS) {
     if (!dropped) { i = peakIdx + 1; continue; }
 
     const eventDuration = Number(rows[dropIdx].time_offset_s) - t0;
-    if (eventDuration > MAX_EVENT_DURATION_S) { i++; continue; }
+    if (eventDuration < MIN_EVENT_DURATION_S || eventDuration > MAX_EVENT_DURATION_S) { i++; continue; }
 
     events.push({
       start_offset_s: t0,
-      peak_offset_s: Number(rows[peakIdx].time_offset_s),
+      peak_offset_s: peakTime,
       end_offset_s: Number(rows[dropIdx].time_offset_s),
       base_hr: Math.round(hr0),
       peak_hr: Math.round(peakHr),
@@ -156,7 +169,7 @@ function NearClimaxPanel({ sessions, allTimelines }) {
     for (const session of sessions) {
       const rows = allTimelines[session.id] || [];
       if (rows.length < 10) continue;
-      const events = detectNearClimaxEvents(rows, session.climax_offset_s);
+      const events = detectNearClimaxEvents(rows, session.climax_offset_s, session.pre_climax_offset_s);
       if (events.length > 0) {
         sessionEvents.push({
           date: session.date?.slice(0, 10),
