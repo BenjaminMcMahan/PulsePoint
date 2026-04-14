@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 
 /**
  * Cross-platform (mouse + touch) drag-to-zoom for recharts.
- * Touch listeners are registered as non-passive so preventDefault works on Android.
+ * Uses a callback ref so touch listeners (non-passive) are attached
+ * as soon as the wrapper div mounts.
  */
 export function useChartZoom(dataMin, dataMax) {
   const [zoomDomain, setZoomDomain] = useState(null);
@@ -11,12 +12,10 @@ export function useChartZoom(dataMin, dataMax) {
   const containerRef = useRef(null);
   const dataMinRef = useRef(dataMin);
   const dataMaxRef = useRef(dataMax);
+  dataMinRef.current = dataMin;
+  dataMaxRef.current = dataMax;
 
-  // Keep refs in sync so touch callbacks (registered once) always see latest values
-  useEffect(() => { dataMinRef.current = dataMin; }, [dataMin]);
-  useEffect(() => { dataMaxRef.current = dataMax; }, [dataMax]);
-
-  // Convert a pixel X position to a data value
+  // Convert pixel X → data value
   const pixelToValue = useCallback((clientX) => {
     const el = containerRef.current;
     if (!el) return null;
@@ -26,70 +25,75 @@ export function useChartZoom(dataMin, dataMax) {
     const plotWidth = rect.width - MARGIN_LEFT - MARGIN_RIGHT;
     const relX = clientX - rect.left - MARGIN_LEFT;
     const clamped = Math.max(0, Math.min(relX, plotWidth));
-    const frac = clamped / plotWidth;
-    const min = dataMinRef.current ?? 0;
-    const max = dataMaxRef.current ?? 1;
-    return min + frac * (max - min);
+    return dataMinRef.current + (clamped / plotWidth) * (dataMaxRef.current - dataMinRef.current);
   }, []);
 
-  // Register touch listeners as non-passive so we can call preventDefault
-  useEffect(() => {
-    const el = containerRef.current;
+  // Callback ref — attaches non-passive touch listeners immediately when element mounts
+  const setContainerRef = useCallback((el) => {
+    if (containerRef.current) {
+      containerRef.current.removeEventListener("touchstart", handleTouchStart);
+      containerRef.current.removeEventListener("touchmove", handleTouchMove);
+      containerRef.current.removeEventListener("touchend", handleTouchEnd);
+    }
+    containerRef.current = el;
     if (!el) return;
-
-    const handleTouchStart = (e) => {
-      if (e.touches.length !== 1) return;
-      const val = pixelToValue(e.touches[0].clientX);
-      if (val == null) return;
-      selectStartRef.current = val;
-      setSelectRange(null);
-    };
-
-    const handleTouchMove = (e) => {
-      if (e.touches.length !== 1 || selectStartRef.current == null) return;
-      const val = pixelToValue(e.touches[0].clientX);
-      if (val == null) return;
-      const diff = Math.abs(val - selectStartRef.current);
-      if (diff > 3) {
-        e.preventDefault(); // works because listener is non-passive
-        setSelectRange({
-          x1: Math.min(selectStartRef.current, val),
-          x2: Math.max(selectStartRef.current, val),
-        });
-      }
-    };
-
-    const handleTouchEnd = (e) => {
-      if (selectStartRef.current == null) return;
-      const lastTouch = e.changedTouches[0];
-      const val = pixelToValue(lastTouch.clientX);
-      if (val != null && Math.abs(val - selectStartRef.current) > 5) {
-        setZoomDomain({
-          x1: Math.min(selectStartRef.current, val),
-          x2: Math.max(selectStartRef.current, val),
-        });
-      }
-      selectStartRef.current = null;
-      setSelectRange(null);
-    };
-
     el.addEventListener("touchstart", handleTouchStart, { passive: true });
-    el.addEventListener("touchmove", handleTouchMove, { passive: false }); // non-passive!
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
     el.addEventListener("touchend", handleTouchEnd, { passive: true });
+  }, []); // eslint-disable-line
 
-    return () => {
-      el.removeEventListener("touchstart", handleTouchStart);
-      el.removeEventListener("touchmove", handleTouchMove);
-      el.removeEventListener("touchend", handleTouchEnd);
-    };
-  }, [pixelToValue]);
+  function handleTouchStart(e) {
+    if (e.touches.length !== 1) return;
+    const val = pixelToValue(e.touches[0].clientX);
+    if (val == null) return;
+    selectStartRef.current = val;
+    setSelectRange(null);
+  }
 
-  // Mouse events (recharts synthetic events)
+  function handleTouchMove(e) {
+    if (e.touches.length !== 1 || selectStartRef.current == null) return;
+    const val = pixelToValue(e.touches[0].clientX);
+    if (val == null) return;
+    if (Math.abs(val - selectStartRef.current) > 2) {
+      e.preventDefault(); // non-passive — this actually works on Android
+      setSelectRange({
+        x1: Math.min(selectStartRef.current, val),
+        x2: Math.max(selectStartRef.current, val),
+      });
+    }
+  }
+
+  function handleTouchEnd(e) {
+    if (selectStartRef.current == null) return;
+    const val = pixelToValue(e.changedTouches[0].clientX);
+    if (val != null && Math.abs(val - selectStartRef.current) > 5) {
+      setZoomDomain({
+        x1: Math.min(selectStartRef.current, val),
+        x2: Math.max(selectStartRef.current, val),
+      });
+    }
+    selectStartRef.current = null;
+    setSelectRange(null);
+  }
+
+  // Global mouseup — fires even if mouse is released outside the chart
   const onMouseDown = useCallback((e) => {
     if (e?.activeLabel == null) return;
     selectStartRef.current = Number(e.activeLabel);
     setSelectRange(null);
-  }, []);
+
+    const handleGlobalMouseUp = (nativeE) => {
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+      if (selectStartRef.current == null) return;
+      const end = pixelToValue(nativeE.clientX);
+      if (end != null && Math.abs(end - selectStartRef.current) > 3) {
+        setZoomDomain({ x1: Math.min(selectStartRef.current, end), x2: Math.max(selectStartRef.current, end) });
+      }
+      selectStartRef.current = null;
+      setSelectRange(null);
+    };
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+  }, [pixelToValue]);
 
   const onMouseMove = useCallback((e) => {
     if (selectStartRef.current == null || e?.activeLabel == null) return;
@@ -99,13 +103,15 @@ export function useChartZoom(dataMin, dataMax) {
 
   const onMouseUp = useCallback((e) => {
     if (selectStartRef.current == null) return;
-    const end = e?.activeLabel != null ? Number(e.activeLabel) : null;
+    // Try recharts activeLabel first, fall back to pixel conversion
+    let end = e?.activeLabel != null ? Number(e.activeLabel) : null;
+    if (end == null && e?.clientX != null) end = pixelToValue(e.clientX);
     if (end != null && Math.abs(end - selectStartRef.current) > 3) {
       setZoomDomain({ x1: Math.min(selectStartRef.current, end), x2: Math.max(selectStartRef.current, end) });
     }
     selectStartRef.current = null;
     setSelectRange(null);
-  }, []);
+  }, [pixelToValue]);
 
   const resetZoom = useCallback(() => {
     setZoomDomain(null);
@@ -117,10 +123,9 @@ export function useChartZoom(dataMin, dataMax) {
 
   const chartProps = { onMouseDown, onMouseMove, onMouseUp };
 
-  // Only ref needed on wrapper — touch listeners attached imperatively
   const wrapperProps = {
-    ref: containerRef,
-    style: { touchAction: "pan-y" }, // browser handles scroll by default; preventDefault overrides when dragging
+    ref: setContainerRef,
+    style: { touchAction: "pan-y" },
   };
 
   return { zoomDomain, resetZoom, isSelecting, selectRange, chartProps, wrapperProps };
