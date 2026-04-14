@@ -11,6 +11,7 @@ import HRZoneAnalysis from "../components/HRZoneAnalysis";
 import HREventOverlayChart from "../components/HREventOverlayChart";
 import NearClimaxEvents, { detectNearClimaxEvents } from "../components/NearClimaxEvents";
 import SessionAIPanel from "../components/SessionAIPanel";
+import SessionExecutiveSummary from "../components/SessionExecutiveSummary";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -169,6 +170,9 @@ export default function SessionDetail() {
       </div>
 
       <div className="px-4 py-4 space-y-4 pb-8">
+        {/* Executive Summary */}
+        <SessionExecutiveSummary session={s} timelineRows={timelineRows} />
+
         {/* Subjective Metrics */}
         <div className="bg-card rounded-xl border border-border p-4 space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Metrics</h3>
