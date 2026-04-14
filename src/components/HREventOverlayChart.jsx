@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis,
-  Tooltip, CartesianGrid, ReferenceLine, Legend,
+  Tooltip, CartesianGrid, ReferenceLine,
 } from "recharts";
 
 function fmtMmSs(s) {
@@ -16,15 +16,17 @@ const EVENT_COLORS = [
   "#fb923c", "#84cc16", "#e879f9", "#34d399", "#f87171",
 ];
 
-function CustomTooltip({ active, payload, label, events }) {
-  if (!active || !payload?.length) return null;
+function CustomTooltip({ active, payload, label, events, pinnedLabel }) {
+  const showLabel = pinnedLabel ?? label;
+  const isActive = active || pinnedLabel != null;
+  if (!isActive || !payload?.length) return null;
   const hrVal = payload.find((p) => p.dataKey === "hr")?.value;
-  const nearby = events.filter((e) => Math.abs(e.time_s - label) <= 10);
+  const nearby = events.filter((e) => Math.abs(e.time_s - showLabel) <= 10);
   return (
     <div className="bg-card border border-border rounded-lg p-2.5 shadow-lg text-xs max-w-[220px]">
-      <p className="font-mono text-muted-foreground mb-1">{fmtMmSs(label)}</p>
+      <p className="font-mono text-muted-foreground mb-1">{fmtMmSs(showLabel)}</p>
       {hrVal != null && (
-        <p className="font-bold text-primary mb-1">{hrVal} bpm</p>
+        <p className="font-bold text-primary mb-1">{Math.round(hrVal)} bpm</p>
       )}
       {nearby.map((e, i) => (
         <p key={i} className="text-foreground/90 leading-snug border-l-2 pl-1.5 mt-1" style={{ borderColor: EVENT_COLORS[events.indexOf(e) % EVENT_COLORS.length] }}>
@@ -35,13 +37,26 @@ function CustomTooltip({ active, payload, label, events }) {
   );
 }
 
+// Find nearest HR value to a given time_s from chartData
+function nearestHR(chartData, time_s) {
+  if (!chartData.length) return null;
+  let best = chartData[0];
+  let bestDist = Math.abs(chartData[0].t - time_s);
+  for (const pt of chartData) {
+    const d = Math.abs(pt.t - time_s);
+    if (d < bestDist) { bestDist = d; best = pt; }
+  }
+  return Math.round(best.hr);
+}
+
 export default function HREventOverlayChart({ timelineRows, events = [], session }) {
-  const [isolatedEvent, setIsolatedEvent] = useState(null); // index of isolated event, or null = show all
+  const [isolatedEvent, setIsolatedEvent] = useState(null);
+  const [pinnedTime, setPinnedTime] = useState(null); // time_s pinned from event tap
 
   const chartData = useMemo(() => {
     return timelineRows.map((r) => ({
       t: Number(r.time_offset_s),
-      hr: Number(r.hr_smoothed || r.hr),
+      hr: Math.round(Number(r.hr_smoothed || r.hr)),
     }));
   }, [timelineRows]);
 
@@ -52,7 +67,9 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
   ].filter(Boolean);
 
   const toggleIsolate = (idx) => {
-    setIsolatedEvent((prev) => (prev === idx ? null : idx));
+    const next = isolatedEvent === idx ? null : idx;
+    setIsolatedEvent(next);
+    setPinnedTime(next !== null ? events[next]?.time_s ?? null : null);
   };
 
   // When isolated, zoom the X domain to ±60s around that event
@@ -74,7 +91,10 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtMmSs} tickCount={8} type="number" domain={xDomain} />
             <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
-            <Tooltip content={<CustomTooltip events={events} />} />
+            <Tooltip
+              content={<CustomTooltip events={events} pinnedLabel={pinnedTime} />}
+              defaultIndex={pinnedTime !== null ? chartData.findIndex((d) => d.t >= pinnedTime) : undefined}
+            />
 
             {/* Phase markers */}
             {phaseMarkers.map((pm) => (
@@ -128,6 +148,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
             const color = EVENT_COLORS[i % EVENT_COLORS.length];
             const isIsolated = isolatedEvent === i;
             const dimmed = isolatedEvent !== null && !isIsolated;
+            const hr = nearestHR(chartData, ev.time_s);
             return (
               <button
                 key={i}
@@ -142,7 +163,10 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
                 <span className="font-mono text-[10px] shrink-0 mt-0.5 font-bold" style={{ color }}>
                   E{i + 1} {fmtMmSs(ev.time_s)}
                 </span>
-                <span className="text-xs text-foreground/90 leading-snug">{ev.note}</span>
+                <span className="flex-1 text-xs text-foreground/90 leading-snug">{ev.note}</span>
+                {hr != null && (
+                  <span className="font-mono text-[10px] shrink-0 font-bold text-primary/80 mt-0.5">{hr} bpm</span>
+                )}
               </button>
             );
           })}
