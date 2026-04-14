@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
 import HRZoneAnalysis from "../components/HRZoneAnalysis";
 import HREventOverlayChart from "../components/HREventOverlayChart";
-import NearClimaxEvents from "../components/NearClimaxEvents";
+import NearClimaxEvents, { detectNearClimaxEvents } from "../components/NearClimaxEvents";
 import SessionAIPanel from "../components/SessionAIPanel";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
@@ -49,6 +49,18 @@ export default function SessionDetail() {
   const [session, setSession] = useState(null);
   const [timelineRows, setTimelineRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedNearClimaxIdx, setSelectedNearClimaxIdx] = useState(null);
+
+  const nearClimaxEvents = useMemo(
+    () => session ? detectNearClimaxEvents(timelineRows, session.climax_offset_s, session.pre_climax_offset_s) : [],
+    [timelineRows, session]
+  );
+
+  const highlightRange = useMemo(() => {
+    if (selectedNearClimaxIdx == null || !nearClimaxEvents[selectedNearClimaxIdx]) return null;
+    const ev = nearClimaxEvents[selectedNearClimaxIdx];
+    return { start: ev.start_offset_s, end: ev.end_offset_s };
+  }, [selectedNearClimaxIdx, nearClimaxEvents]);
 
   const elevatedTime = timelineRows.length > 1
     ? timelineRows.reduce((total, row, i) => {
@@ -217,6 +229,7 @@ export default function SessionDetail() {
                 await base44.entities.Session.update(id, markers);
                 setSession((prev) => ({ ...prev, ...markers }));
               }}
+              highlightRange={highlightRange}
             />
           )}
           {timelineRows.length > 0 && (
@@ -230,7 +243,12 @@ export default function SessionDetail() {
             />
           )}
           {timelineRows.length > 0 && (
-            <NearClimaxEvents timelineRows={timelineRows} session={s} />
+            <NearClimaxEvents
+              timelineRows={timelineRows}
+              session={s}
+              selectedIndex={selectedNearClimaxIdx}
+              onSelectIndex={setSelectedNearClimaxIdx}
+            />
           )}
           {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
             <div className="h-32">

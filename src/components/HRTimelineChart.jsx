@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 
@@ -88,7 +88,7 @@ const WINDOWS = [
 const MARKING_PHASES = ["pre_climax", "climax", "recovery"];
 const PHASE_LABELS = { pre_climax: "Pre-Climax", climax: "Climax", recovery: "Recovery" };
 
-export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChange }) {
+export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChange, highlightRange = null }) {
   const maxOffsetS = useMemo(() => Math.max(...rows.map((r) => Number(r.time_offset_s) || 0)), [rows]);
   const durationMins = maxOffsetS / 60;
 
@@ -345,6 +345,19 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
               contentStyle={{ fontSize: 11 }}
               labelStyle={{ color: '#111827', fontWeight: 600 }}
             />
+
+            {/* Near-climax event highlight */}
+            {highlightRange && (
+              <ReferenceArea
+                x1={highlightRange.start}
+                x2={highlightRange.end}
+                fill="hsl(var(--chart-3))"
+                fillOpacity={0.15}
+                stroke="hsl(var(--chart-3))"
+                strokeOpacity={0.6}
+                strokeWidth={1}
+              />
+            )}
 
             {/* Data-driven marker lines */}
             {markerLines.map((m, i) => (
