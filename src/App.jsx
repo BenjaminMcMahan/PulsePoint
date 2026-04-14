@@ -18,6 +18,7 @@ import CascadeAnalysis from './pages/CascadeAnalysis';
 import Profiler from './pages/Profiler';
 import HROverlay from './pages/HROverlay';
 import LongTermTrends from './pages/LongTermTrends';
+import Profile from './pages/Profile';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -58,6 +59,7 @@ const AuthenticatedApp = () => {
         <Route path="/profiler" element={<Profiler />} />
         <Route path="/overlay" element={<HROverlay />} />
         <Route path="/trends" element={<LongTermTrends />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

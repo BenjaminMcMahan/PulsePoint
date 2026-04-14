@@ -49,6 +49,7 @@ export default function SessionDetail() {
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [timelineRows, setTimelineRows] = useState([]);
+  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedNearClimaxIdx, setSelectedNearClimaxIdx] = useState(null);
 
@@ -75,9 +76,13 @@ export default function SessionDetail() {
 
   useEffect(() => {
     (async () => {
-      const all = await base44.entities.Session.filter({ id });
+      const [all, me] = await Promise.all([
+        base44.entities.Session.filter({ id }),
+        base44.auth.me(),
+      ]);
       const s = all[0];
       setSession(s);
+      setUserProfile(me);
       const rows = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
       setTimelineRows(rows);
 
@@ -245,7 +250,7 @@ export default function SessionDetail() {
             />
           )}
           {timelineRows.length > 0 && (
-            <HRZoneAnalysis rows={timelineRows} sessionMaxHR={s.max_hr} />
+            <HRZoneAnalysis rows={timelineRows} sessionMaxHR={s.max_hr} userProfile={userProfile} />
           )}
           {timelineRows.length > 0 && (s.event_timeline || []).length > 0 && (
             <HREventOverlayChart
@@ -347,7 +352,7 @@ export default function SessionDetail() {
         )}
 
         {/* AI Analysis */}
-        <SessionAIPanel session={s} timelineRows={timelineRows} />
+        <SessionAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />
 
         {/* Tags */}
         {(s.tags || []).length > 0 && (

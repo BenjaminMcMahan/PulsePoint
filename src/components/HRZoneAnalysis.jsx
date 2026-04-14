@@ -32,20 +32,22 @@ function getZoneIndex(hr, restingHR, mhr) {
   return 5;
 }
 
-export default function HRZoneAnalysis({ rows, sessionMaxHR }) {
+export default function HRZoneAnalysis({ rows, sessionMaxHR, userProfile }) {
   const analysis = useMemo(() => {
     if (!rows || rows.length < 2) return null;
 
     const sorted = [...rows].sort((a, b) => Number(a.time_offset_s) - Number(b.time_offset_s));
 
-    // Resting HR: average of first 5 seconds
+    // Resting HR: prefer profile value, then session start average, then first point
     const restingRows = sorted.filter((r) => Number(r.time_offset_s) <= 5);
-    const restingHR = restingRows.length > 0
+    const sessionRestingHR = restingRows.length > 0
       ? Math.round(restingRows.reduce((a, r) => a + Number(r.hr), 0) / restingRows.length)
       : sorted[0] ? Number(sorted[0].hr) : 60;
+    const restingHR = userProfile?.resting_hr || sessionRestingHR;
 
-    // MHR: use sessionMaxHR if provided, else max in timeline
-    const mhr = sessionMaxHR || Math.max(...sorted.map((r) => Number(r.hr)));
+    // MHR: prefer profile true max, then age-estimated, then session max, then timeline max
+    const ageEstimatedMax = userProfile?.age ? 220 - userProfile.age : null;
+    const mhr = userProfile?.max_hr || sessionMaxHR || ageEstimatedMax || Math.max(...sorted.map((r) => Number(r.hr)));
 
     // Time in each zone
     const zoneTimes = [0, 0, 0, 0, 0, 0]; // seconds per zone
@@ -71,6 +73,7 @@ export default function HRZoneAnalysis({ rows, sessionMaxHR }) {
     const recovery60 = sorted.find((r) => Number(r.time_offset_s) >= peakOffset + 60);
     const recoveryDrop = recovery60 ? Math.round(Number(sorted[peakIdx].hr) - Number(recovery60.hr)) : null;
     const peakHR = Number(sorted[peakIdx].hr);
+    const profileRecoveryNorm = userProfile?.recovery_hr_60s || null; // personal baseline for recovery interpretation
 
     // Zone HR boundaries for display
     const zoneBoundaries = [
@@ -82,11 +85,11 @@ export default function HRZoneAnalysis({ rows, sessionMaxHR }) {
       { range: `${Math.round(mhr * 0.90)}+ bpm`, label: "Zone 5" },
     ];
 
-    return { restingHR, mhr, zoneData, recoveryDrop, peakHR, zoneBoundaries, totalTime };
+    return { restingHR, mhr, zoneData, recoveryDrop, peakHR, zoneBoundaries, totalTime, profileRecoveryNorm };
   }, [rows, sessionMaxHR]);
 
   if (!analysis) return null;
-  const { restingHR, mhr, zoneData, recoveryDrop, peakHR, zoneBoundaries } = analysis;
+  const { restingHR, mhr, zoneData, recoveryDrop, peakHR, zoneBoundaries, profileRecoveryNorm } = analysis;
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-4">
@@ -185,13 +188,20 @@ export default function HRZoneAnalysis({ rows, sessionMaxHR }) {
       </div>
 
       {/* Recovery insight */}
-      {recoveryDrop != null && (
-        <div className={`rounded-lg px-3 py-2 text-xs ${recoveryDrop >= 12 ? "bg-green-500/10 text-green-600" : "bg-orange-500/10 text-orange-600"}`}>
-          {recoveryDrop >= 12
-            ? `Good recovery: HR dropped ${recoveryDrop} bpm in the 60s after peak (${peakHR} bpm).`
-            : `Slow recovery: HR only dropped ${recoveryDrop} bpm in the 60s after peak (${peakHR} bpm).`}
-        </div>
-      )}
+      {recoveryDrop != null && (() => {
+        const norm = profileRecoveryNorm || 12;
+        const good = recoveryDrop >= norm;
+        const vsNorm = profileRecoveryNorm
+          ? ` (your baseline: ${profileRecoveryNorm} bpm)`
+          : "";
+        return (
+          <div className={`rounded-lg px-3 py-2 text-xs ${good ? "bg-green-500/10 text-green-600" : "bg-orange-500/10 text-orange-600"}`}>
+            {good
+              ? `Good recovery: HR dropped ${recoveryDrop} bpm in 60s after peak (${peakHR} bpm)${vsNorm}.`
+              : `Slow recovery: HR dropped only ${recoveryDrop} bpm in 60s after peak (${peakHR} bpm)${vsNorm}.`}
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,0 +1,52 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "description": "The role of the user in the app",
+      "enum": [
+        "admin",
+        "user"
+      ]
+    },
+    "age": {
+      "type": "number",
+      "description": "User age in years"
+    },
+    "weight_kg": {
+      "type": "number",
+      "description": "User weight in kg"
+    },
+    "resting_hr": {
+      "type": "number",
+      "description": "Resting heart rate in bpm"
+    },
+    "max_hr": {
+      "type": "number",
+      "description": "True measured max heart rate in bpm"
+    },
+    "recovery_hr_60s": {
+      "type": "number",
+      "description": "Typical HR drop (bpm) in 60s after peak \u2014 auto-computed or manually set"
+    },
+    "medications": {
+      "type": "string",
+      "description": "Medications or conditions affecting HR (e.g. beta-blockers)"
+    },
+    "fitness_level": {
+      "type": "string",
+      "enum": [
+        "sedentary",
+        "light",
+        "moderate",
+        "active",
+        "athlete"
+      ],
+      "description": "Self-rated fitness level"
+    }
+  },
+  "required": [
+    "role"
+  ]
+}
