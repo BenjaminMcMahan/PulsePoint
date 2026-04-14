@@ -9,6 +9,7 @@ import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
 import HRZoneAnalysis from "../components/HRZoneAnalysis";
 import HREventOverlayChart from "../components/HREventOverlayChart";
+import NearClimaxEvents from "../components/NearClimaxEvents";
 import SessionAIPanel from "../components/SessionAIPanel";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
@@ -227,6 +228,9 @@ export default function SessionDetail() {
               events={s.event_timeline}
               session={s}
             />
+          )}
+          {timelineRows.length > 0 && (
+            <NearClimaxEvents timelineRows={timelineRows} session={s} />
           )}
           {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
             <div className="h-32">
