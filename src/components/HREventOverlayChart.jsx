@@ -3,7 +3,7 @@ import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis,
   Tooltip, CartesianGrid, ReferenceLine, ReferenceArea,
 } from "recharts";
-import { ZoomOut } from "lucide-react";
+import { ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import { useChartZoom } from "@/hooks/useChartZoom";
 
 function fmtMmSs(s) {
@@ -54,6 +54,7 @@ function nearestHR(chartData, time_s) {
 export default function HREventOverlayChart({ timelineRows, events = [], session }) {
   const [isolatedEvent, setIsolatedEvent] = useState(null);
   const [pinnedTime, setPinnedTime] = useState(null);
+  const [focusedIdx, setFocusedIdx] = useState(null); // nav bar focus (independent of isolatedEvent)
 
   const chartData = useMemo(() => {
     return timelineRows.map((r) => ({
@@ -81,8 +82,26 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
   const toggleIsolate = (idx) => {
     const next = isolatedEvent === idx ? null : idx;
     setIsolatedEvent(next);
+    setFocusedIdx(next);
     setPinnedTime(next !== null ? events[next]?.time_s ?? null : null);
     resetZoom();
+  };
+
+  const navigateTo = (idx) => {
+    setFocusedIdx(idx);
+    setIsolatedEvent(idx);
+    setPinnedTime(events[idx]?.time_s ?? null);
+    resetZoom();
+  };
+
+  const handlePrev = () => {
+    const cur = focusedIdx ?? 0;
+    navigateTo(cur > 0 ? cur - 1 : events.length - 1);
+  };
+
+  const handleNext = () => {
+    const cur = focusedIdx ?? -1;
+    navigateTo(cur < events.length - 1 ? cur + 1 : 0);
   };
 
   // Isolated event zoom overrides drag zoom
@@ -105,7 +124,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h3>
         {isZoomed ? (
           <button
-            onClick={() => { resetZoom(); setIsolatedEvent(null); setPinnedTime(null); }}
+            onClick={() => { resetZoom(); setIsolatedEvent(null); setPinnedTime(null); setFocusedIdx(null); }}
             className="flex items-center gap-1 text-[10px] text-primary border border-primary rounded px-2 py-0.5"
           >
             <ZoomOut className="w-3 h-3" /> Reset Zoom
@@ -180,6 +199,31 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Event navigator bar */}
+      {events.length > 0 && (() => {
+        const idx = focusedIdx ?? 0;
+        const ev = events[idx];
+        const color = EVENT_COLORS[idx % EVENT_COLORS.length];
+        const hr = nearestHR(chartData, ev.time_s);
+        return (
+          <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: color + "18", borderLeft: `3px solid ${color}` }}>
+            <button onClick={handlePrev} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+              <ChevronLeft className="w-4 h-4" style={{ color }} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[10px] font-bold shrink-0" style={{ color }}>E{idx + 1} / {events.length} — {fmtMmSs(ev.time_s)}</span>
+                {hr != null && <span className="font-mono text-[10px] font-bold text-primary/80 shrink-0">{hr} bpm</span>}
+              </div>
+              <p className="text-xs text-foreground/90 leading-snug mt-0.5 truncate">{ev.note}</p>
+            </div>
+            <button onClick={handleNext} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+              <ChevronRight className="w-4 h-4" style={{ color }} />
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Event legend */}
       {events.length > 0 && (
