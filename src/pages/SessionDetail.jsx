@@ -233,6 +233,14 @@ export default function SessionDetail() {
             />
           )}
           {timelineRows.length > 0 && (
+            <NearClimaxEvents
+              timelineRows={timelineRows}
+              session={s}
+              selectedIndex={selectedNearClimaxIdx}
+              onSelectIndex={setSelectedNearClimaxIdx}
+            />
+          )}
+          {timelineRows.length > 0 && (
             <HRZoneAnalysis rows={timelineRows} sessionMaxHR={s.max_hr} />
           )}
           {timelineRows.length > 0 && (s.event_timeline || []).length > 0 && (
@@ -240,14 +248,6 @@ export default function SessionDetail() {
               timelineRows={timelineRows}
               events={s.event_timeline}
               session={s}
-            />
-          )}
-          {timelineRows.length > 0 && (
-            <NearClimaxEvents
-              timelineRows={timelineRows}
-              session={s}
-              selectedIndex={selectedNearClimaxIdx}
-              onSelectIndex={setSelectedNearClimaxIdx}
             />
           )}
           {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
