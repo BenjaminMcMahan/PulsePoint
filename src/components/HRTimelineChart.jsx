@@ -4,6 +4,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut } from "lucide-react";
+import { useChartZoom } from "@/hooks/useChartZoom";
 
 const MARKER_COLORS = {
   build: "#f59e0b",
@@ -105,54 +106,18 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
     recovery: savedMarkers.recovery_offset_s ?? null,
   });
 
-  // Zoom state
-  const [zoomDomain, setZoomDomain] = useState(null); // { x1, x2 } in seconds, or null for full view
-  const [selectStart, setSelectStart] = useState(null);
-  const [selectEnd, setSelectEnd] = useState(null);
-  const [isSelecting, setIsSelecting] = useState(false);
-
   const visibleRows = useMemo(() => {
     if (window === "full") return rows;
     const cutoff = maxOffsetS - window * 60;
     return rows.filter((r) => Number(r.time_offset_s) >= cutoff);
   }, [rows, window, maxOffsetS]);
 
-  const xDomain = useMemo(() => {
-    if (zoomDomain) return [zoomDomain.x1, zoomDomain.x2];
-    return ["dataMin", "dataMax"];
-  }, [zoomDomain]);
+  const visibleMin = useMemo(() => Math.min(...visibleRows.map(r => Number(r.time_offset_s))), [visibleRows]);
+  const visibleMax = useMemo(() => Math.max(...visibleRows.map(r => Number(r.time_offset_s))), [visibleRows]);
 
-  const handleMouseDown = (e) => {
-    if (markingPhase) return; // don't zoom when marking
-    if (e?.activeLabel == null) return;
-    setSelectStart(Number(e.activeLabel));
-    setSelectEnd(null);
-    setIsSelecting(true);
-  };
+  const { zoomDomain, resetZoom, isSelecting, selectRange, chartProps, wrapperProps } = useChartZoom(visibleMin, visibleMax);
 
-  const handleMouseMove = (e) => {
-    if (!isSelecting || e?.activeLabel == null) return;
-    setSelectEnd(Number(e.activeLabel));
-  };
-
-  const handleMouseUp = () => {
-    if (!isSelecting) return;
-    setIsSelecting(false);
-    if (selectStart != null && selectEnd != null && Math.abs(selectEnd - selectStart) > 5) {
-      const x1 = Math.min(selectStart, selectEnd);
-      const x2 = Math.max(selectStart, selectEnd);
-      setZoomDomain({ x1, x2 });
-    }
-    setSelectStart(null);
-    setSelectEnd(null);
-  };
-
-  const resetZoom = () => {
-    setZoomDomain(null);
-    setSelectStart(null);
-    setSelectEnd(null);
-    setIsSelecting(false);
-  };
+  const xDomain = zoomDomain ? [zoomDomain.x1, zoomDomain.x2] : ["dataMin", "dataMax"];
 
   if (!rows || rows.length === 0) return null;
 
@@ -295,6 +260,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
             variant={window === value && !zoomDomain ? "default" : "outline"}
             className="h-6 text-[10px] px-2"
             onClick={() => { setWindow(value); resetZoom(); }}
+
           >
             {label}
           </Button>
@@ -378,15 +344,13 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
         ))}
       </div>
 
-      <div className={`h-64 ${markingPhase ? "cursor-crosshair" : !zoomDomain ? "cursor-crosshair" : "cursor-default"}`}>
+      <div className={`h-64 cursor-crosshair`} {...wrapperProps}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleRows}
             margin={{ top: 8, right: 4, bottom: 0, left: -20 }}
             onClick={handleChartClick}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
+            {...chartProps}
           >
             <XAxis
               dataKey="time_offset_s"
@@ -409,10 +373,10 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
             />
 
             {/* Drag-to-zoom selection area */}
-            {isSelecting && selectStart != null && selectEnd != null && (
+            {isSelecting && selectRange && (
               <ReferenceArea
-                x1={Math.min(selectStart, selectEnd)}
-                x2={Math.max(selectStart, selectEnd)}
+                x1={selectRange.x1}
+                x2={selectRange.x2}
                 fill="hsl(var(--primary))"
                 fillOpacity={0.15}
                 stroke="hsl(var(--primary))"

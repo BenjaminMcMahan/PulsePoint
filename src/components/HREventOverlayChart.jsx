@@ -1,8 +1,10 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis,
-  Tooltip, CartesianGrid, ReferenceLine,
+  Tooltip, CartesianGrid, ReferenceLine, ReferenceArea,
 } from "recharts";
+import { ZoomOut } from "lucide-react";
+import { useChartZoom } from "@/hooks/useChartZoom";
 
 function fmtMmSs(s) {
   const totalS = Math.round(Number(s));
@@ -51,7 +53,7 @@ function nearestHR(chartData, time_s) {
 
 export default function HREventOverlayChart({ timelineRows, events = [], session }) {
   const [isolatedEvent, setIsolatedEvent] = useState(null);
-  const [pinnedTime, setPinnedTime] = useState(null); // time_s pinned from event tap
+  const [pinnedTime, setPinnedTime] = useState(null);
 
   const chartData = useMemo(() => {
     return timelineRows.map((r) => ({
@@ -59,6 +61,11 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
       hr: Math.round(Number(r.hr_smoothed || r.hr)),
     }));
   }, [timelineRows]);
+
+  const dataMin = chartData.length ? chartData[0].t : 0;
+  const dataMax = chartData.length ? chartData[chartData.length - 1].t : 1;
+
+  const { zoomDomain, resetZoom, isSelecting, selectRange, chartProps, wrapperProps } = useChartZoom(dataMin, dataMax);
 
   const phaseMarkers = [
     session?.pre_climax_offset_s != null && { time_s: session.pre_climax_offset_s, label: "Pre-Climax", color: "#a855f7" },
@@ -70,24 +77,42 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
     const next = isolatedEvent === idx ? null : idx;
     setIsolatedEvent(next);
     setPinnedTime(next !== null ? events[next]?.time_s ?? null : null);
+    resetZoom();
   };
 
-  // When isolated, zoom the X domain to ±60s around that event
+  // Isolated event zoom overrides drag zoom
   const xDomain = useMemo(() => {
-    if (isolatedEvent === null || !events[isolatedEvent]) return ["dataMin", "dataMax"];
-    const t = events[isolatedEvent].time_s;
-    return [Math.max(0, t - 60), t + 60];
-  }, [isolatedEvent, events]);
+    if (isolatedEvent !== null && events[isolatedEvent]) {
+      const t = events[isolatedEvent].time_s;
+      return [Math.max(0, t - 60), t + 60];
+    }
+    if (zoomDomain) return [zoomDomain.x1, zoomDomain.x2];
+    return ["dataMin", "dataMax"];
+  }, [isolatedEvent, events, zoomDomain]);
 
   if (!timelineRows.length) return null;
 
+  const isZoomed = zoomDomain != null || isolatedEvent !== null;
+
   return (
     <div className="space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h3>
+        {isZoomed ? (
+          <button
+            onClick={() => { resetZoom(); setIsolatedEvent(null); setPinnedTime(null); }}
+            className="flex items-center gap-1 text-[10px] text-primary border border-primary rounded px-2 py-0.5"
+          >
+            <ZoomOut className="w-3 h-3" /> Reset Zoom
+          </button>
+        ) : (
+          <span className="text-[10px] text-muted-foreground">Drag to zoom</span>
+        )}
+      </div>
 
-      <div className="h-64">
+      <div className="h-64 cursor-crosshair" {...wrapperProps}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 8, right: 4, bottom: 0, left: -20 }}>
+          <ComposedChart data={chartData} margin={{ top: 8, right: 4, bottom: 0, left: -20 }} {...chartProps}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtMmSs} tickCount={8} type="number" domain={xDomain} />
             <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
@@ -126,6 +151,19 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
               );
             })}
 
+            {/* Drag-to-zoom selection */}
+            {isSelecting && selectRange && (
+              <ReferenceArea
+                x1={selectRange.x1}
+                x2={selectRange.x2}
+                fill="hsl(var(--primary))"
+                fillOpacity={0.15}
+                stroke="hsl(var(--primary))"
+                strokeOpacity={0.5}
+                strokeWidth={1}
+              />
+            )}
+
             <Line
               type="monotone"
               dataKey="hr"
@@ -142,7 +180,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
       {events.length > 0 && (
         <div className="space-y-1.5 pt-1">
           <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
-            Events {isolatedEvent !== null ? "— tap again to reset" : "— tap to isolate"}
+            Events {isolatedEvent !== null ? "— tap again to reset · drag chart to zoom" : "— tap to isolate · drag chart to zoom"}
           </p>
           {events.map((ev, i) => {
             const color = EVENT_COLORS[i % EVENT_COLORS.length];
