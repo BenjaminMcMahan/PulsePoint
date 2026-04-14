@@ -36,7 +36,7 @@ function CustomTooltip({ active, payload, label, events }) {
 }
 
 export default function HREventOverlayChart({ timelineRows, events = [], session }) {
-  const [hiddenEvents, setHiddenEvents] = useState(new Set());
+  const [isolatedEvent, setIsolatedEvent] = useState(null); // index of isolated event, or null = show all
 
   const chartData = useMemo(() => {
     return timelineRows.map((r) => ({
@@ -45,21 +45,22 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
     }));
   }, [timelineRows]);
 
-  const visibleEvents = events.filter((_, i) => !hiddenEvents.has(i));
-
   const phaseMarkers = [
     session?.pre_climax_offset_s != null && { time_s: session.pre_climax_offset_s, label: "Pre-Climax", color: "#a855f7" },
     session?.climax_offset_s != null && { time_s: session.climax_offset_s, label: "Climax", color: "#ef4444" },
     session?.recovery_offset_s != null && { time_s: session.recovery_offset_s, label: "Recovery", color: "#3b82f6" },
   ].filter(Boolean);
 
-  const toggleEvent = (idx) => {
-    setHiddenEvents((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx); else next.add(idx);
-      return next;
-    });
+  const toggleIsolate = (idx) => {
+    setIsolatedEvent((prev) => (prev === idx ? null : idx));
   };
+
+  // When isolated, zoom the X domain to ±60s around that event
+  const xDomain = useMemo(() => {
+    if (isolatedEvent === null || !events[isolatedEvent]) return ["dataMin", "dataMax"];
+    const t = events[isolatedEvent].time_s;
+    return [Math.max(0, t - 60), t + 60];
+  }, [isolatedEvent, events]);
 
   if (!timelineRows.length) return null;
 
@@ -71,7 +72,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 8, right: 4, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtMmSs} tickCount={8} type="number" domain={["dataMin", "dataMax"]} />
+            <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtMmSs} tickCount={8} type="number" domain={xDomain} />
             <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
             <Tooltip content={<CustomTooltip events={events} />} />
 
@@ -88,16 +89,22 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
             ))}
 
             {/* Event markers */}
-            {events.map((ev, i) => !hiddenEvents.has(i) && (
-              <ReferenceLine
-                key={i}
-                x={ev.time_s}
-                stroke={EVENT_COLORS[i % EVENT_COLORS.length]}
-                strokeWidth={1.5}
-                strokeDasharray="2 3"
-                label={{ value: `E${i + 1}`, fontSize: 7, fill: EVENT_COLORS[i % EVENT_COLORS.length], position: "insideTopLeft" }}
-              />
-            ))}
+            {events.map((ev, i) => {
+              const isIsolated = isolatedEvent === i;
+              const dimmed = isolatedEvent !== null && !isIsolated;
+              if (dimmed) return null;
+              const color = EVENT_COLORS[i % EVENT_COLORS.length];
+              return (
+                <ReferenceLine
+                  key={i}
+                  x={ev.time_s}
+                  stroke={color}
+                  strokeWidth={isIsolated ? 2.5 : 1.5}
+                  strokeDasharray="2 3"
+                  label={{ value: `E${i + 1}`, fontSize: 7, fill: color, position: "insideTopLeft" }}
+                />
+              );
+            })}
 
             <Line
               type="monotone"
@@ -114,16 +121,23 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
       {/* Event legend */}
       {events.length > 0 && (
         <div className="space-y-1.5 pt-1">
-          <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">Events (tap to toggle)</p>
+          <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
+            Events {isolatedEvent !== null ? "— tap again to reset" : "— tap to isolate"}
+          </p>
           {events.map((ev, i) => {
             const color = EVENT_COLORS[i % EVENT_COLORS.length];
-            const hidden = hiddenEvents.has(i);
+            const isIsolated = isolatedEvent === i;
+            const dimmed = isolatedEvent !== null && !isIsolated;
             return (
               <button
                 key={i}
-                onClick={() => toggleEvent(i)}
-                className={`w-full flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-opacity ${hidden ? "opacity-40" : ""}`}
-                style={{ background: color + "15", borderLeft: `3px solid ${color}` }}
+                onClick={() => toggleIsolate(i)}
+                className={`w-full flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-opacity ${dimmed ? "opacity-30" : ""}`}
+                style={{
+                  background: isIsolated ? color + "30" : color + "15",
+                  borderLeft: `3px solid ${color}`,
+                  outline: isIsolated ? `1px solid ${color}55` : "none",
+                }}
               >
                 <span className="font-mono text-[10px] shrink-0 mt-0.5 font-bold" style={{ color }}>
                   E{i + 1} {fmtMmSs(ev.time_s)}
