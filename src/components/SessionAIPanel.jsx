@@ -52,10 +52,25 @@ export default function SessionAIPanel({ session, timelineRows, userProfile }) {
       hr_max: Math.round(Math.max(...timelineRows.map(r => Number(r.hr)))),
     } : null;
 
+    // Build a sorted HR lookup from timeline rows for nearest-HR matching
+    const sortedRows = [...timelineRows].sort((a, b) => Number(a.time_offset_s) - Number(b.time_offset_s));
+    const nearestHR = (time_s) => {
+      if (!sortedRows.length) return null;
+      let best = sortedRows[0];
+      let bestDist = Math.abs(Number(sortedRows[0].time_offset_s) - time_s);
+      for (const r of sortedRows) {
+        const d = Math.abs(Number(r.time_offset_s) - time_s);
+        if (d < bestDist) { bestDist = d; best = r; }
+        if (Number(r.time_offset_s) > time_s + 10) break; // past the window, stop early
+      }
+      return Math.round(Number(best.hr));
+    };
+
     const eventTimeline = (session.event_timeline || []).map(e => {
       const m = Math.floor(e.time_s / 60);
       const s = (e.time_s % 60).toString().padStart(2, '0');
-      return `${m}:${s} — ${e.note}`;
+      const hr = nearestHR(e.time_s);
+      return `${m}:${s} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ''}`;
     });
 
     const profileContext = userProfile && (userProfile.age || userProfile.resting_hr || userProfile.max_hr || userProfile.medications || userProfile.recovery_hr_60s) ? `

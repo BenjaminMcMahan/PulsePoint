@@ -17,78 +17,107 @@ function fmtMmSs(s) {
 
 export function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
   if (!rows || rows.length < 10) return [];
+
+  // Smooth HR with a small rolling average to reduce noise before detection
+  const smoothed = rows.map((r, i) => {
+    const window = rows.slice(Math.max(0, i - 2), i + 3);
+    const avg = window.reduce((a, w) => a + Number(w.hr), 0) / window.length;
+    return { t: Number(r.time_offset_s), hr: avg };
+  });
+
+  // Determine the terminal climax cascade region to exclude
+  // Exclude from preClimaxOffset (or 90s before climax) through end of data
+  const excludeStart = climaxOffsetS != null
+    ? (preClimaxOffsetS != null ? Math.min(preClimaxOffsetS, climaxOffsetS - 60) : climaxOffsetS - 120)
+    : Infinity;
+
+  // Also compute session-wide HR stats for relative thresholds
+  const allHRs = smoothed.map(p => p.hr);
+  const sessionMinHR = Math.min(...allHRs);
+  const sessionMaxHR = Math.max(...allHRs);
+  const sessionHRRange = sessionMaxHR - sessionMinHR;
+
+  // Thresholds — tuned for sub-climax arousal spikes:
+  // Rise must be meaningful relative to session range but not a full climax cascade
+  const MIN_RISE_BPM = Math.max(6, sessionHRRange * 0.12);   // at least 12% of range or 6 bpm
+  const MAX_RISE_BPM = sessionHRRange * 0.80;                  // not a near-full-range surge (climax-level)
+  const RISE_WINDOW_S = 90;       // must reach peak within 90s of start
+  const PLATEAU_MIN_S = 5;        // peak must be sustained at least 5s
+  const PLATEAU_TOLERANCE = 4;    // bpm tolerance for "sustained" plateau
+  const DROP_BPM = Math.max(5, MIN_RISE_BPM * 0.6); // drop needed to end event
+  const SEARCH_DROP_S = 120;      // look up to 120s after peak for the drop
+  const MIN_DURATION_S = 15;
+  const MAX_DURATION_S = 240;
+  const COOLDOWN_S = 25;
+
   const events = [];
-
-  const RISE_THRESHOLD = 8;
-  const RISE_WINDOW_S = 120;
-  const PLATEAU_MIN_S = 6;
-  const DROP_NEEDED = 6;
-  const COOLDOWN_S = 30;
-  const MIN_EVENT_DURATION_S = 10;
-  const MAX_EVENT_DURATION_S = (climaxOffsetS != null && preClimaxOffsetS != null)
-    ? Math.max(60, Math.abs(climaxOffsetS - preClimaxOffsetS) * 0.8)
-    : 180;
-  const climaxExcludeRadius = 90;
-
-  let i = 0;
   let lastEventEnd = -Infinity;
+  let i = 0;
 
-  while (i < rows.length - 5) {
-    const t0 = Number(rows[i].time_offset_s);
-    const hr0 = Number(rows[i].hr);
+  while (i < smoothed.length - 5) {
+    const { t: t0, hr: hr0 } = smoothed[i];
 
+    // Skip cooldown period after last event
     if (t0 < lastEventEnd + COOLDOWN_S) { i++; continue; }
-    if (climaxOffsetS != null && Math.abs(t0 - climaxOffsetS) < climaxExcludeRadius) { i++; continue; }
 
+    // Skip the terminal climax cascade region
+    if (t0 >= excludeStart) break;
+
+    // Find local peak within RISE_WINDOW_S
     let peakIdx = i;
     let peakHr = hr0;
-    for (let j = i + 1; j < rows.length; j++) {
-      const tj = Number(rows[j].time_offset_s);
-      if (tj - t0 > RISE_WINDOW_S) break;
-      if (Number(rows[j].hr) > peakHr) {
-        peakHr = Number(rows[j].hr);
-        peakIdx = j;
-      }
+    for (let j = i + 1; j < smoothed.length; j++) {
+      if (smoothed[j].t - t0 > RISE_WINDOW_S) break;
+      if (smoothed[j].t >= excludeStart) break;
+      if (smoothed[j].hr > peakHr) { peakHr = smoothed[j].hr; peakIdx = j; }
     }
 
-    if (peakHr - hr0 < RISE_THRESHOLD || peakIdx === i) { i++; continue; }
+    const rise = peakHr - hr0;
 
-    const peakTime = Number(rows[peakIdx].time_offset_s);
+    // Must be a meaningful rise but NOT a full climax-level surge
+    if (rise < MIN_RISE_BPM || rise > MAX_RISE_BPM || peakIdx === i) { i++; continue; }
 
+    // Ensure the rise is sharp: peak reached within a reasonable ascent window
+    const ascentTime = smoothed[peakIdx].t - t0;
+    if (ascentTime < 5 || ascentTime > RISE_WINDOW_S) { i++; continue; }
+
+    const peakTime = smoothed[peakIdx].t;
+
+    // Confirm plateau: HR stays within PLATEAU_TOLERANCE of peak for PLATEAU_MIN_S
     let plateauEnd = peakIdx;
-    for (let j = peakIdx; j < rows.length; j++) {
-      if (Number(rows[j].time_offset_s) - peakTime > PLATEAU_MIN_S) break;
-      if (Number(rows[j].hr) >= peakHr - DROP_NEEDED / 2) plateauEnd = j;
+    for (let j = peakIdx + 1; j < smoothed.length; j++) {
+      if (smoothed[j].t - peakTime > 60) break; // don't search too far for plateau
+      if (smoothed[j].hr >= peakHr - PLATEAU_TOLERANCE) plateauEnd = j;
     }
-    const plateauDuration = Number(rows[plateauEnd].time_offset_s) - peakTime;
-    if (plateauDuration < PLATEAU_MIN_S * 0.5) { i = peakIdx + 1; continue; }
+    const plateauDuration = smoothed[plateauEnd].t - peakTime;
+    if (plateauDuration < PLATEAU_MIN_S) { i = peakIdx + 1; continue; }
 
-    let dropped = false;
-    let dropIdx = plateauEnd;
-    for (let j = plateauEnd + 1; j < rows.length && j < plateauEnd + 40; j++) {
-      if (Number(rows[j].hr) <= peakHr - DROP_NEEDED) {
-        dropped = true;
-        dropIdx = j;
-        break;
-      }
+    // Find the descent — HR drops DROP_BPM below the peak
+    let dropIdx = -1;
+    for (let j = plateauEnd + 1; j < smoothed.length; j++) {
+      if (smoothed[j].t - peakTime > SEARCH_DROP_S) break;
+      if (smoothed[j].hr <= peakHr - DROP_BPM) { dropIdx = j; break; }
     }
+    if (dropIdx === -1) { i = peakIdx + 1; continue; }
 
-    if (!dropped) { i = peakIdx + 1; continue; }
+    const eventDuration = smoothed[dropIdx].t - t0;
+    if (eventDuration < MIN_DURATION_S || eventDuration > MAX_DURATION_S) { i++; continue; }
 
-    const eventDuration = Number(rows[dropIdx].time_offset_s) - t0;
-    if (eventDuration < MIN_EVENT_DURATION_S || eventDuration > MAX_EVENT_DURATION_S) { i++; continue; }
+    // Final guard: reject if this event's peak HR is suspiciously close to session max
+    // (i.e. it IS the climax, just not properly marked)
+    if (peakHr >= sessionMaxHR * 0.97) { i = dropIdx + 1; continue; }
 
     events.push({
       start_offset_s: t0,
       peak_offset_s: peakTime,
-      end_offset_s: Number(rows[dropIdx].time_offset_s),
+      end_offset_s: smoothed[dropIdx].t,
       base_hr: Math.round(hr0),
       peak_hr: Math.round(peakHr),
-      rise_bpm: Math.round(peakHr - hr0),
+      rise_bpm: Math.round(rise),
       duration_s: Math.round(eventDuration),
     });
 
-    lastEventEnd = Number(rows[dropIdx].time_offset_s);
+    lastEventEnd = smoothed[dropIdx].t;
     i = dropIdx + 1;
   }
 
