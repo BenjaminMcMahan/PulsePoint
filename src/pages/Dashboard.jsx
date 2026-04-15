@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import moment from "moment";
-import { TrendingUp, Heart, Zap, Star, Activity, BarChart2, Timer } from "lucide-react";
+import { TrendingUp, Heart, Zap, Star, Activity, BarChart2, Timer, MessageSquare } from "lucide-react";
 
 function StatCard({ label, value, sub, icon: Icon, color = "primary" }) {
   return (
@@ -134,6 +134,53 @@ export default function Dashboard() {
     return sessions
       .filter((s) => s.intensity && s.satisfaction)
       .map((s) => ({ x: s.intensity, y: s.satisfaction }));
+  }, [sessions]);
+
+  // Event timeline stats — across all sessions
+  const eventStats = useMemo(() => {
+    const allEvents = [];
+    sessions.forEach((s) => {
+      if (!s.event_timeline?.length) return;
+      // Pair each event with the session's HR data for nearest HR lookup
+      s.event_timeline.forEach((ev) => {
+        allEvents.push({ session_id: s.id, time_s: ev.time_s, note: ev.note });
+      });
+    });
+
+    if (!allEvents.length) return null;
+
+    // Sessions that have at least one event
+    const sessionsWithEvents = sessions.filter((s) => s.event_timeline?.length > 0);
+
+    // Average events per session (among those with events)
+    const avgEventsPerSession = (allEvents.length / sessionsWithEvents.length).toFixed(1);
+
+    // Spread within a session: last event time_s - first event time_s
+    const spreads = sessionsWithEvents
+      .map((s) => {
+        const times = s.event_timeline.map((e) => e.time_s).sort((a, b) => a - b);
+        return times[times.length - 1] - times[0];
+      })
+      .filter((sp) => sp > 0);
+    const avgSpreadS = spreads.length
+      ? Math.round(spreads.reduce((a, b) => a + b, 0) / spreads.length)
+      : null;
+
+    // HR during events: use hr_avg_pre_to_climax or hr_at_climax as proxy for sessions with events
+    const hrValues = sessionsWithEvents
+      .map((s) => s.hr_avg_pre_to_climax || s.hr_at_climax || s.avg_hr)
+      .filter(Boolean);
+    const avgEventHR = hrValues.length
+      ? Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length)
+      : null;
+
+    return {
+      total: allEvents.length,
+      sessionsWithEvents: sessionsWithEvents.length,
+      avgEventsPerSession,
+      avgSpreadS,
+      avgEventHR,
+    };
   }, [sessions]);
 
   // Physiological patterns — recovery rate and climax duration
@@ -333,6 +380,43 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Event Timeline Stats */}
+      {eventStats && (
+        <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+          <SectionTitle>Session Event Summary</SectionTitle>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Events</p>
+              <p className="text-2xl font-bold font-mono text-primary">{eventStats.total}</p>
+              <p className="text-[10px] text-muted-foreground">across {eventStats.sessionsWithEvents} sessions</p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg / Session</p>
+              <p className="text-2xl font-bold font-mono text-chart-2">{eventStats.avgEventsPerSession}</p>
+              <p className="text-[10px] text-muted-foreground">events per session</p>
+            </div>
+            {eventStats.avgEventHR && (
+              <div className="bg-muted/50 rounded-lg p-3 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg HR During Events</p>
+                <p className="text-2xl font-bold font-mono text-chart-3">{eventStats.avgEventHR} <span className="text-sm font-normal">bpm</span></p>
+                <p className="text-[10px] text-muted-foreground">HR at event sessions</p>
+              </div>
+            )}
+            {eventStats.avgSpreadS != null && (
+              <div className="bg-muted/50 rounded-lg p-3 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg Event Span</p>
+                <p className="text-2xl font-bold font-mono text-accent">
+                  {eventStats.avgSpreadS >= 60
+                    ? `${Math.floor(eventStats.avgSpreadS / 60)}m ${eventStats.avgSpreadS % 60}s`
+                    : `${eventStats.avgSpreadS}s`}
+                </p>
+                <p className="text-[10px] text-muted-foreground">first → last event</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
