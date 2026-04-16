@@ -17,7 +17,8 @@ const LEGACY_CATS = ["pause", "resume", "paused", "resumed"];
 function getCategories(ev) {
   if (!ev.category) return [];
   const arr = Array.isArray(ev.category) ? ev.category : [ev.category];
-  return arr.filter((v) => typeof v === "string" && v && !LEGACY_CATS.includes(v.toLowerCase()));
+  const filtered = arr.filter((v) => typeof v === "string" && v && !LEGACY_CATS.includes(v.toLowerCase()));
+  return filtered.length ? filtered : ["other"];
 }
 
 function CategoryPill({ value }) {
@@ -32,7 +33,6 @@ function CategoryPill({ value }) {
 
 function EventCategoryPills({ ev }) {
   const cats = getCategories(ev);
-  if (!cats.length) return <CategoryPill value="other" />;
   return <>{cats.map((c) => <CategoryPill key={c} value={c} />)}</>;
 }
 
@@ -60,9 +60,58 @@ function nearestHR(chartData, time_s) {
   return Math.round(best.hr);
 }
 
+// Get all unique categories present across all events
+function getAllUsedCategories(events) {
+  const seen = new Set();
+  for (const ev of events) {
+    for (const c of getCategories(ev)) seen.add(c);
+  }
+  // Return in EVENT_CATEGORIES order
+  return EVENT_CATEGORIES.filter((ec) => seen.has(ec.value));
+}
+
 export default function HREventOverlayChart({ timelineRows, events = [], session }) {
   const [isolatedEvent, setIsolatedEvent] = useState(null);
-  const [focusedIdx, setFocusedIdx] = useState(null);
+  const [focusedFilteredIdx, setFocusedFilteredIdx] = useState(0);
+
+  // Active category filters — null means "all"
+  const usedCategories = useMemo(() => getAllUsedCategories(events), [events]);
+  const [activeFilters, setActiveFilters] = useState(null); // null = all active
+
+  const toggleFilter = (catValue) => {
+    setIsolatedEvent(null);
+    setFocusedFilteredIdx(0);
+    if (activeFilters === null) {
+      // Switch from "all" to just this one deselected (all except this)
+      const allVals = usedCategories.map((c) => c.value);
+      setActiveFilters(allVals.filter((v) => v !== catValue));
+    } else {
+      const next = activeFilters.includes(catValue)
+        ? activeFilters.filter((v) => v !== catValue)
+        : [...activeFilters, catValue];
+      // If all are selected, revert to null (all)
+      if (next.length === usedCategories.length) setActiveFilters(null);
+      else setActiveFilters(next.length ? next : null);
+    }
+  };
+
+  const selectAllFilters = () => {
+    setActiveFilters(null);
+    setIsolatedEvent(null);
+    setFocusedFilteredIdx(0);
+  };
+
+  const isCatActive = (catValue) => activeFilters === null || activeFilters.includes(catValue);
+
+  // Filtered events (indices relative to original events array preserved)
+  const filteredEventIndices = useMemo(() => {
+    return events.reduce((acc, ev, i) => {
+      const cats = getCategories(ev);
+      const passes = activeFilters === null || cats.some((c) => activeFilters.includes(c));
+      if (passes) acc.push(i);
+      return acc;
+    }, []);
+  }, [events, activeFilters]);
 
   const chartData = useMemo(() => {
     return timelineRows.map((r) => ({
@@ -87,27 +136,32 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
     session?.recovery_offset_s != null && { time_s: session.recovery_offset_s, label: "Recovery", color: "#3b82f6" },
   ].filter(Boolean);
 
-  const toggleIsolate = (idx) => {
-    const next = isolatedEvent === idx ? null : idx;
-    setIsolatedEvent(next);
-    setFocusedIdx(next);
+  // Navigation operates on filtered events
+  const safeFilteredIdx = Math.min(focusedFilteredIdx, Math.max(0, filteredEventIndices.length - 1));
+  const currentOriginalIdx = filteredEventIndices[safeFilteredIdx] ?? null;
+
+  // When an event is isolated on chart, sync it to the navigator
+  const activeIsolatedIdx = isolatedEvent; // original index
+
+  const navigateToFiltered = (filteredIdx) => {
+    const newIdx = ((filteredIdx % filteredEventIndices.length) + filteredEventIndices.length) % filteredEventIndices.length;
+    setFocusedFilteredIdx(newIdx);
+    setIsolatedEvent(filteredEventIndices[newIdx]);
     resetZoom();
   };
 
-  const navigateTo = (idx) => {
-    setFocusedIdx(idx);
-    setIsolatedEvent(idx);
-    resetZoom();
-  };
+  const handlePrev = () => navigateToFiltered(safeFilteredIdx - 1);
+  const handleNext = () => navigateToFiltered(safeFilteredIdx + 1);
 
-  const handlePrev = () => {
-    const cur = focusedIdx ?? 0;
-    navigateTo(cur > 0 ? cur - 1 : events.length - 1);
-  };
-
-  const handleNext = () => {
-    const cur = focusedIdx ?? -1;
-    navigateTo(cur < events.length - 1 ? cur + 1 : 0);
+  const toggleIsolateOriginal = (origIdx) => {
+    if (isolatedEvent === origIdx) {
+      setIsolatedEvent(null);
+    } else {
+      setIsolatedEvent(origIdx);
+      const fi = filteredEventIndices.indexOf(origIdx);
+      if (fi !== -1) setFocusedFilteredIdx(fi);
+      resetZoom();
+    }
   };
 
   // Isolated event zoom overrides drag zoom
@@ -124,13 +178,18 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
 
   const isZoomed = zoomDomain != null || isolatedEvent !== null;
 
+  // Navigator current event
+  const navOrigIdx = currentOriginalIdx;
+  const navEv = navOrigIdx != null ? events[navOrigIdx] : null;
+  const navColor = navOrigIdx != null ? EVENT_COLORS[navOrigIdx % EVENT_COLORS.length] : "#888";
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h3>
         {isZoomed ? (
           <button
-            onClick={() => { resetZoom(); setIsolatedEvent(null); setFocusedIdx(null); }}
+            onClick={() => { resetZoom(); setIsolatedEvent(null); }}
             className="flex items-center gap-1 text-[10px] text-primary border border-primary rounded px-2 py-0.5"
           >
             <ZoomOut className="w-3 h-3" /> Reset Zoom
@@ -164,11 +223,11 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
               />
             ))}
 
-            {/* Event markers */}
+            {/* Event markers — show all, dim non-filtered */}
             {events.map((ev, i) => {
+              const isFiltered = filteredEventIndices.includes(i);
               const isIsolated = isolatedEvent === i;
-              const dimmed = isolatedEvent !== null && !isIsolated;
-              if (dimmed) return null;
+              if (!isFiltered && !isIsolated) return null;
               const color = EVENT_COLORS[i % EVENT_COLORS.length];
               return (
                 <ReferenceLine
@@ -177,6 +236,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
                   stroke={color}
                   strokeWidth={isIsolated ? 2.5 : 1.5}
                   strokeDasharray="2 3"
+                  strokeOpacity={isolatedEvent !== null && !isIsolated ? 0.3 : 1}
                   label={{ value: `E${i + 1}`, fontSize: 7, fill: color, position: "insideTopLeft" }}
                 />
               );
@@ -208,47 +268,77 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
       </div>
 
       {/* Event navigator bar */}
-      {events.length > 0 && (() => {
-        const idx = focusedIdx ?? 0;
-        const ev = events[idx];
-        const color = EVENT_COLORS[idx % EVENT_COLORS.length];
-        const hr = nearestHR(chartData, ev.time_s);
-        return (
-          <div className="rounded-lg px-3 py-3" style={{ background: color + "18", borderLeft: `3px solid ${color}` }}>
-            <div className="flex items-center gap-2 mb-2">
-              <button onClick={handlePrev} className="p-0.5 rounded hover:bg-black/10 shrink-0">
-                <ChevronLeft className="w-4 h-4" style={{ color }} />
-              </button>
-              <div className="flex-1 flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-[11px] font-bold" style={{ color }}>E{idx + 1} / {events.length}</span>
-                <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(ev.time_s)}</span>
-                <EventCategoryPills ev={ev} />
-                {hr != null && <span className="font-mono text-[11px] font-bold text-primary">{hr} bpm</span>}
-              </div>
-              <button onClick={handleNext} className="p-0.5 rounded hover:bg-black/10 shrink-0">
-                <ChevronRight className="w-4 h-4" style={{ color }} />
-              </button>
+      {navEv && (
+        <div className="rounded-lg px-3 py-3" style={{ background: navColor + "18", borderLeft: `3px solid ${navColor}` }}>
+          <div className="flex items-center gap-2 mb-2">
+            <button onClick={handlePrev} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+              <ChevronLeft className="w-4 h-4" style={{ color: navColor }} />
+            </button>
+            <div className="flex-1 flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-[11px] font-bold" style={{ color: navColor }}>
+                E{navOrigIdx + 1} / {filteredEventIndices.length}
+                {activeFilters !== null && <span className="text-muted-foreground font-normal"> (filtered)</span>}
+              </span>
+              <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(navEv.time_s)}</span>
+              <EventCategoryPills ev={navEv} />
+              {(() => { const hr = nearestHR(chartData, navEv.time_s); return hr != null && <span className="font-mono text-[11px] font-bold text-primary">{hr} bpm</span>; })()}
             </div>
-            <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">{ev.note}</p>
+            <button onClick={handleNext} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+              <ChevronRight className="w-4 h-4" style={{ color: navColor }} />
+            </button>
           </div>
-        );
-      })()}
+          <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">{navEv.note}</p>
+        </div>
+      )}
 
-      {/* Event legend */}
+      {/* Category filter chips + legend */}
       {events.length > 0 && (
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-2 pt-1">
+          {/* Filter chips */}
+          {usedCategories.length > 1 && (
+            <div className="flex flex-wrap gap-1.5 items-center">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mr-1">Filter:</span>
+              <button
+                onClick={selectAllFilters}
+                className="text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all"
+                style={activeFilters === null
+                  ? { background: "hsl(var(--primary))", color: "#fff", borderColor: "hsl(var(--primary))" }
+                  : { background: "transparent", color: "hsl(var(--muted-foreground))", borderColor: "hsl(var(--border))" }}
+              >
+                All
+              </button>
+              {usedCategories.map((cat) => {
+                const active = isCatActive(cat.value);
+                return (
+                  <button
+                    key={cat.value}
+                    onClick={() => toggleFilter(cat.value)}
+                    className="text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all"
+                    style={active
+                      ? { background: cat.color, color: "#fff", borderColor: cat.color }
+                      : { background: cat.color + "18", color: cat.color, borderColor: cat.color + "44", opacity: 0.5 }}
+                  >
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
             Events {isolatedEvent !== null ? "— tap again to reset · drag chart to zoom" : "— tap to isolate · drag chart to zoom"}
           </p>
+
           {events.map((ev, i) => {
             const color = EVENT_COLORS[i % EVENT_COLORS.length];
             const isIsolated = isolatedEvent === i;
-            const dimmed = isolatedEvent !== null && !isIsolated;
+            const isFiltered = filteredEventIndices.includes(i);
+            const dimmed = !isFiltered || (isolatedEvent !== null && !isIsolated);
             const hr = nearestHR(chartData, ev.time_s);
             return (
               <button
                 key={i}
-                onClick={() => toggleIsolate(i)}
+                onClick={() => toggleIsolateOriginal(i)}
                 className={`w-full flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-opacity ${dimmed ? "opacity-30" : ""}`}
                 style={{
                   background: isIsolated ? color + "30" : color + "15",

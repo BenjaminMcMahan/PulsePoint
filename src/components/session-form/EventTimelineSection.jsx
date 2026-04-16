@@ -6,11 +6,12 @@ import { Plus, Trash2, Pencil, Check, X } from "lucide-react";
 
 export const EVENT_CATEGORIES = [
   { value: "stimulation", label: "Stimulation", color: "#3b82f6" },
-  { value: "sensation", label: "Sensation", color: "#a855f7" },
-  { value: "physical", label: "Physical", color: "#10b981" },
+  { value: "stimulation_started", label: "Stim Started", color: "#06b6d4" },
   { value: "stimulation_paused", label: "Stim Paused", color: "#f97316" },
   { value: "stimulation_resumed", label: "Stim Resumed", color: "#22c55e" },
   { value: "stimulation_stopped", label: "Stim Stopped", color: "#ef4444" },
+  { value: "sensation", label: "Sensation", color: "#a855f7" },
+  { value: "physical", label: "Physical", color: "#10b981" },
   { value: "other", label: "Other", color: "#94a3b8" },
 ];
 
