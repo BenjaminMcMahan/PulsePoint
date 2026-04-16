@@ -3,6 +3,11 @@ import { base44 } from "@/api/base44Client";
 import { Brain, AlertCircle, Activity, Lightbulb, TrendingUp, Zap } from "lucide-react";
 import TTSButton from "./TTSButton";
 import { Button } from "@/components/ui/button";
+import { EVENT_CATEGORIES } from "./session-form/EventTimelineSection";
+
+function getCategoryMeta(value) {
+  return EVENT_CATEGORIES.find((c) => c.value === value) || EVENT_CATEGORIES[EVENT_CATEGORIES.length - 1];
+}
 
 const SECTION_COLORS = {
   primary: "hsl(var(--primary))",
@@ -70,7 +75,10 @@ export default function SessionAIPanel({ session, timelineRows, userProfile }) {
       const m = Math.floor(e.time_s / 60);
       const s = (e.time_s % 60).toString().padStart(2, '0');
       const hr = nearestHR(e.time_s);
-      return `${m}:${s} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ''}`;
+      const catMeta = getCategoryMeta(e.category);
+      const relToClimax = session.climax_offset_s != null ? Math.round(e.time_s - session.climax_offset_s) : null;
+      const relStr = relToClimax != null ? ` (${relToClimax >= 0 ? "+" : ""}${relToClimax}s vs climax)` : "";
+      return `[${catMeta.label}] ${m}:${s}${relStr} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ''}`;
     });
 
     const profileContext = userProfile && (userProfile.age || userProfile.resting_hr || userProfile.max_hr || userProfile.medications || userProfile.recovery_hr_60s) ? `

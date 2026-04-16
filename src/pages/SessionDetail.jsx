@@ -12,6 +12,19 @@ import HREventOverlayChart from "../components/HREventOverlayChart";
 import NearClimaxEvents, { detectNearClimaxEvents } from "../components/NearClimaxEvents";
 import SessionAIPanel from "../components/SessionAIPanel";
 import SessionExecutiveSummary from "../components/SessionExecutiveSummary";
+import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
+import { EVENT_CATEGORIES } from "../components/session-form/EventTimelineSection";
+
+function getCategoryMeta(value) {
+  return EVENT_CATEGORIES.find((c) => c.value === value) || EVENT_CATEGORIES[EVENT_CATEGORIES.length - 1];
+}
+
+function fmtMmSs(s) {
+  const totalS = Math.round(Number(s));
+  const m = Math.floor(totalS / 60);
+  const sec = totalS % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -350,6 +363,41 @@ export default function SessionDetail() {
             )}
           </div>
         )}
+
+        {/* Event Timeline */}
+        {(s.event_timeline || []).length > 0 && (
+          <div className="bg-card rounded-xl border border-border p-4 space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Event Timeline</h3>
+            <div className="space-y-2">
+              {[...(s.event_timeline)].sort((a, b) => a.time_s - b.time_s).map((ev, i) => {
+                const meta = getCategoryMeta(ev.category);
+                return (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2 rounded-lg px-3 py-2"
+                    style={{ background: meta.color + "12", borderLeft: `3px solid ${meta.color}` }}
+                  >
+                    <span className="font-mono text-[10px] font-bold shrink-0 mt-0.5" style={{ color: meta.color }}>
+                      {fmtMmSs(ev.time_s)}
+                    </span>
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span
+                        className="inline-flex items-center self-start rounded-full text-[9px] px-1.5 py-0 font-medium"
+                        style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}
+                      >
+                        {meta.label}
+                      </span>
+                      <span className="text-sm text-foreground/90 leading-snug">{ev.note}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Cascade Overview AI */}
+        <CascadeOverviewPanel session={s} timelineRows={timelineRows} />
 
         {/* AI Analysis */}
         <SessionAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />
