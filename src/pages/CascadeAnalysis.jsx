@@ -92,50 +92,108 @@ function AIInsightPanel({ sessions }) {
     setLoading(true);
     setResult(null);
 
-    const summary = sessions.map((s) => ({
-      date: s.date?.slice(0, 10),
-      climax_offset_s: s.climax_offset_s,
-      recovery_offset_s: s.recovery_offset_s,
-      pre_climax_offset_s: s.pre_climax_offset_s,
-      hr_at_climax: s.hr_at_climax,
-      avg_hr: s.avg_hr,
-      max_hr: s.max_hr,
-      hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
-      hr_avg_at_climax_window: s.hr_avg_at_climax_window,
-      intensity: s.intensity,
-      satisfaction: s.satisfaction,
-      build_type: s.build_type,
-      climax_duration: s.climax_duration,
-      mood: s.mood,
-      methods: s.methods,
-    }));
+    // Build nearest-HR lookup per session for event annotation
+    const nearestHR = (rows, time_s) => {
+      if (!rows?.length) return null;
+      let best = rows[0];
+      let bestDist = Math.abs(Number(rows[0].time_offset_s) - time_s);
+      for (const r of rows) {
+        const d = Math.abs(Number(r.time_offset_s) - time_s);
+        if (d < bestDist) { bestDist = d; best = r; }
+        if (Number(r.time_offset_s) > time_s + 10) break;
+      }
+      return Math.round(Number(best.hr));
+    };
 
-    const withRecovery = summary.filter((s) => s.recovery_offset_s && s.climax_offset_s);
+    const summary = sessions.map((s) => {
+      const rows = (s._hrRows || []).sort((a, b) => Number(a.time_offset_s) - Number(b.time_offset_s));
+
+      // Sample HR at key phase points for cascade shape description
+      const hrAt = (offset_s) => {
+        if (offset_s == null || !rows.length) return null;
+        return nearestHR(rows, offset_s);
+      };
+
+      // Annotate events with HR
+      const annotatedEvents = (s.event_timeline || []).map((e) => {
+        const m = Math.floor(e.time_s / 60);
+        const sec = (e.time_s % 60).toString().padStart(2, "0");
+        const hr = nearestHR(rows, e.time_s);
+        // Express time relative to climax for cascade context
+        const relToClimax = s.climax_offset_s != null ? Math.round(e.time_s - s.climax_offset_s) : null;
+        const relStr = relToClimax != null ? ` (${relToClimax >= 0 ? "+" : ""}${relToClimax}s vs climax)` : "";
+        return `${m}:${sec}${relStr} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ""}`;
+      });
+
+      // Build cascade shape: HR at pre-climax, climax, and recovery markers
+      const cascadeShape = {
+        hr_at_pre_climax_marker: hrAt(s.pre_climax_offset_s),
+        hr_at_climax_marker: s.hr_at_climax || hrAt(s.climax_offset_s),
+        hr_at_recovery_marker: hrAt(s.recovery_offset_s),
+        build_duration_s: s.pre_climax_offset_s != null ? Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null,
+        recovery_onset_s: s.recovery_offset_s != null ? Math.round(s.recovery_offset_s - s.climax_offset_s) : null,
+        hr_rise_pre_to_climax: (s.hr_at_climax || hrAt(s.climax_offset_s)) != null && hrAt(s.pre_climax_offset_s) != null
+          ? Math.round((s.hr_at_climax || hrAt(s.climax_offset_s)) - hrAt(s.pre_climax_offset_s))
+          : null,
+      };
+
+      return {
+        date: s.date?.slice(0, 10),
+        cascade_shape: cascadeShape,
+        hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
+        hr_avg_at_climax_window: s.hr_avg_at_climax_window,
+        avg_hr: s.avg_hr,
+        max_hr: s.max_hr,
+        intensity: s.intensity,
+        satisfaction: s.satisfaction,
+        build_type: s.build_type,
+        climax_duration: s.climax_duration,
+        mood: s.mood,
+        methods: s.methods,
+        event_notes: annotatedEvents.length > 0 ? annotatedEvents : undefined,
+        discomfort_entries: s.discomfort_entries?.length > 0 ? s.discomfort_entries : undefined,
+        notes: s.notes || undefined,
+      };
+    });
+
+    const withRecovery = summary.filter((s) => s.cascade_shape?.recovery_onset_s != null);
     const avgRecoveryOnset = withRecovery.length
-      ? Math.round(withRecovery.reduce((a, s) => a + (s.recovery_offset_s - s.climax_offset_s), 0) / withRecovery.length)
+      ? Math.round(withRecovery.reduce((a, s) => a + s.cascade_shape.recovery_onset_s, 0) / withRecovery.length)
       : null;
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant analyzing sexual response data.
-You have ${sessions.length} sessions with heart rate cascade data (build → pre-climax → climax → recovery phases).
+      prompt: `You are a physiological research assistant analyzing sexual response cascade data across ${sessions.length} sessions.
+
+Each session includes the full cascade arc: pre-climax buildup → climax peak → recovery onset.
+Where available, event notes are annotated with HR values and their timing relative to the climax marker.
 
 Session data:
 ${JSON.stringify(summary, null, 2)}
 
-Please provide a structured analysis with these sections:
-1. COMMON SIGNATURES: Recurring physiological patterns across sessions (HR trajectory, timing, intensity).
-2. ANOMALIES: Sessions with unusual cascade patterns worth investigating.
-3. MARKER REFINEMENT SUGGESTIONS: Improved detection heuristics based on the distribution of manually set markers${avgRecoveryOnset ? ` (e.g., recovery onset currently averages ~${avgRecoveryOnset}s post-climax)` : ""}.
-4. PREDICTIVE INSIGHTS: Which factors (methods, mood, build_type) best predict a longer or stronger climax response?
-5. PHENOTYPE CLUSTERS: Distinct response profiles visible in this data.
+Provide a structured analysis covering:
 
-Be specific, concise, and use physiological research language.`,
+1. CASCADE OVERVIEW: Describe the physiological arc across sessions — how the pre-climax build unfolds (rate of HR rise, build duration), the nature of the climax peak (intensity, HR at peak, climax duration), and the recovery trajectory (onset timing, recovery speed). Identify what is consistent and what varies. ${avgRecoveryOnset ? `Average recovery onset is ~${avgRecoveryOnset}s post-climax.` : ""}
+
+2. EVENT NOTE PATTERNS: Analyze the annotated event notes across sessions. What physiological states (HR levels) are associated with logged events? Do events cluster at specific phases of the cascade? Do event types (stimulation changes, pauses, sensations) correlate with HR inflections or cascade shape?
+
+3. COMMON SIGNATURES: Recurring physiological patterns across the full cascade arc.
+
+4. PREDICTIVE INSIGHTS: Which factors (methods, mood, build_type, event patterns) best predict cascade quality (intensity, climax duration, recovery speed)?
+
+5. ANOMALIES: Sessions with unusual cascade shapes, unexpected HR behavior, or atypical event-HR correlations.
+
+6. PHENOTYPE CLUSTERS: Distinct cascade response profiles visible in this data.
+
+Be specific, research-oriented, and reference actual data values where relevant.`,
       response_json_schema: {
         type: "object",
         properties: {
           summary: { type: "string" },
+          cascade_overview: { type: "array", items: { type: "string" } },
+          event_note_patterns: { type: "array", items: { type: "string" } },
           common_signatures: { type: "array", items: { type: "string" } },
+          predictive_insights: { type: "array", items: { type: "string" } },
           anomalies: {
             type: "array",
             items: {
@@ -147,11 +205,9 @@ Be specific, concise, and use physiological research language.`,
               required: ["session_date", "finding"],
             },
           },
-          marker_refinement: { type: "array", items: { type: "string" } },
-          predictive_insights: { type: "array", items: { type: "string" } },
           phenotype_clusters: { type: "array", items: { type: "string" } },
         },
-        required: ["summary", "common_signatures", "marker_refinement", "predictive_insights", "phenotype_clusters", "anomalies"],
+        required: ["summary", "cascade_overview", "event_note_patterns", "common_signatures", "predictive_insights", "anomalies", "phenotype_clusters"],
       },
     });
 
@@ -177,8 +233,9 @@ Be specific, concise, and use physiological research language.`,
         <div className="flex items-center gap-2">
           {result && <TTSButton getText={() => {
             const parts = [result.summary];
+            result.cascade_overview?.forEach(s => parts.push(s));
+            result.event_note_patterns?.forEach(s => parts.push(s));
             result.common_signatures?.forEach(s => parts.push(s));
-            result.marker_refinement?.forEach(s => parts.push(s));
             result.predictive_insights?.forEach(s => parts.push(s));
             result.phenotype_clusters?.forEach(s => parts.push(s));
             result.anomalies?.forEach(a => parts.push(`${a.session_date}: ${a.finding}`));
@@ -211,14 +268,19 @@ Be specific, concise, and use physiological research language.`,
           ) : (
             <p className="text-xs text-muted-foreground italic">Analysis complete — no summary returned.</p>
           )}
-          {result.common_signatures?.length > 0 && (
-            <Section icon={<Activity className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-1"] }} />} title="Common Signatures" color="chart-1">
-              {result.common_signatures.map((s, i) => <Item key={i} text={s} />)}
+          {result.cascade_overview?.length > 0 && (
+            <Section icon={<Activity className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-1"] }} />} title="Cascade Overview" color="chart-1">
+              {result.cascade_overview.map((s, i) => <Item key={i} text={s} />)}
             </Section>
           )}
-          {result.marker_refinement?.length > 0 && (
-            <Section icon={<Clock className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-2"] }} />} title="Marker Refinement Suggestions" color="chart-2">
-              {result.marker_refinement.map((s, i) => <Item key={i} text={s} />)}
+          {result.event_note_patterns?.length > 0 && (
+            <Section icon={<Clock className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-2"] }} />} title="Event Note Patterns" color="chart-2">
+              {result.event_note_patterns.map((s, i) => <Item key={i} text={s} />)}
+            </Section>
+          )}
+          {result.common_signatures?.length > 0 && (
+            <Section icon={<TrendingDown className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["accent"] }} />} title="Common Signatures" color="accent">
+              {result.common_signatures.map((s, i) => <Item key={i} text={s} />)}
             </Section>
           )}
           {result.predictive_insights?.length > 0 && (
@@ -236,7 +298,7 @@ Be specific, concise, and use physiological research language.`,
               {result.anomalies.map((a, i) => <Item key={i} text={`${a.session_date}: ${a.finding}`} />)}
             </Section>
           )}
-          {!result.summary && !result.common_signatures?.length && !result.predictive_insights?.length && (
+          {!result.summary && !result.cascade_overview?.length && !result.predictive_insights?.length && (
             <p className="text-xs text-muted-foreground italic">Analysis returned no content. Please try again.</p>
           )}
         </div>
@@ -437,7 +499,7 @@ export default function CascadeAnalysis() {
       )}
 
       {/* AI Panel */}
-      <AIInsightPanel sessions={eligibleSessions.length > 0 ? eligibleSessions : sessions} />
+      <AIInsightPanel sessions={(eligibleSessions.length > 0 ? eligibleSessions : sessions).map(s => ({ ...s, _hrRows: hrData[s.id] || [] }))} />
     </div>
   );
 }
