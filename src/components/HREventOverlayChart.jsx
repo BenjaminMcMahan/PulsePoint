@@ -6,6 +6,21 @@ import {
 
 import { ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import { useChartZoom } from "@/hooks/useChartZoom";
+import { EVENT_CATEGORIES } from "@/components/session-form/EventTimelineSection";
+
+function getCategoryMeta(value) {
+  return EVENT_CATEGORIES.find((c) => c.value === value) || EVENT_CATEGORIES[EVENT_CATEGORIES.length - 1];
+}
+
+function CategoryPill({ value }) {
+  const meta = getCategoryMeta(value);
+  return (
+    <span className="inline-flex items-center rounded-full text-[9px] px-1.5 py-0 font-medium"
+      style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
+      {meta.label}
+    </span>
+  );
+}
 
 function fmtMmSs(s) {
   const totalS = Math.round(Number(s));
@@ -193,6 +208,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
               <div className="flex-1 flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-[11px] font-bold" style={{ color }}>E{idx + 1} / {events.length}</span>
                 <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(ev.time_s)}</span>
+                {ev.category && <CategoryPill value={ev.category} />}
                 {hr != null && <span className="font-mono text-[11px] font-bold text-primary">{hr} bpm</span>}
               </div>
               <button onClick={handleNext} className="p-0.5 rounded hover:bg-black/10 shrink-0">
@@ -229,7 +245,10 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
                 <span className="font-mono text-[10px] shrink-0 mt-0.5 font-bold" style={{ color }}>
                   E{i + 1} {fmtMmSs(ev.time_s)}
                 </span>
-                <span className="flex-1 text-xs text-foreground/90 leading-snug">{ev.note}</span>
+                <div className="flex-1 flex flex-col gap-0.5">
+                  {ev.category && <CategoryPill value={ev.category} />}
+                  <span className="text-xs text-foreground/90 leading-snug">{ev.note}</span>
+                </div>
                 {hr != null && (
                   <span className="font-mono text-[10px] shrink-0 font-bold text-primary/80 mt-0.5">{hr} bpm</span>
                 )}

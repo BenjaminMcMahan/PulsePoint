@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import moment from "moment";
 import { TrendingUp, Heart, Zap, Star, Activity, BarChart2, Timer, MessageSquare } from "lucide-react";
+import EventSummaryCard from "../components/EventSummaryCard";
 
 function StatCard({ label, value, sub, icon: Icon, color = "primary" }) {
   return (
@@ -383,42 +384,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Event Timeline Stats */}
-      {eventStats && (
-        <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-          <SectionTitle>Session Event Summary</SectionTitle>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Events</p>
-              <p className="text-2xl font-bold font-mono text-primary">{eventStats.total}</p>
-              <p className="text-[10px] text-muted-foreground">across {eventStats.sessionsWithEvents} sessions</p>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg / Session</p>
-              <p className="text-2xl font-bold font-mono text-chart-2">{eventStats.avgEventsPerSession}</p>
-              <p className="text-[10px] text-muted-foreground">events per session</p>
-            </div>
-            {eventStats.avgEventHR && (
-              <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg HR During Events</p>
-                <p className="text-2xl font-bold font-mono text-chart-3">{eventStats.avgEventHR} <span className="text-sm font-normal">bpm</span></p>
-                <p className="text-[10px] text-muted-foreground">HR at event sessions</p>
-              </div>
-            )}
-            {eventStats.avgSpreadS != null && (
-              <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg Event Span</p>
-                <p className="text-2xl font-bold font-mono text-accent">
-                  {eventStats.avgSpreadS >= 60
-                    ? `${Math.floor(eventStats.avgSpreadS / 60)}m ${eventStats.avgSpreadS % 60}s`
-                    : `${eventStats.avgSpreadS}s`}
-                </p>
-                <p className="text-[10px] text-muted-foreground">first → last event</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Event Log Summary */}
+      <EventSummaryCard sessions={sessions} />
 
       {/* Intensity vs Satisfaction Scatter */}
       {scatterData.length > 2 && (
