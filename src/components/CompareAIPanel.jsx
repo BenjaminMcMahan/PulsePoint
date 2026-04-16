@@ -55,29 +55,30 @@ export default function CompareAIPanel({ sessions }) {
 
   const runAnalysis = async (existingId) => {
     setLoading(true);
-    const summary = sessions.map((s) => ({
-      date: s.date?.slice(0, 10),
-      duration_minutes: s.duration_minutes,
-      intensity: s.intensity,
-      satisfaction: s.satisfaction,
-      build_quality: s.build_quality,
-      build_type: s.build_type,
-      climax_duration: s.climax_duration,
-      mood: s.mood,
-      methods: s.methods,
-      avg_hr: s.avg_hr,
-      max_hr: s.max_hr,
-      hr_at_climax: s.hr_at_climax,
-      hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
-      hr_avg_at_climax_window: s.hr_avg_at_climax_window,
-      pre_climax_offset_s: s.pre_climax_offset_s,
-      climax_offset_s: s.climax_offset_s,
-      recovery_offset_s: s.recovery_offset_s,
-    }));
+    try {
+      const summary = sessions.map((s) => ({
+        date: s.date?.slice(0, 10),
+        duration_minutes: s.duration_minutes,
+        intensity: s.intensity,
+        satisfaction: s.satisfaction,
+        build_quality: s.build_quality,
+        build_type: s.build_type,
+        climax_duration: s.climax_duration,
+        mood: s.mood,
+        methods: s.methods,
+        avg_hr: s.avg_hr,
+        max_hr: s.max_hr,
+        hr_at_climax: s.hr_at_climax,
+        hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
+        hr_avg_at_climax_window: s.hr_avg_at_climax_window,
+        pre_climax_offset_s: s.pre_climax_offset_s,
+        climax_offset_s: s.climax_offset_s,
+        recovery_offset_s: s.recovery_offset_s,
+      }));
 
-    const res = await base44.integrations.Core.InvokeLLM({
-      model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant. Compare the following ${sessions.length} sexual response sessions side-by-side.
+      const res = await base44.integrations.Core.InvokeLLM({
+        model: "claude_sonnet_4_6",
+        prompt: `You are a physiological research assistant. Compare the following ${sessions.length} sexual response sessions side-by-side.
 
 For each session, analyze the full cascade arc: Build Phase → Pre-Climax → Climax → Recovery.
 Focus on: HR trajectories, phase durations, build types, climax quality, recovery speed, and any event notes.
@@ -87,32 +88,33 @@ Sessions:
 ${JSON.stringify(summary, null, 2)}
 
 Provide a structured comparative analysis.`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          summary: { type: "string" },
-          key_differences: { type: "array", items: { type: "string" } },
-          hr_comparison: { type: "array", items: { type: "string" } },
-          phase_comparison: { type: "array", items: { type: "string" } },
-          standout_session: { type: "string" },
-          recommendations: { type: "array", items: { type: "string" } },
+        response_json_schema: {
+          type: "object",
+          properties: {
+            summary: { type: "string" },
+            key_differences: { type: "array", items: { type: "string" } },
+            hr_comparison: { type: "array", items: { type: "string" } },
+            phase_comparison: { type: "array", items: { type: "string" } },
+            standout_session: { type: "string" },
+            recommendations: { type: "array", items: { type: "string" } },
+          },
+          required: ["summary", "key_differences", "hr_comparison", "phase_comparison", "recommendations"],
         },
-        required: ["summary", "key_differences", "hr_comparison", "phase_comparison", "recommendations"],
-      },
-    });
+      });
 
-    const raw = typeof res === "string" ? JSON.parse(res) : res;
-    const parsed = raw?.response ?? raw;
-    setResult(parsed);
+      const raw = typeof res === "string" ? JSON.parse(res) : res;
+      const parsed = raw?.response ?? raw;
+      setResult(parsed);
 
-    const idToUse = existingId ?? savedId;
-    if (idToUse) {
-      await base44.entities.CompareAnalysisResult.update(idToUse, { result: parsed, session_key: sessionKey });
-    } else {
-      const created = await base44.entities.CompareAnalysisResult.create({ result: parsed, session_key: sessionKey });
-      setSavedId(created.id);
+      if (existingId) {
+        await base44.entities.CompareAnalysisResult.update(existingId, { result: parsed, session_key: sessionKey });
+      } else {
+        const created = await base44.entities.CompareAnalysisResult.create({ result: parsed, session_key: sessionKey });
+        setSavedId(created.id);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
