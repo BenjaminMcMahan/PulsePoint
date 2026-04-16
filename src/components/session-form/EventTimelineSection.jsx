@@ -10,8 +10,20 @@ export const EVENT_CATEGORIES = [
   { value: "physical", label: "Physical", color: "#10b981" },
   { value: "stimulation_paused", label: "Stim Paused", color: "#f97316" },
   { value: "stimulation_resumed", label: "Stim Resumed", color: "#22c55e" },
+  { value: "stimulation_stopped", label: "Stim Stopped", color: "#ef4444" },
   { value: "other", label: "Other", color: "#94a3b8" },
 ];
+
+// Legacy string categories to migrate away from (old pause/resume values)
+const LEGACY_PAUSE_RESUME = ["pause", "resume", "paused", "resumed"];
+
+// Normalize a raw category value to a clean array, stripping legacy pause/resume strings
+export function normalizeCategoryArray(raw) {
+  if (!raw) return [];
+  const arr = Array.isArray(raw) ? raw : [raw];
+  // Strip old bare-string pause/resume tags that are no longer valid
+  return arr.filter((v) => typeof v === "string" && v && !LEGACY_PAUSE_RESUME.includes(v.toLowerCase()));
+}
 
 function getCategoryMeta(value) {
   return EVENT_CATEGORIES.find((c) => c.value === value) || EVENT_CATEGORIES[EVENT_CATEGORIES.length - 1];
@@ -62,11 +74,9 @@ function CategorySelector({ selected, onChange }) {
   );
 }
 
-// Normalize: events may have category as string or array
+// Normalize: events may have category as string or array, strip legacy values
 function getCategories(ev) {
-  if (!ev.category) return [];
-  if (Array.isArray(ev.category)) return ev.category;
-  return [ev.category];
+  return normalizeCategoryArray(ev.category);
 }
 
 function EventRow({ ev, idx, onRemove, onUpdate }) {
@@ -74,7 +84,7 @@ function EventRow({ ev, idx, onRemove, onUpdate }) {
   const [editMin, setEditMin] = useState(String(Math.floor(ev.time_s / 60)));
   const [editSec, setEditSec] = useState(String(ev.time_s % 60));
   const [editNote, setEditNote] = useState(ev.note);
-  const [editCats, setEditCats] = useState(getCategories(ev).length ? getCategories(ev) : ["other"]);
+  const [editCats, setEditCats] = useState(normalizeCategoryArray(ev.category).length ? normalizeCategoryArray(ev.category) : ["other"]);
 
   const cats = getCategories(ev);
   const primaryMeta = getCategoryMeta(cats[0]);
@@ -90,7 +100,7 @@ function EventRow({ ev, idx, onRemove, onUpdate }) {
     setEditMin(String(Math.floor(ev.time_s / 60)));
     setEditSec(String(ev.time_s % 60));
     setEditNote(ev.note);
-    setEditCats(getCategories(ev).length ? getCategories(ev) : ["other"]);
+    setEditCats(normalizeCategoryArray(ev.category).length ? normalizeCategoryArray(ev.category) : ["other"]);
     setEditing(false);
   };
 

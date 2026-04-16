@@ -68,6 +68,18 @@ export default function EditSession() {
       const duration = calcDuration(data.start_time, data.end_time);
       // Exclude internal/computed fields that shouldn't be re-saved
       const { _csv_rows, ai_analysis, ai_cascade, ...sessionData } = data;
+
+      // Sanitize event_timeline: ensure category is always a clean array of strings
+      const LEGACY = ["pause", "resume", "paused", "resumed"];
+      if (sessionData.event_timeline) {
+        sessionData.event_timeline = sessionData.event_timeline.map((ev) => {
+          const raw = ev.category;
+          const arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+          const cats = arr.filter((v) => typeof v === "string" && v && !LEGACY.includes(v.toLowerCase()));
+          return { ...ev, category: cats.length ? cats : ["other"] };
+        });
+      }
+
       await base44.entities.Session.update(id, {
         ...sessionData,
         duration_minutes: duration || data.duration_minutes,

@@ -12,11 +12,12 @@ function getCategoryMeta(value) {
   return EVENT_CATEGORIES.find((c) => c.value === value) || EVENT_CATEGORIES[EVENT_CATEGORIES.length - 1];
 }
 
-// Normalize: category may be string or array
+// Normalize: category may be string or array, strip legacy values
+const LEGACY_CATS = ["pause", "resume", "paused", "resumed"];
 function getCategories(ev) {
   if (!ev.category) return [];
-  if (Array.isArray(ev.category)) return ev.category;
-  return [ev.category];
+  const arr = Array.isArray(ev.category) ? ev.category : [ev.category];
+  return arr.filter((v) => typeof v === "string" && v && !LEGACY_CATS.includes(v.toLowerCase()));
 }
 
 function CategoryPill({ value }) {

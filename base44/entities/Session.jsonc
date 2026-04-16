@@ -71,7 +71,11 @@
             "type": "string"
           },
           "category": {
-            "type": "string"
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "One or more event categories"
           }
         },
         "required": [
