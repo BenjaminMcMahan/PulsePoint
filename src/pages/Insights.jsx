@@ -253,6 +253,40 @@ export default function Insights() {
     });
   }
 
+  // Pause time insight
+  const calcPauseS = (s) => {
+    const events = s.event_timeline || [];
+    const cats = (ev) => Array.isArray(ev.category) ? ev.category : [ev.category].filter(Boolean);
+    const sorted = [...events].sort((a, b) => a.time_s - b.time_s);
+    let total = 0, start = null;
+    for (const ev of sorted) {
+      const c = cats(ev);
+      if (c.includes("stimulation_paused") && start == null) start = ev.time_s;
+      if (c.includes("stimulation_resumed") && start != null) { total += ev.time_s - start; start = null; }
+    }
+    return total;
+  };
+  const fmtS2 = (v) => { const m = Math.floor(v / 60); const sec = Math.round(v % 60); return m > 0 ? `${m}m ${sec}s` : `${sec}s`; };
+  const pauseSessions = sessions.filter((s) => calcPauseS(s) > 0);
+  if (pauseSessions.length >= 2) {
+    const pauseTimes = pauseSessions.map((s) => calcPauseS(s));
+    const avgPause = pauseTimes.reduce((a, b) => a + b, 0) / pauseTimes.length;
+    // Correlation: low-pause vs high-pause sessions and satisfaction
+    const median = [...pauseTimes].sort((a, b) => a - b)[Math.floor(pauseTimes.length / 2)];
+    const lowPause = pauseSessions.filter((s) => calcPauseS(s) <= median && s.satisfaction);
+    const highPause = pauseSessions.filter((s) => calcPauseS(s) > median && s.satisfaction);
+    const lpAvg = lowPause.length ? lowPause.reduce((a, s) => a + s.satisfaction, 0) / lowPause.length : null;
+    const hpAvg = highPause.length ? highPause.reduce((a, s) => a + s.satisfaction, 0) / highPause.length : null;
+    const desc = lpAvg && hpAvg
+      ? `Avg satisfaction: fewer pauses ${lpAvg.toFixed(1)}/10 vs more pauses ${hpAvg.toFixed(1)}/10`
+      : `Avg pause time: ${fmtS2(avgPause)} across ${pauseSessions.length} sessions`;
+    insights.push({
+      icon: Activity,
+      title: `Avg Pause Time: ${fmtS2(avgPause)}`,
+      description: desc,
+    });
+  }
+
   // Climax → Recovery duration (recovery speed)
   const recSessions = sessions.filter((s) => s.climax_offset_s != null && s.recovery_offset_s != null);
   if (recSessions.length >= 2) {

@@ -118,11 +118,11 @@ function ClusterCard({ cluster, index }) {
           <p className="text-sm font-bold" style={{ color }}>{cluster.name}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{cluster.session_count} sessions · {cluster.typical_duration || "—"}</p>
         </div>
-        <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: color, color }}>
+        <Badge variant="outline" className="text-[10px] shrink-0 max-w-[120px] truncate" style={{ borderColor: color, color }} title={cluster.build_type_tendency || "Mixed"}>
           {cluster.build_type_tendency || "Mixed"}
         </Badge>
       </div>
-      <p className="text-sm text-foreground/85 leading-relaxed">{cluster.description}</p>
+      <p className="text-sm text-foreground/85 leading-relaxed break-words">{cluster.description}</p>
       {cluster.defining_methods?.length > 0 && (
         <div>
           <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Key Methods</p>
@@ -134,11 +134,11 @@ function ClusterCard({ cluster, index }) {
         </div>
       )}
       {cluster.physiological_signature && (
-        <p className="text-sm text-foreground/75 border-l-2 border-border pl-2 italic leading-relaxed">{cluster.physiological_signature}</p>
+        <p className="text-sm text-foreground/75 border-l-2 border-border pl-2 italic leading-relaxed break-words">{cluster.physiological_signature}</p>
       )}
       {cluster.recommendation && (
         <div className="bg-muted/60 rounded-lg p-3">
-          <p className="text-sm text-foreground leading-relaxed">{cluster.recommendation}</p>
+          <p className="text-sm text-foreground leading-relaxed break-words">{cluster.recommendation}</p>
         </div>
       )}
     </div>

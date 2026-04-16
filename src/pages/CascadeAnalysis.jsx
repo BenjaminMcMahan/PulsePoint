@@ -114,15 +114,16 @@ function AIInsightPanel({ sessions }) {
         return nearestHR(rows, offset_s);
       };
 
-      // Annotate events with HR
+      // Annotate events with HR and category
       const annotatedEvents = (s.event_timeline || []).map((e) => {
         const m = Math.floor(e.time_s / 60);
         const sec = (e.time_s % 60).toString().padStart(2, "0");
         const hr = nearestHR(rows, e.time_s);
-        // Express time relative to climax for cascade context
         const relToClimax = s.climax_offset_s != null ? Math.round(e.time_s - s.climax_offset_s) : null;
         const relStr = relToClimax != null ? ` (${relToClimax >= 0 ? "+" : ""}${relToClimax}s vs climax)` : "";
-        return `${m}:${sec}${relStr} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ""}`;
+        const cats = Array.isArray(e.category) ? e.category : [e.category].filter(Boolean);
+        const catStr = cats.length ? `[${cats.join("+")}]` : "";
+        return `${catStr} ${m}:${sec}${relStr} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ""}`.trim();
       });
 
       // Build cascade shape: HR at pre-climax, climax, and recovery markers

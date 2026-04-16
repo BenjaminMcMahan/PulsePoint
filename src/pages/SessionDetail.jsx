@@ -364,37 +364,43 @@ export default function SessionDetail() {
           </div>
         )}
 
-        {/* Event Timeline */}
-        {(s.event_timeline || []).length > 0 && (
-          <div className="bg-card rounded-xl border border-border p-4 space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Event Timeline</h3>
-            <div className="space-y-2">
-              {[...(s.event_timeline)].sort((a, b) => a.time_s - b.time_s).map((ev, i) => {
-                const meta = getCategoryMeta(ev.category);
-                return (
-                  <div
-                    key={i}
-                    className="flex items-start gap-2 rounded-lg px-3 py-2"
-                    style={{ background: meta.color + "12", borderLeft: `3px solid ${meta.color}` }}
-                  >
-                    <span className="font-mono text-[10px] font-bold shrink-0 mt-0.5" style={{ color: meta.color }}>
-                      {fmtMmSs(ev.time_s)}
-                    </span>
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <span
-                        className="inline-flex items-center self-start rounded-full text-[9px] px-1.5 py-0 font-medium"
-                        style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}
-                      >
-                        {meta.label}
-                      </span>
-                      <span className="text-sm text-foreground/90 leading-snug">{ev.note}</span>
-                    </div>
+        {/* Pause / Active Time */}
+        {(() => {
+          const events = s.event_timeline || [];
+          const cats = (ev) => Array.isArray(ev.category) ? ev.category : [ev.category].filter(Boolean);
+          const sorted = [...events].sort((a, b) => a.time_s - b.time_s);
+          let totalPause = 0;
+          let pauseStart = null;
+          for (const ev of sorted) {
+            const c = cats(ev);
+            if (c.includes("stimulation_paused") && pauseStart == null) pauseStart = ev.time_s;
+            if (c.includes("stimulation_resumed") && pauseStart != null) {
+              totalPause += ev.time_s - pauseStart;
+              pauseStart = null;
+            }
+          }
+          if (totalPause === 0) return null;
+          const totalS = (s.duration_minutes || 0) * 60;
+          const activeS = totalS > 0 ? Math.max(0, totalS - totalPause) : null;
+          const fmtS = (v) => { const m = Math.floor(v / 60); const sec = Math.round(v % 60); return m > 0 ? `${m}m ${sec}s` : `${sec}s`; };
+          return (
+            <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Stimulation Timing</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Paused</p>
+                  <p className="text-2xl font-bold font-mono text-destructive">{fmtS(totalPause)}</p>
+                </div>
+                {activeS != null && (
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Active</p>
+                    <p className="text-2xl font-bold font-mono text-chart-1">{fmtS(activeS)}</p>
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Cascade Overview AI */}
         <CascadeOverviewPanel session={s} timelineRows={timelineRows} />

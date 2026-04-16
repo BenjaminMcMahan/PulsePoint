@@ -12,6 +12,13 @@ function getCategoryMeta(value) {
   return EVENT_CATEGORIES.find((c) => c.value === value) || EVENT_CATEGORIES[EVENT_CATEGORIES.length - 1];
 }
 
+// Normalize: category may be string or array
+function getCategories(ev) {
+  if (!ev.category) return [];
+  if (Array.isArray(ev.category)) return ev.category;
+  return [ev.category];
+}
+
 function CategoryPill({ value }) {
   const meta = getCategoryMeta(value);
   return (
@@ -20,6 +27,12 @@ function CategoryPill({ value }) {
       {meta.label}
     </span>
   );
+}
+
+function EventCategoryPills({ ev }) {
+  const cats = getCategories(ev);
+  if (!cats.length) return <CategoryPill value="other" />;
+  return <>{cats.map((c) => <CategoryPill key={c} value={c} />)}</>;
 }
 
 function fmtMmSs(s) {
@@ -208,7 +221,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
               <div className="flex-1 flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-[11px] font-bold" style={{ color }}>E{idx + 1} / {events.length}</span>
                 <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(ev.time_s)}</span>
-                {ev.category && <CategoryPill value={ev.category} />}
+                <EventCategoryPills ev={ev} />
                 {hr != null && <span className="font-mono text-[11px] font-bold text-primary">{hr} bpm</span>}
               </div>
               <button onClick={handleNext} className="p-0.5 rounded hover:bg-black/10 shrink-0">
@@ -246,7 +259,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
                   E{i + 1} {fmtMmSs(ev.time_s)}
                 </span>
                 <div className="flex-1 flex flex-col gap-0.5">
-                  {ev.category && <CategoryPill value={ev.category} />}
+                  <div className="flex flex-wrap gap-1"><EventCategoryPills ev={ev} /></div>
                   <span className="text-xs text-foreground/90 leading-snug">{ev.note}</span>
                 </div>
                 {hr != null && (

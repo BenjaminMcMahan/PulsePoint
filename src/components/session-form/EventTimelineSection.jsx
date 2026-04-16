@@ -7,9 +7,9 @@ import { Plus, Trash2, Pencil, Check, X } from "lucide-react";
 export const EVENT_CATEGORIES = [
   { value: "stimulation", label: "Stimulation", color: "#3b82f6" },
   { value: "sensation", label: "Sensation", color: "#a855f7" },
-  { value: "emotional", label: "Emotional", color: "#f59e0b" },
   { value: "physical", label: "Physical", color: "#10b981" },
-  { value: "pause", label: "Pause/Resume", color: "#6b7280" },
+  { value: "stimulation_paused", label: "Stim Paused", color: "#f97316" },
+  { value: "stimulation_resumed", label: "Stim Resumed", color: "#22c55e" },
   { value: "other", label: "Other", color: "#94a3b8" },
 ];
 
@@ -35,18 +35,54 @@ function CategoryPill({ value, small }) {
   );
 }
 
+// Multi-category pill selector
+function CategorySelector({ selected, onChange }) {
+  const toggle = (val) => {
+    if (selected.includes(val)) {
+      onChange(selected.filter((v) => v !== val));
+    } else {
+      onChange([...selected, val]);
+    }
+  };
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {EVENT_CATEGORIES.map((c) => {
+        const active = selected.includes(c.value);
+        return (
+          <button key={c.value} type="button" onClick={() => toggle(c.value)}
+            className="text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all"
+            style={active
+              ? { background: c.color, color: "#fff", borderColor: c.color }
+              : { background: c.color + "18", color: c.color, borderColor: c.color + "44" }
+            }
+          >{c.label}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Normalize: events may have category as string or array
+function getCategories(ev) {
+  if (!ev.category) return [];
+  if (Array.isArray(ev.category)) return ev.category;
+  return [ev.category];
+}
+
 function EventRow({ ev, idx, onRemove, onUpdate }) {
   const [editing, setEditing] = useState(false);
   const [editMin, setEditMin] = useState(String(Math.floor(ev.time_s / 60)));
   const [editSec, setEditSec] = useState(String(ev.time_s % 60));
   const [editNote, setEditNote] = useState(ev.note);
-  const [editCat, setEditCat] = useState(ev.category || "other");
-  const meta = getCategoryMeta(ev.category);
+  const [editCats, setEditCats] = useState(getCategories(ev).length ? getCategories(ev) : ["other"]);
+
+  const cats = getCategories(ev);
+  const primaryMeta = getCategoryMeta(cats[0]);
 
   const saveEdit = () => {
     const m = parseInt(editMin, 10) || 0;
     const s = Math.min(59, parseInt(editSec, 10) || 0);
-    onUpdate(idx, { ...ev, time_s: m * 60 + s, note: editNote.trim() || ev.note, category: editCat });
+    onUpdate(idx, { ...ev, time_s: m * 60 + s, note: editNote.trim() || ev.note, category: editCats });
     setEditing(false);
   };
 
@@ -54,31 +90,21 @@ function EventRow({ ev, idx, onRemove, onUpdate }) {
     setEditMin(String(Math.floor(ev.time_s / 60)));
     setEditSec(String(ev.time_s % 60));
     setEditNote(ev.note);
-    setEditCat(ev.category || "other");
+    setEditCats(getCategories(ev).length ? getCategories(ev) : ["other"]);
     setEditing(false);
   };
 
   if (editing) {
     return (
-      <div className="rounded-lg px-3 py-2.5 space-y-2" style={{ background: meta.color + "12", borderLeft: `3px solid ${meta.color}` }}>
+      <div className="rounded-lg px-3 py-2.5 space-y-2" style={{ background: primaryMeta.color + "12", borderLeft: `3px solid ${primaryMeta.color}` }}>
         <div className="flex items-center gap-2">
           <Input type="number" min={0} value={editMin} onChange={(e) => setEditMin(e.target.value)}
             className="h-8 w-14 font-mono text-center text-xs" placeholder="Min" />
           <span className="text-muted-foreground font-bold">:</span>
           <Input type="number" min={0} max={59} value={editSec} onChange={(e) => setEditSec(e.target.value)}
             className="h-8 w-14 font-mono text-center text-xs" placeholder="Sec" />
-          <div className="flex flex-wrap gap-1 flex-1">
-            {EVENT_CATEGORIES.map((c) => (
-              <button key={c.value} onClick={() => setEditCat(c.value)}
-                className="text-[9px] px-1.5 py-0.5 rounded-full border transition-all font-medium"
-                style={editCat === c.value
-                  ? { background: c.color, color: "#fff", borderColor: c.color }
-                  : { background: c.color + "18", color: c.color, borderColor: c.color + "44" }
-                }
-              >{c.label}</button>
-            ))}
-          </div>
         </div>
+        <CategorySelector selected={editCats} onChange={setEditCats} />
         <Textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} rows={2} className="text-sm resize-none" />
         <div className="flex gap-2">
           <Button size="sm" className="h-7 text-xs gap-1" onClick={saveEdit}><Check className="w-3 h-3" />Save</Button>
@@ -89,11 +115,14 @@ function EventRow({ ev, idx, onRemove, onUpdate }) {
   }
 
   return (
-    <div className="flex items-start gap-2 rounded-lg px-3 py-2" style={{ background: meta.color + "0f", borderLeft: `3px solid ${meta.color}44` }}>
+    <div className="flex items-start gap-2 rounded-lg px-3 py-2" style={{ background: primaryMeta.color + "0f", borderLeft: `3px solid ${primaryMeta.color}44` }}>
       <span className="font-mono text-xs text-primary shrink-0 mt-0.5 w-10">{fmtMmSs(ev.time_s)}</span>
       <div className="flex-1 min-w-0">
-        <CategoryPill value={ev.category} small />
-        <p className="text-sm text-foreground leading-snug mt-0.5 whitespace-pre-wrap">{ev.note}</p>
+        <div className="flex flex-wrap gap-1 mb-0.5">
+          {cats.map((c) => <CategoryPill key={c} value={c} small />)}
+          {cats.length === 0 && <CategoryPill value="other" small />}
+        </div>
+        <p className="text-sm text-foreground leading-snug whitespace-pre-wrap">{ev.note}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0 mt-0.5">
         <button onClick={() => setEditing(true)} className="text-muted-foreground hover:text-primary transition-colors">
@@ -112,7 +141,7 @@ export default function EventTimelineSection({ data, onChange }) {
   const [minutes, setMinutes] = useState("");
   const [seconds, setSeconds] = useState("");
   const [noteInput, setNoteInput] = useState("");
-  const [category, setCategory] = useState("stimulation");
+  const [categories, setCategories] = useState(["stimulation"]);
   const [timeError, setTimeError] = useState(false);
 
   const update = (newEvents) => onChange({ ...data, event_timeline: newEvents });
@@ -124,7 +153,7 @@ export default function EventTimelineSection({ data, onChange }) {
     if (!noteInput.trim()) return;
     setTimeError(false);
     const totalSeconds = m * 60 + s;
-    const newEvent = { time_s: totalSeconds, note: noteInput.trim(), category };
+    const newEvent = { time_s: totalSeconds, note: noteInput.trim(), category: categories };
     const sorted = [...events, newEvent].sort((a, b) => a.time_s - b.time_s);
     update(sorted);
     setMinutes("");
@@ -143,10 +172,9 @@ export default function EventTimelineSection({ data, onChange }) {
     <div className="space-y-4">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-primary">Event Timeline</h3>
       <p className="text-xs text-muted-foreground -mt-2">
-        Log notable moments — stimulation changes, sensations, emotional states, or pauses.
+        Log notable moments — stimulation changes, sensations, pauses, or physical events. Select multiple tags.
       </p>
 
-      {/* Existing events */}
       {events.length > 0 && (
         <div className="space-y-1.5">
           {events.map((ev, i) => (
@@ -155,11 +183,9 @@ export default function EventTimelineSection({ data, onChange }) {
         </div>
       )}
 
-      {/* Add new event */}
       <div className="space-y-2 bg-muted/30 rounded-xl p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Add Event</p>
 
-        {/* Time inputs */}
         <div className="flex items-center gap-2">
           <Input type="number" min={0} value={minutes}
             onChange={(e) => { setMinutes(e.target.value); setTimeError(false); }}
@@ -171,20 +197,8 @@ export default function EventTimelineSection({ data, onChange }) {
           {timeError && <p className="text-[10px] text-destructive">Valid time required</p>}
         </div>
 
-        {/* Category selector */}
-        <div className="flex flex-wrap gap-1.5">
-          {EVENT_CATEGORIES.map((c) => (
-            <button key={c.value} onClick={() => setCategory(c.value)}
-              className="text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all"
-              style={category === c.value
-                ? { background: c.color, color: "#fff", borderColor: c.color }
-                : { background: c.color + "18", color: c.color, borderColor: c.color + "44" }
-              }
-            >{c.label}</button>
-          ))}
-        </div>
+        <CategorySelector selected={categories} onChange={setCategories} />
 
-        {/* Note + submit */}
         <div className="flex gap-2 items-end">
           <Textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addEvent(); } }}

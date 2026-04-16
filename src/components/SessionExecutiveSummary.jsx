@@ -24,6 +24,25 @@ function calcHRRise(session) {
   return session.hr_avg_pre_to_climax - session.avg_hr;
 }
 
+// Pause time: total seconds between stimulation_paused and stimulation_resumed events
+function calcPauseTime(session) {
+  const events = session?.event_timeline || [];
+  // normalize category to array
+  const cats = (ev) => Array.isArray(ev.category) ? ev.category : [ev.category].filter(Boolean);
+  const sorted = [...events].sort((a, b) => a.time_s - b.time_s);
+  let totalPause = 0;
+  let pauseStart = null;
+  for (const ev of sorted) {
+    const c = cats(ev);
+    if (c.includes("stimulation_paused") && pauseStart == null) pauseStart = ev.time_s;
+    if (c.includes("stimulation_resumed") && pauseStart != null) {
+      totalPause += ev.time_s - pauseStart;
+      pauseStart = null;
+    }
+  }
+  return totalPause; // seconds
+}
+
 // Discomfort penalty: derived from discomfort_entries severity average, or boolean
 function calcDiscomfortPenalty(session) {
   if (session?.discomfort_entries?.length > 0) {
@@ -81,7 +100,15 @@ function computeScore(session, timelineRows) {
     factors.push({ label: "HR Arousal Rise", score: normalized * 10, max: 10 });
   }
 
-  // 7. Discomfort penalty (up to −15 pts)
+  // 7. Pause time penalty (up to −10 pts) — more pauses = lower score
+  const pauseS = calcPauseTime(session);
+  if (pauseS > 0 && session.duration_minutes) {
+    const sessionS = session.duration_minutes * 60;
+    const pauseRatio = Math.min(1, pauseS / sessionS);
+    factors.push({ label: "Pause Time", score: -pauseRatio * 10, max: 0, penalty: true });
+  }
+
+  // 8. Discomfort penalty (up to −15 pts)
   const discomfort = calcDiscomfortPenalty(session);
   if (discomfort > 0) {
     factors.push({ label: "Discomfort", score: -(discomfort / 10) * 15, max: 0, penalty: true });
@@ -124,6 +151,7 @@ export default function SessionExecutiveSummary({ session, timelineRows }) {
   const hrVar = calcHRVariability(timelineRows);
   const hrRise = calcHRRise(session);
   const discomfortPenalty = calcDiscomfortPenalty(session);
+  const pauseS = calcPauseTime(session);
 
   // Determine trend icon vs previous score — just show neutral for now (no historical compare here)
   const scorePct = pct;
@@ -148,6 +176,11 @@ export default function SessionExecutiveSummary({ session, timelineRows }) {
       label: "Climax",
       value: session.climax_duration.charAt(0).toUpperCase() + session.climax_duration.slice(1),
       good: session.climax_duration !== "short",
+    },
+    pauseS > 0 && {
+      label: "Paused",
+      value: fmtSec(pauseS),
+      good: false,
     },
     discomfortPenalty > 0 && {
       label: "Discomfort",

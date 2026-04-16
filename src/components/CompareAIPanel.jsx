@@ -77,7 +77,11 @@ export default function CompareAIPanel({ sessions }) {
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant. Compare the following ${sessions.length} sexual response sessions side-by-side and identify meaningful differences and patterns.
+      prompt: `You are a physiological research assistant. Compare the following ${sessions.length} sexual response sessions side-by-side.
+
+For each session, analyze the full cascade arc: Build Phase → Pre-Climax → Climax → Recovery.
+Focus on: HR trajectories, phase durations, build types, climax quality, recovery speed, and any event notes.
+Identify meaningful physiological differences and patterns across sessions.
 
 Sessions:
 ${JSON.stringify(summary, null, 2)}
