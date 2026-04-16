@@ -64,20 +64,26 @@ export default function EditSession() {
       return;
     }
     setSaving(true);
-    const duration = calcDuration(data.start_time, data.end_time);
-    const { _csv_rows, ...sessionData } = data;
-    await base44.entities.Session.update(id, {
-      ...sessionData,
-      duration_minutes: duration || data.duration_minutes,
-    });
-    if (_csv_rows && _csv_rows.length > 0) {
-      const existing = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
-      await Promise.all(existing.map((r) => base44.entities.HeartRateTimeline.delete(r.id)));
-      const rows = _csv_rows.map((r) => ({ ...r, session: id }));
-      await base44.entities.HeartRateTimeline.bulkCreate(rows);
+    try {
+      const duration = calcDuration(data.start_time, data.end_time);
+      // Exclude internal/computed fields that shouldn't be re-saved
+      const { _csv_rows, ai_analysis, ai_cascade, ...sessionData } = data;
+      await base44.entities.Session.update(id, {
+        ...sessionData,
+        duration_minutes: duration || data.duration_minutes,
+      });
+      if (_csv_rows && _csv_rows.length > 0) {
+        const existing = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
+        await Promise.all(existing.map((r) => base44.entities.HeartRateTimeline.delete(r.id)));
+        const rows = _csv_rows.map((r) => ({ ...r, session: id }));
+        await base44.entities.HeartRateTimeline.bulkCreate(rows);
+      }
+      toast({ title: "Session updated!", duration: 2000 });
+      navigate(`/sessions/${id}`);
+    } catch (err) {
+      toast({ title: "Save failed: " + err.message, variant: "destructive" });
+      setSaving(false);
     }
-    toast({ title: "Session updated!", duration: 2000 });
-    navigate(`/sessions/${id}`);
   };
 
   const renderSection = (sectionId) => {
