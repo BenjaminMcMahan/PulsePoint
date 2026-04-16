@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import PageHeader from "../components/PageHeader";
 import SessionCard from "../components/SessionCard";
 import { PlusCircle, Search, SlidersHorizontal, Download } from "lucide-react";
+import RoutinePatternAnalysis from "../components/RoutinePatternAnalysis";
 
 const ALL_METHODS = ["Manual", "Silicone Sleeve", "Coyote E-Stim", "TENS", "Foley Catheter"];
 const BUILD_TYPES = ["Gradual", "Stepwise", "Spike", "Plateau-heavy", "Erratic", "Other"];
@@ -156,6 +157,8 @@ export default function Sessions() {
             </div>
           </div>
         )}
+
+        <RoutinePatternAnalysis sessions={sessions} />
 
         <div className="space-y-2 pb-4">
           {filtered.length === 0 ? (
