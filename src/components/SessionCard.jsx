@@ -2,51 +2,18 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Star, Heart, Zap, Clock, Brain, ChevronDown, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { base44 } from "@/api/base44Client";
 import moment from "moment";
 import { computeSessionScore, gradeFromPct } from "@/utils/sessionScore";
 
 export default function SessionCard({ session, selectable, selected, onSelect }) {
   const [aiExpanded, setAiExpanded] = useState(false);
-  const [aiText, setAiText] = useState(session.ai_analysis?.summary ?? null);
-  const [aiLoading, setAiLoading] = useState(false);
 
   const date = moment(session.date).format("MMM D, YYYY");
   const methods = session.methods || [];
   const eventCount = (session.event_timeline || []).length;
   const scorePct = computeSessionScore(session, []);
   const gradeInfo = scorePct != null ? gradeFromPct(scorePct) : null;
-
-  const loadAI = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (aiText) { setAiExpanded((v) => !v); return; }
-    setAiExpanded(true);
-    setAiLoading(true);
-    try {
-      const res = await base44.integrations.Core.InvokeLLM({
-        prompt: `Write a brief 1–2 paragraph physiological summary of this session. Be concise and insightful. Focus on what happened, how the body responded, and any notable patterns.
-
-Session data:
-- Date: ${session.date?.slice(0, 10)}
-- Duration: ${session.duration_minutes ?? "unknown"} minutes
-- Methods: ${(session.methods || []).join(", ") || "none listed"}
-- Build type: ${session.build_type || "unknown"}
-- Intensity: ${session.intensity}/10
-- Build quality: ${session.build_quality ?? "—"}/10
-- Satisfaction: ${session.satisfaction ?? "—"}/10
-- Climax duration: ${session.climax_duration || "—"}
-- Avg HR: ${session.avg_hr ?? "—"} bpm, Max HR: ${session.max_hr ?? "—"} bpm, HR at climax: ${session.hr_at_climax ?? "—"} bpm
-- Mood: ${session.mood || "—"}
-- Events logged: ${eventCount}
-${session.notes ? `- Notes: ${session.notes.slice(0, 200)}` : ""}`,
-      });
-      const text = typeof res === "string" ? res : (res?.response ?? res?.summary ?? JSON.stringify(res));
-      setAiText(text);
-    } finally {
-      setAiLoading(false);
-    }
-  };
+  const aiSummary = session.ai_analysis?.summary;
 
   const content = (
     <div className={`bg-card rounded-xl border p-4 transition-all ${
@@ -121,27 +88,23 @@ ${session.notes ? `- Notes: ${session.notes.slice(0, 200)}` : ""}`,
         ))}
       </div>
 
-      {/* AI toggle */}
-      {!selectable && (
-        <button
-          onClick={loadAI}
-          className="flex items-center gap-1 text-[10px] text-primary font-semibold mt-1"
-        >
-          <Brain className="w-3 h-3" />
-          {aiLoading ? "Generating…" : aiExpanded ? "Hide breakdown" : session.ai_analysis?.summary ? "Show AI breakdown" : "Generate AI breakdown"}
-          {!aiLoading && (aiExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-        </button>
-      )}
-
-      {/* AI text */}
-      {aiExpanded && (
-        <div className="mt-2 pt-2 border-t border-border">
-          {aiLoading ? (
-            <p className="text-xs text-muted-foreground animate-pulse">Generating breakdown…</p>
-          ) : aiText ? (
-            <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap">{aiText}</p>
-          ) : null}
-        </div>
+      {/* AI breakdown toggle (only shown when summary exists) */}
+      {!selectable && aiSummary && (
+        <>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAiExpanded((v) => !v); }}
+            className="flex items-center gap-1 text-[10px] text-primary font-semibold mt-1"
+          >
+            <Brain className="w-3 h-3" />
+            {aiExpanded ? "Hide breakdown" : "Show AI breakdown"}
+            {aiExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+          {aiExpanded && (
+            <div className="mt-2 pt-2 border-t border-border">
+              <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

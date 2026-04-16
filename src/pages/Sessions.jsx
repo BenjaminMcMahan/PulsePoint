@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PageHeader from "../components/PageHeader";
 import SessionCard from "../components/SessionCard";
-import { PlusCircle, Search, SlidersHorizontal, Download } from "lucide-react";
+import { PlusCircle, Search, SlidersHorizontal, Download, Brain } from "lucide-react";
 import RoutinePatternAnalysis from "../components/RoutinePatternAnalysis";
 
 const ALL_METHODS = ["Manual", "Silicone Sleeve", "Coyote E-Stim", "TENS", "Foley Catheter"];
@@ -15,6 +15,8 @@ const BUILD_TYPES = ["Gradual", "Stepwise", "Spike", "Plateau-heavy", "Erratic",
 export default function Sessions() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeProgress, setAnalyzeProgress] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState("");
   const [filterMethod, setFilterMethod] = useState("");
@@ -52,6 +54,40 @@ export default function Sessions() {
     }
     return true;
   });
+
+  const analyzeAll = async () => {
+    const toAnalyze = sessions.filter((s) => !s.ai_analysis?.summary);
+    if (!toAnalyze.length) return;
+    setAnalyzing(true);
+    setAnalyzeProgress(0);
+    let done = 0;
+    await Promise.all(toAnalyze.map(async (s) => {
+      const eventCount = (s.event_timeline || []).length;
+      const text = await base44.integrations.Core.InvokeLLM({
+        prompt: `Write a brief 1–2 paragraph physiological summary of this session. Be concise and insightful. Focus on what happened, how the body responded, and any notable patterns.
+
+Session data:
+- Date: ${s.date?.slice(0, 10)}
+- Duration: ${s.duration_minutes ?? "unknown"} minutes
+- Methods: ${(s.methods || []).join(", ") || "none listed"}
+- Build type: ${s.build_type || "unknown"}
+- Intensity: ${s.intensity}/10
+- Build quality: ${s.build_quality ?? "—"}/10
+- Satisfaction: ${s.satisfaction ?? "—"}/10
+- Climax duration: ${s.climax_duration || "—"}
+- Avg HR: ${s.avg_hr ?? "—"} bpm, Max HR: ${s.max_hr ?? "—"} bpm, HR at climax: ${s.hr_at_climax ?? "—"} bpm
+- Mood: ${s.mood || "—"}
+- Events logged: ${eventCount}
+${s.notes ? `- Notes: ${s.notes.slice(0, 200)}` : ""}`,
+      });
+      const summary = typeof text === "string" ? text : (text?.response ?? text?.summary ?? "");
+      await base44.entities.Session.update(s.id, { ai_analysis: { ...(s.ai_analysis || {}), summary } });
+      done++;
+      setAnalyzeProgress(Math.round((done / toAnalyze.length) * 100));
+      setSessions((prev) => prev.map((p) => p.id === s.id ? { ...p, ai_analysis: { ...(p.ai_analysis || {}), summary } } : p));
+    }));
+    setAnalyzing(false);
+  };
 
   const clearFilters = () => {
     setFilterMethod(""); setFilterBuildType("");
@@ -93,6 +129,17 @@ export default function Sessions() {
           <div className="flex gap-2">
             <Button variant="outline" size="icon" onClick={exportCSV} className="h-9 w-9">
               <Download className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={analyzeAll}
+              disabled={analyzing || sessions.every((s) => s.ai_analysis?.summary)}
+              className="gap-1.5 h-9"
+            >
+              {analyzing
+                ? <><span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />{analyzeProgress}%</>
+                : <><Brain className="w-4 h-4" />Analyze</>}
             </Button>
             <Link to="/new">
               <Button size="sm" className="gap-1.5 h-9">
