@@ -46,7 +46,20 @@ export default function EditSession() {
   useEffect(() => {
     (async () => {
       const results = await base44.entities.Session.filter({ id });
-      if (results[0]) setData(results[0]);
+      if (results[0]) {
+        const session = results[0];
+        // Auto-derive start_time from the session date if not already stored
+        if (!session.start_time && session.date) {
+          const etTime = new Date(session.date).toLocaleTimeString("en-US", {
+            timeZone: "America/New_York",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          });
+          session.start_time = etTime === "24:00" ? "00:00" : etTime;
+        }
+        setData(session);
+      }
       setLoading(false);
     })();
   }, [id]);
