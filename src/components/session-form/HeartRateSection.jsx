@@ -126,7 +126,21 @@ export default function HeartRateSection({ data, onChange }) {
     const maxOffsetS = Math.max(...validRows.map((r) => r.time_offset_s || 0));
     const durationMins = Math.round(maxOffsetS / 60);
     const timestamps = validRows.map((r) => r.timestamp).filter(Boolean).sort();
-    const firstTimestamp = timestamps[0] ? new Date(timestamps[0]).toISOString() : data.date;
+    const firstTs = timestamps[0] ? new Date(timestamps[0]) : null;
+    const firstTimestamp = firstTs ? firstTs.toISOString() : data.date;
+
+    // Extract HH:MM start time in America/New_York from the first timestamp
+    let startTime = data.start_time;
+    if (firstTs) {
+      const etTime = firstTs.toLocaleTimeString("en-US", {
+        timeZone: "America/New_York",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+      // toLocaleTimeString may return "24:xx" for midnight — normalize
+      startTime = etTime === "24:00" ? "00:00" : etTime;
+    }
 
     // Derived metrics
     const metrics = calcDerivedMetrics(validRows);
@@ -138,6 +152,7 @@ export default function HeartRateSection({ data, onChange }) {
       max_hr: maxHr,
       date: firstTimestamp || data.date,
       duration_minutes: durationMins,
+      start_time: startTime,
       _csv_rows: validRows,
     });
 
