@@ -13,6 +13,10 @@
     "near_climax_result": {
       "type": "object",
       "description": "Stored AI near-climax event narrative and stats"
+    },
+    "best_session_result": {
+      "type": "object",
+      "description": "Stored AI best session determination result"
     }
   },
   "required": []

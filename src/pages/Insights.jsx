@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, Heart, TrendingUp, TrendingDown, AlertTriangle, Star, Layers, Brain, Activity } from "lucide-react";
 import moment from "moment";
 import { Link } from "react-router-dom";
+import BestSessionPanel from "../components/BestSessionPanel";
 
 function InsightCard({ icon: Icon, color, title, description, sessionId }) {
   const content = (
@@ -338,6 +339,8 @@ export default function Insights() {
             Since {moment(sessions[sessions.length - 1].date).format("MMM YYYY")}
           </Badge>
         </div>
+
+        <BestSessionPanel sessions={sessions} />
 
         {insights.map((insight, i) => <InsightCard key={i} {...insight} />)}
 
