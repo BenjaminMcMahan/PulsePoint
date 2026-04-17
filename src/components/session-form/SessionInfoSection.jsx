@@ -1,6 +1,16 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+// Get today's date in America/New_York
+function todayET() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+}
+
+// Get current time HH:MM in America/New_York
+function nowTimeET() {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+}
+
 export default function SessionInfoSection({ data, onChange }) {
   const update = (field, value) => onChange({ ...data, [field]: value });
 
@@ -11,13 +21,18 @@ export default function SessionInfoSection({ data, onChange }) {
     onChange({ ...data, [field]: Number(value), duration_minutes: totalMinutes });
   };
 
+  // Auto-fill start time with current ET time if not set
+  const handleStartTimeFocus = () => {
+    if (!data.start_time) update("start_time", nowTimeET());
+  };
+
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-primary">Session Info</h3>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-xs text-muted-foreground">Date</Label>
+          <Label className="text-xs text-muted-foreground">Date (ET)</Label>
           <Input
             type="date"
             value={data.date?.split("T")[0] || ""}
@@ -25,7 +40,16 @@ export default function SessionInfoSection({ data, onChange }) {
             className="h-12 mt-1"
           />
         </div>
-        <div />
+        <div>
+          <Label className="text-xs text-muted-foreground">Start Time (ET)</Label>
+          <Input
+            type="time"
+            value={data.start_time || ""}
+            onFocus={handleStartTimeFocus}
+            onChange={(e) => update("start_time", e.target.value)}
+            className="h-12 mt-1 font-mono"
+          />
+        </div>
       </div>
 
       <div className="space-y-2">

@@ -49,9 +49,16 @@ export default function BestSessionPanel({ sessions }) {
   const runAnalysis = async () => {
     setLoading(true);
     try {
-      const summaries = sessions.slice(0, 100).map((s) => ({
+      const summaries = sessions.slice(0, 100).map((s) => {
+        const h = s.start_time ? parseInt(s.start_time.split(":")[0], 10) : null;
+        const timeOfDay = h !== null
+          ? (h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night")
+          : undefined;
+        return {
         id: s.id,
         date: s.date?.slice(0, 10),
+        start_time_et: s.start_time || undefined,
+        time_of_day: timeOfDay,
         duration_minutes: s.duration_minutes,
         intensity: s.intensity,
         satisfaction: s.satisfaction,
@@ -78,7 +85,8 @@ export default function BestSessionPanel({ sessions }) {
           ? Math.round(s.recovery_offset_s - s.climax_offset_s) : undefined,
         is_favorite: s.is_favorite || undefined,
         tags: s.tags?.length ? s.tags : undefined,
-      }));
+        }; // closes the object literal
+      }); // closes the .map()
 
       const res = await base44.integrations.Core.InvokeLLM({
         model: "claude_sonnet_4_6",
@@ -88,6 +96,7 @@ Consider ALL factors holistically:
 - Physiological quality: HR data, HR at climax, build quality, intensity
 - Cascade quality: phase marker timing, build-to-climax duration, recovery speed
 - Subjective quality: satisfaction, mood, climax duration
+- Time of day (ET): morning/afternoon/evening/night sessions may show different physiological patterns — factor this in
 - Session richness: event logs, notes, unusual sensations
 - Efficiency: pause time (less is generally better for a focused session)
 - Absence of negatives: discomfort, low ratings
@@ -95,6 +104,7 @@ Consider ALL factors holistically:
 - Any standout notes or unusual observations
 
 Return the session ID of the best session, and a thorough, specific explanation referencing actual data values.
+IMPORTANT: In the runner_up field, refer to sessions by their date (e.g. "April 5, 2025"), NOT by their ID.
 
 Sessions data:
 ${JSON.stringify(summaries, null, 2)}`,

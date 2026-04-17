@@ -56,8 +56,15 @@ export default function CompareAIPanel({ sessions }) {
   const runAnalysis = async (existingId) => {
     setLoading(true);
     try {
-      const summary = sessions.map((s) => ({
+      const summary = sessions.map((s) => {
+        const h = s.start_time ? parseInt(s.start_time.split(":")[0], 10) : null;
+        const timeOfDay = h !== null
+          ? (h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night")
+          : undefined;
+        return {
         date: s.date?.slice(0, 10),
+        start_time_et: s.start_time || undefined,
+        time_of_day: timeOfDay,
         duration_minutes: s.duration_minutes,
         intensity: s.intensity,
         satisfaction: s.satisfaction,
@@ -74,7 +81,8 @@ export default function CompareAIPanel({ sessions }) {
         pre_climax_offset_s: s.pre_climax_offset_s,
         climax_offset_s: s.climax_offset_s,
         recovery_offset_s: s.recovery_offset_s,
-      }));
+        }; // closes the object literal
+      }); // closes the .map()
 
       const res = await base44.integrations.Core.InvokeLLM({
         model: "claude_sonnet_4_6",

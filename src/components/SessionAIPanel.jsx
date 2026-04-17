@@ -113,6 +113,14 @@ IMPORTANT: ${estimScreenshots.length} E-Stim settings screenshot(s) from the How
 Session data:
 ${JSON.stringify({
   date: session.date?.slice(0, 10),
+  start_time_et: session.start_time || undefined,
+  time_of_day: session.start_time ? (() => {
+    const h = parseInt(session.start_time.split(":")[0], 10);
+    if (h >= 5 && h < 12) return "morning (5am–12pm)";
+    if (h >= 12 && h < 17) return "afternoon (12pm–5pm)";
+    if (h >= 17 && h < 21) return "evening (5pm–9pm)";
+    return "night (9pm–5am)";
+  })() : undefined,
   duration_minutes: session.duration_minutes,
   intensity: session.intensity,
   satisfaction: session.satisfaction,

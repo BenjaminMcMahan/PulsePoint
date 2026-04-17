@@ -80,6 +80,11 @@ export default function CascadeOverviewPanel({ session, timelineRows }) {
     const recoveryOnset = session.recovery_offset_s != null && session.climax_offset_s != null
       ? Math.round(session.recovery_offset_s - session.climax_offset_s) : null;
 
+    const h = session.start_time ? parseInt(session.start_time.split(":")[0], 10) : null;
+    const timeOfDay = h !== null
+      ? (h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night")
+      : null;
+
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       prompt: `You are a physiological research assistant. Analyze the climax cascade arc of this single sexual response session in depth.
@@ -96,7 +101,9 @@ Be specific, reference actual values, note event-HR correlations.
 Session cascade data:
 ${JSON.stringify({
   date: session.date?.slice(0, 10),
-  duration_minutes: session.duration_minutes,
+    start_time_et: session.start_time || undefined,
+    time_of_day: timeOfDay || undefined,
+    duration_minutes: session.duration_minutes,
   build_type: session.build_type,
   build_quality: session.build_quality,
   climax_duration: session.climax_duration,
