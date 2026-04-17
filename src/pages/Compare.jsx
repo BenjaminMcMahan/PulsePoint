@@ -8,6 +8,7 @@ import CompareHRTimelineChart from "../components/CompareHRTimelineChart";
 import CompareStats from "../components/CompareStats";
 import { GitCompare } from "lucide-react";
 import CompareAIPanel from "../components/CompareAIPanel";
+import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import moment from "moment";
 
 function MetricRow({ label, value, max = 10 }) {
@@ -126,6 +127,7 @@ export default function Compare() {
   const [comparing, setComparing] = useState(false);
   const [timelines, setTimelines] = useState([]);
   const [loadingTimelines, setLoadingTimelines] = useState(false);
+  const [timelineMap, setTimelineMap] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -147,6 +149,10 @@ export default function Compare() {
         )
       );
       setTimelines(results.filter((r) => r.rows.length > 0));
+      // Build a map from session id → rows for cascade panels
+      const map = {};
+      selectedSessions.forEach((s, i) => { map[s.id] = results[i]?.rows || []; });
+      setTimelineMap(map);
       setLoadingTimelines(false);
     })();
   }, [comparing]);
@@ -208,6 +214,17 @@ export default function Compare() {
             <CompareAIPanel sessions={selectedSessions} />
             <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
               {selectedSessions.map((s) => <CompareColumn key={s.id} session={s} />)}
+            </div>
+
+            {/* Per-session cascade analysis */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Cascade Analysis Per Session</h3>
+              {selectedSessions.map((s) => (
+                <div key={s.id} className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-semibold">{moment(s.date).format("MMM D, YYYY")}</p>
+                  <CascadeOverviewPanel session={s} timelineRows={timelineMap[s.id] || []} />
+                </div>
+              ))}
             </div>
           </div>
         )}
