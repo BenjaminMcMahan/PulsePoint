@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, List, PlusCircle, GitCompare, TrendingUp, Waves, ScanSearch, GitMerge, LineChart, Menu, X, UserCircle } from "lucide-react";
+import { LayoutDashboard, List, PlusCircle, GitCompare, TrendingUp, Waves, ScanSearch, GitMerge, LineChart, Menu, X, UserCircle, Grid3x3 } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -12,6 +12,7 @@ const navItems = [
   { path: "/profiler", icon: ScanSearch, label: "AI Profiler" },
   { path: "/overlay", icon: GitMerge, label: "HR Overlay" },
   { path: "/trends", icon: LineChart, label: "Trends" },
+  { path: "/correlations", icon: Grid3x3, label: "Correlations" },
   { path: "/profile", icon: UserCircle, label: "My Profile" },
 ];
 

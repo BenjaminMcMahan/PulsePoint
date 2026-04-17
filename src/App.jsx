@@ -19,6 +19,7 @@ import Profiler from './pages/Profiler';
 import HROverlay from './pages/HROverlay';
 import LongTermTrends from './pages/LongTermTrends';
 import Profile from './pages/Profile';
+import CorrelationMatrix from './pages/CorrelationMatrix';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -60,6 +61,7 @@ const AuthenticatedApp = () => {
         <Route path="/overlay" element={<HROverlay />} />
         <Route path="/trends" element={<LongTermTrends />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/correlations" element={<CorrelationMatrix />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>
