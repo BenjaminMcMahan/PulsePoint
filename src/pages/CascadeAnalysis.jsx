@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip,
-  CartesianGrid, ReferenceLine,
-} from "recharts";
+  CartesianGrid, ReferenceLine } from
+"recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Activity, TrendingDown, Clock, Zap, AlertCircle } from "lucide-react";
@@ -31,7 +31,7 @@ const SECTION_COLORS = {
   "chart-2": "hsl(var(--chart-2))",
   "chart-4": "hsl(var(--chart-4))",
   "accent": "hsl(var(--accent))",
-  "destructive": "hsl(var(--destructive))",
+  "destructive": "hsl(var(--destructive))"
 };
 
 // ─── Heatmap cell ─────────────────────────────────────────────────────────────
@@ -46,11 +46,11 @@ function HeatmapCell({ value, min, max }) {
     <td
       className="w-4 h-6 text-center text-[8px] font-mono cursor-default"
       style={{ background: `rgb(${r},${g},${b})`, color: pct > 0.5 ? "#fff" : "#111" }}
-      title={`${Math.round(value)} bpm`}
-    >
+      title={`${Math.round(value)} bpm`}>
+      
       {Math.round(value)}
-    </td>
-  );
+    </td>);
+
 }
 
 // ─── Section / Item for AI output ─────────────────────────────────────────────
@@ -62,14 +62,14 @@ function Section({ icon, title, color, children }) {
         {icon}{title}
       </p>
       <ul className="space-y-1">{children}</ul>
-    </div>
-  );
+    </div>);
+
 }
 
 function Item({ text }) {
   return (
-    <li className="text-sm text-foreground/90 leading-relaxed pl-3 border-l-2 border-primary/40 py-0.5">• {text}</li>
-  );
+    <li className="text-[#ffffff] pl-3 py-0.5 text-sm leading-relaxed border-l-2 border-primary/40">• {text}</li>);
+
 }
 
 // ─── AI Insight panel ─────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ function AIInsightPanel({ sessions }) {
       let bestDist = Math.abs(Number(rows[0].time_offset_s) - time_s);
       for (const r of rows) {
         const d = Math.abs(Number(r.time_offset_s) - time_s);
-        if (d < bestDist) { bestDist = d; best = r; }
+        if (d < bestDist) {bestDist = d;best = r;}
         if (Number(r.time_offset_s) > time_s + 10) break;
       }
       return Math.round(Number(best.hr));
@@ -133,9 +133,9 @@ function AIInsightPanel({ sessions }) {
         hr_at_recovery_marker: hrAt(s.recovery_offset_s),
         build_duration_s: s.pre_climax_offset_s != null ? Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null,
         recovery_onset_s: s.recovery_offset_s != null ? Math.round(s.recovery_offset_s - s.climax_offset_s) : null,
-        hr_rise_pre_to_climax: (s.hr_at_climax || hrAt(s.climax_offset_s)) != null && hrAt(s.pre_climax_offset_s) != null
-          ? Math.round((s.hr_at_climax || hrAt(s.climax_offset_s)) - hrAt(s.pre_climax_offset_s))
-          : null,
+        hr_rise_pre_to_climax: (s.hr_at_climax || hrAt(s.climax_offset_s)) != null && hrAt(s.pre_climax_offset_s) != null ?
+        Math.round((s.hr_at_climax || hrAt(s.climax_offset_s)) - hrAt(s.pre_climax_offset_s)) :
+        null
       };
 
       return {
@@ -153,14 +153,14 @@ function AIInsightPanel({ sessions }) {
         methods: s.methods,
         event_notes: annotatedEvents.length > 0 ? annotatedEvents : undefined,
         discomfort_entries: s.discomfort_entries?.length > 0 ? s.discomfort_entries : undefined,
-        notes: s.notes || undefined,
+        notes: s.notes || undefined
       };
     });
 
     const withRecovery = summary.filter((s) => s.cascade_shape?.recovery_onset_s != null);
-    const avgRecoveryOnset = withRecovery.length
-      ? Math.round(withRecovery.reduce((a, s) => a + s.cascade_shape.recovery_onset_s, 0) / withRecovery.length)
-      : null;
+    const avgRecoveryOnset = withRecovery.length ?
+    Math.round(withRecovery.reduce((a, s) => a + s.cascade_shape.recovery_onset_s, 0) / withRecovery.length) :
+    null;
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
@@ -201,15 +201,15 @@ Be specific, research-oriented, and reference actual data values where relevant.
               type: "object",
               properties: {
                 session_date: { type: "string" },
-                finding: { type: "string" },
+                finding: { type: "string" }
               },
-              required: ["session_date", "finding"],
-            },
+              required: ["session_date", "finding"]
+            }
           },
-          phenotype_clusters: { type: "array", items: { type: "string" } },
+          phenotype_clusters: { type: "array", items: { type: "string" } }
         },
-        required: ["summary", "cascade_overview", "event_note_patterns", "common_signatures", "predictive_insights", "anomalies", "phenotype_clusters"],
-      },
+        required: ["summary", "cascade_overview", "event_note_patterns", "common_signatures", "predictive_insights", "anomalies", "phenotype_clusters"]
+      }
     });
 
     console.log("AI Cascade result:", res);
@@ -234,78 +234,78 @@ Be specific, research-oriented, and reference actual data values where relevant.
         <div className="flex items-center gap-2">
           {result && <TTSButton getText={() => {
             const parts = [result.summary];
-            result.cascade_overview?.forEach(s => parts.push(s));
-            result.event_note_patterns?.forEach(s => parts.push(s));
-            result.common_signatures?.forEach(s => parts.push(s));
-            result.predictive_insights?.forEach(s => parts.push(s));
-            result.phenotype_clusters?.forEach(s => parts.push(s));
-            result.anomalies?.forEach(a => parts.push(`${a.session_date}: ${a.finding}`));
+            result.cascade_overview?.forEach((s) => parts.push(s));
+            result.event_note_patterns?.forEach((s) => parts.push(s));
+            result.common_signatures?.forEach((s) => parts.push(s));
+            result.predictive_insights?.forEach((s) => parts.push(s));
+            result.phenotype_clusters?.forEach((s) => parts.push(s));
+            result.anomalies?.forEach((a) => parts.push(`${a.session_date}: ${a.finding}`));
             return parts.filter(Boolean).join('. ');
           }} />}
         <Button size="sm" onClick={analyze} disabled={loading || sessions.length < 2} className="h-7 text-xs gap-1.5">
-          {loading
-            ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
-            : <><Brain className="w-3 h-3" />Analyze</>}
+          {loading ?
+            <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</> :
+            <><Brain className="w-3 h-3" />Analyze</>}
         </Button>
         </div>
       </div>
 
-      {sessions.length < 2 && (
-        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+      {sessions.length < 2 &&
+      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
           <AlertCircle className="w-3.5 h-3.5" />Need at least 2 sessions with climax markers to run AI analysis.
         </p>
-      )}
+      }
 
-      {!result && !loading && sessions.length >= 2 && (
-        <p className="text-xs text-muted-foreground">
+      {!result && !loading && sessions.length >= 2 &&
+      <p className="text-xs text-muted-foreground">
           Click Analyze to generate AI-powered physiological insights across all aligned sessions. Uses Claude Sonnet (advanced model).
         </p>
-      )}
+      }
 
-      {result && (
-        <div className="space-y-4 text-xs">
-          {result.summary ? (
-            <p className="text-base text-foreground font-medium leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground italic">Analysis complete — no summary returned.</p>
-          )}
-          {result.cascade_overview?.length > 0 && (
-            <Section icon={<Activity className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-1"] }} />} title="Cascade Overview" color="chart-1">
+      {result &&
+      <div className="space-y-4 text-xs">
+          {result.summary ?
+        <p className="text-base text-foreground font-medium leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p> :
+
+        <p className="text-xs text-muted-foreground italic">Analysis complete — no summary returned.</p>
+        }
+          {result.cascade_overview?.length > 0 &&
+        <Section icon={<Activity className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-1"] }} />} title="Cascade Overview" color="chart-1">
               {result.cascade_overview.map((s, i) => <Item key={i} text={s} />)}
             </Section>
-          )}
-          {result.event_note_patterns?.length > 0 && (
-            <Section icon={<Clock className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-2"] }} />} title="Event Note Patterns" color="chart-2">
+        }
+          {result.event_note_patterns?.length > 0 &&
+        <Section icon={<Clock className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-2"] }} />} title="Event Note Patterns" color="chart-2">
               {result.event_note_patterns.map((s, i) => <Item key={i} text={s} />)}
             </Section>
-          )}
-          {result.common_signatures?.length > 0 && (
-            <Section icon={<TrendingDown className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["accent"] }} />} title="Common Signatures" color="accent">
+        }
+          {result.common_signatures?.length > 0 &&
+        <Section icon={<TrendingDown className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["accent"] }} />} title="Common Signatures" color="accent">
               {result.common_signatures.map((s, i) => <Item key={i} text={s} />)}
             </Section>
-          )}
-          {result.predictive_insights?.length > 0 && (
-            <Section icon={<Zap className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-4"] }} />} title="Predictive Insights" color="chart-4">
+        }
+          {result.predictive_insights?.length > 0 &&
+        <Section icon={<Zap className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-4"] }} />} title="Predictive Insights" color="chart-4">
               {result.predictive_insights.map((s, i) => <Item key={i} text={s} />)}
             </Section>
-          )}
-          {result.phenotype_clusters?.length > 0 && (
-            <Section icon={<TrendingDown className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["accent"] }} />} title="Phenotype Clusters" color="accent">
+        }
+          {result.phenotype_clusters?.length > 0 &&
+        <Section icon={<TrendingDown className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["accent"] }} />} title="Phenotype Clusters" color="accent">
               {result.phenotype_clusters.map((s, i) => <Item key={i} text={s} />)}
             </Section>
-          )}
-          {result.anomalies?.length > 0 && (
-            <Section icon={<AlertCircle className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["destructive"] }} />} title="Anomalies" color="destructive">
+        }
+          {result.anomalies?.length > 0 &&
+        <Section icon={<AlertCircle className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["destructive"] }} />} title="Anomalies" color="destructive">
               {result.anomalies.map((a, i) => <Item key={i} text={`${a.session_date}: ${a.finding}`} />)}
             </Section>
-          )}
-          {!result.summary && !result.cascade_overview?.length && !result.predictive_insights?.length && (
-            <p className="text-xs text-muted-foreground italic">Analysis returned no content. Please try again.</p>
-          )}
+        }
+          {!result.summary && !result.cascade_overview?.length && !result.predictive_insights?.length &&
+        <p className="text-xs text-muted-foreground italic">Analysis returned no content. Please try again.</p>
+        }
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
@@ -395,8 +395,8 @@ export default function CascadeAnalysis() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+      </div>);
+
   }
 
   if (sessions.length === 0) {
@@ -404,8 +404,8 @@ export default function CascadeAnalysis() {
       <div className="flex flex-col items-center justify-center h-64 gap-2 text-center px-6">
         <Activity className="w-10 h-10 text-muted-foreground" />
         <p className="text-muted-foreground text-sm">No sessions with climax markers found. Set climax markers in a session to enable cascade analysis.</p>
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -417,22 +417,22 @@ export default function CascadeAnalysis() {
 
       {/* Window selector */}
       <div className="flex gap-1 flex-wrap">
-        {[60, 120, 180, 300].map((w) => (
-          <Button key={w} size="sm" variant={windowSec === w ? "default" : "outline"} className="h-7 text-xs" onClick={() => setWindowSec(w)}>
+        {[60, 120, 180, 300].map((w) =>
+        <Button key={w} size="sm" variant={windowSec === w ? "default" : "outline"} className="h-7 text-xs" onClick={() => setWindowSec(w)}>
             ±{w / 60}m
           </Button>
-        ))}
+        )}
       </div>
 
-      {eligibleSessions.length === 0 && (
-        <div className="bg-muted/40 rounded-xl p-4 text-sm text-muted-foreground text-center">
+      {eligibleSessions.length === 0 &&
+      <div className="bg-muted/40 rounded-xl p-4 text-sm text-muted-foreground text-center">
           Sessions have climax markers but no imported HR data. Upload HR CSVs to enable cascade visualizations.
         </div>
-      )}
+      }
 
       {/* Overlaid HR curves */}
-      {eligibleSessions.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+      {eligibleSessions.length > 0 &&
+      <div className="bg-card rounded-xl border border-border p-4 space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Aligned HR Cascade (time relative to climax)</h3>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
@@ -441,48 +441,48 @@ export default function CascadeAnalysis() {
                 <XAxis dataKey="rel" tick={{ fontSize: 9 }} tickFormatter={fmtRel} />
                 <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
                 <Tooltip
-                  labelFormatter={(v) => `Climax ${fmtRel(Number(v))}`}
-                  formatter={(val, name) => [
-                    val ? `${val} bpm` : "—",
-                    name === "_avg" ? "Avg" : (eligibleSessions.find((s) => s.id === name)?.date?.slice(0, 10) || name),
-                  ]}
-                  contentStyle={{ fontSize: 10 }}
-                />
+                labelFormatter={(v) => `Climax ${fmtRel(Number(v))}`}
+                formatter={(val, name) => [
+                val ? `${val} bpm` : "—",
+                name === "_avg" ? "Avg" : eligibleSessions.find((s) => s.id === name)?.date?.slice(0, 10) || name]
+                }
+                contentStyle={{ fontSize: 10 }} />
+              
                 <ReferenceLine x={0} stroke="#ef4444" strokeWidth={2} label={{ value: "Climax", fontSize: 8, fill: "#ef4444", position: "top" }} />
-                {eligibleSessions.map((s, i) => (
-                  <Line key={s.id} type="monotone" dataKey={s.id} stroke={PHASE_COLORS[i % PHASE_COLORS.length]} strokeWidth={1} dot={false} strokeOpacity={0.4} connectNulls isAnimationActive={false} />
-                ))}
+                {eligibleSessions.map((s, i) =>
+              <Line key={s.id} type="monotone" dataKey={s.id} stroke={PHASE_COLORS[i % PHASE_COLORS.length]} strokeWidth={1} dot={false} strokeOpacity={0.4} connectNulls isAnimationActive={false} />
+              )}
                 <Line type="monotone" dataKey="_avg" stroke="#ffffff" strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} name="Avg" />
               </LineChart>
             </ResponsiveContainer>
           </div>
           <p className="text-[10px] text-muted-foreground">White line = population average. Colored lines = individual sessions.</p>
         </div>
-      )}
+      }
 
       {/* Heatmap */}
-      {alignedData.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+      {alignedData.length > 0 &&
+      <div className="bg-card rounded-xl border border-border p-4 space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR Heatmap (sessions × time)</h3>
           <div className="overflow-x-auto">
             <table className="border-separate border-spacing-0.5">
               <thead>
                 <tr>
                   <th className="text-[8px] text-muted-foreground text-left pr-2 font-normal w-12">Session</th>
-                  {buckets.filter((_, i) => i % 4 === 0).map((t) => (
-                    <th key={t} className="text-[7px] text-muted-foreground font-normal" colSpan={4}>{fmtRel(t)}</th>
-                  ))}
+                  {buckets.filter((_, i) => i % 4 === 0).map((t) =>
+                <th key={t} className="text-[7px] text-muted-foreground font-normal" colSpan={4}>{fmtRel(t)}</th>
+                )}
                 </tr>
               </thead>
               <tbody>
-                {alignedData.map(({ session, series }) => (
-                  <tr key={session.id}>
+                {alignedData.map(({ session, series }) =>
+              <tr key={session.id}>
                     <td className="text-[8px] text-muted-foreground pr-2 whitespace-nowrap">{session.date?.slice(5, 10)}</td>
-                    {buckets.map((t) => (
-                      <HeatmapCell key={t} value={series[t]} min={hrMin} max={hrMax} />
-                    ))}
+                    {buckets.map((t) =>
+                <HeatmapCell key={t} value={series[t]} min={hrMin} max={hrMax} />
+                )}
                   </tr>
-                ))}
+              )}
               </tbody>
             </table>
           </div>
@@ -492,17 +492,17 @@ export default function CascadeAnalysis() {
             <span className="text-[9px] text-muted-foreground">{Math.round(hrMax)} bpm</span>
           </div>
         </div>
-      )}
+      }
 
       {/* Phase timing summary */}
-      {eligibleSessions.length > 0 && (
-        <PhaseSummary sessions={eligibleSessions} />
-      )}
+      {eligibleSessions.length > 0 &&
+      <PhaseSummary sessions={eligibleSessions} />
+      }
 
       {/* AI Panel */}
-      <AIInsightPanel sessions={(eligibleSessions.length > 0 ? eligibleSessions : sessions).map(s => ({ ...s, _hrRows: hrData[s.id] || [] }))} />
-    </div>
-  );
+      <AIInsightPanel sessions={(eligibleSessions.length > 0 ? eligibleSessions : sessions).map((s) => ({ ...s, _hrRows: hrData[s.id] || [] }))} />
+    </div>);
+
 }
 
 function PhaseSummary({ sessions }) {
@@ -520,18 +520,18 @@ function PhaseSummary({ sessions }) {
           <p className="text-[9px] text-muted-foreground uppercase">Sessions</p>
           <p className="text-2xl font-bold font-mono">{sessions.length}</p>
         </div>
-        {avgPre && (
-          <div className="bg-muted/50 rounded-lg p-3 text-center">
+        {avgPre &&
+        <div className="bg-muted/50 rounded-lg p-3 text-center">
             <p className="text-[9px] text-muted-foreground uppercase">Avg Build→Climax</p>
             <p className="text-xl font-bold font-mono text-chart-3">{fmtDur(avgPre)}</p>
           </div>
-        )}
-        {avgRec && (
-          <div className="bg-muted/50 rounded-lg p-3 text-center">
+        }
+        {avgRec &&
+        <div className="bg-muted/50 rounded-lg p-3 text-center">
             <p className="text-[9px] text-muted-foreground uppercase">Avg Recovery Onset</p>
             <p className="text-xl font-bold font-mono text-chart-2">{fmtDur(avgRec)}</p>
           </div>
-        )}
+        }
       </div>
       <div className="space-y-1.5">
         {sessions.map((s) => {
@@ -544,10 +544,10 @@ function PhaseSummary({ sessions }) {
               {recDur > 0 && <Badge variant="outline" className="text-[9px] h-5 px-1.5 text-chart-2 border-chart-2/30">Recovery +{fmtDur(recDur)}</Badge>}
               {s.intensity && <Badge variant="secondary" className="text-[9px] h-5 px-1.5">I:{s.intensity}</Badge>}
               {s.hr_at_climax && <Badge variant="secondary" className="text-[9px] h-5 px-1.5">♥ {s.hr_at_climax}</Badge>}
-            </div>
-          );
+            </div>);
+
         })}
       </div>
-    </div>
-  );
+    </div>);
+
 }
