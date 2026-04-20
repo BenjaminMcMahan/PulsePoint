@@ -7,10 +7,10 @@ import moment from "moment";
 
 function Item({ text }) {
   return (
-    <li className="text-sm text-foreground/90 leading-relaxed pl-3 border-l-2 border-primary/40 py-0.5">
+    <li className="text-[#ffffff] pl-3 py-0.5 text-sm leading-relaxed border-l-2 border-primary/40">
       {text}
-    </li>
-  );
+    </li>);
+
 }
 
 export default function BestSessionPanel({ sessions }) {
@@ -37,11 +37,11 @@ export default function BestSessionPanel({ sessions }) {
     const events = s.event_timeline || [];
     const cats = (ev) => Array.isArray(ev.category) ? ev.category : [ev.category].filter(Boolean);
     const sorted = [...events].sort((a, b) => a.time_s - b.time_s);
-    let total = 0, start = null;
+    let total = 0,start = null;
     for (const ev of sorted) {
       const c = cats(ev);
       if (c.includes("stimulation_paused") && start == null) start = ev.time_s;
-      if (c.includes("stimulation_resumed") && start != null) { total += ev.time_s - start; start = null; }
+      if (c.includes("stimulation_resumed") && start != null) {total += ev.time_s - start;start = null;}
     }
     return total;
   };
@@ -51,40 +51,40 @@ export default function BestSessionPanel({ sessions }) {
     try {
       const summaries = sessions.slice(0, 100).map((s) => {
         const h = s.start_time ? parseInt(s.start_time.split(":")[0], 10) : null;
-        const timeOfDay = h !== null
-          ? (h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night")
-          : undefined;
+        const timeOfDay = h !== null ?
+        h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night" :
+        undefined;
         return {
-        id: s.id,
-        date: s.date?.slice(0, 10),
-        start_time_et: s.start_time || undefined,
-        time_of_day: timeOfDay,
-        duration_minutes: s.duration_minutes,
-        intensity: s.intensity,
-        satisfaction: s.satisfaction,
-        build_quality: s.build_quality,
-        build_type: s.build_type,
-        climax_duration: s.climax_duration,
-        mood: s.mood,
-        methods: s.methods,
-        avg_hr: s.avg_hr,
-        max_hr: s.max_hr,
-        hr_at_climax: s.hr_at_climax,
-        hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
-        ejaculate_volume: s.ejaculate_volume,
-        discomfort: s.discomfort,
-        discomfort_entries: s.discomfort_entries?.length ? s.discomfort_entries : undefined,
-        unusual_sensations: s.unusual_sensations || undefined,
-        notes: s.notes || undefined,
-        event_count: (s.event_timeline || []).length,
-        pause_time_s: calcPauseS(s) || undefined,
-        has_phase_markers: s.climax_offset_s != null,
-        pre_to_climax_s: (s.pre_climax_offset_s != null && s.climax_offset_s != null)
-          ? Math.round(s.climax_offset_s - s.pre_climax_offset_s) : undefined,
-        recovery_onset_s: (s.climax_offset_s != null && s.recovery_offset_s != null)
-          ? Math.round(s.recovery_offset_s - s.climax_offset_s) : undefined,
-        is_favorite: s.is_favorite || undefined,
-        tags: s.tags?.length ? s.tags : undefined,
+          id: s.id,
+          date: s.date?.slice(0, 10),
+          start_time_et: s.start_time || undefined,
+          time_of_day: timeOfDay,
+          duration_minutes: s.duration_minutes,
+          intensity: s.intensity,
+          satisfaction: s.satisfaction,
+          build_quality: s.build_quality,
+          build_type: s.build_type,
+          climax_duration: s.climax_duration,
+          mood: s.mood,
+          methods: s.methods,
+          avg_hr: s.avg_hr,
+          max_hr: s.max_hr,
+          hr_at_climax: s.hr_at_climax,
+          hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
+          ejaculate_volume: s.ejaculate_volume,
+          discomfort: s.discomfort,
+          discomfort_entries: s.discomfort_entries?.length ? s.discomfort_entries : undefined,
+          unusual_sensations: s.unusual_sensations || undefined,
+          notes: s.notes || undefined,
+          event_count: (s.event_timeline || []).length,
+          pause_time_s: calcPauseS(s) || undefined,
+          has_phase_markers: s.climax_offset_s != null,
+          pre_to_climax_s: s.pre_climax_offset_s != null && s.climax_offset_s != null ?
+          Math.round(s.climax_offset_s - s.pre_climax_offset_s) : undefined,
+          recovery_onset_s: s.climax_offset_s != null && s.recovery_offset_s != null ?
+          Math.round(s.recovery_offset_s - s.climax_offset_s) : undefined,
+          is_favorite: s.is_favorite || undefined,
+          tags: s.tags?.length ? s.tags : undefined
         }; // closes the object literal
       }); // closes the .map()
 
@@ -118,10 +118,10 @@ ${JSON.stringify(summaries, null, 2)}`,
             subjective_reasons: { type: "array", items: { type: "string" } },
             cascade_reasons: { type: "array", items: { type: "string" } },
             notable_details: { type: "array", items: { type: "string" } },
-            runner_up: { type: "string" },
+            runner_up: { type: "string" }
           },
-          required: ["session_id", "headline", "summary", "physiological_reasons", "subjective_reasons"],
-        },
+          required: ["session_id", "headline", "summary", "physiological_reasons", "subjective_reasons"]
+        }
       });
 
       const raw = typeof res === "string" ? JSON.parse(res) : res;
@@ -137,7 +137,7 @@ ${JSON.stringify(summaries, null, 2)}`,
       } else {
         const created = await base44.entities.SessionClusterAnalysis.create({
           best_session_result: parsed,
-          session_count: sessions.length,
+          session_count: sessions.length
         });
         setSavedId(created.id);
       }
@@ -153,42 +153,42 @@ ${JSON.stringify(summaries, null, 2)}`,
           <Trophy className="w-4 h-4" /> AI Best Session
         </h3>
         <div className="flex items-center gap-2">
-          {result && (
-            <TTSButton getText={() => {
-              const parts = [result.headline, result.summary];
-              [...(result.physiological_reasons || []), ...(result.subjective_reasons || []),
-               ...(result.cascade_reasons || []), ...(result.notable_details || [])].forEach((s) => parts.push(s));
-              if (result.runner_up) parts.push(result.runner_up);
-              return parts.filter(Boolean).join(". ");
-            }} />
-          )}
+          {result &&
+          <TTSButton getText={() => {
+            const parts = [result.headline, result.summary];
+            [...(result.physiological_reasons || []), ...(result.subjective_reasons || []),
+            ...(result.cascade_reasons || []), ...(result.notable_details || [])].forEach((s) => parts.push(s));
+            if (result.runner_up) parts.push(result.runner_up);
+            return parts.filter(Boolean).join(". ");
+          }} />
+          }
           <button
             onClick={runAnalysis}
             disabled={loading}
-            className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 disabled:opacity-50"
-          >
-            {loading
-              ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
-              : <><Brain className="w-3 h-3" />{result ? "Re-analyze" : "Find Best Session"}</>}
+            className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 disabled:opacity-50">
+            
+            {loading ?
+            <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</> :
+            <><Brain className="w-3 h-3" />{result ? "Re-analyze" : "Find Best Session"}</>}
           </button>
         </div>
       </div>
 
-      {!result && !loading && (
-        <p className="text-xs text-muted-foreground">
+      {!result && !loading &&
+      <p className="text-xs text-muted-foreground">
           AI analyzes all {sessions.length} sessions holistically — HR, cascade phases, satisfaction, events, notes, pauses, and more — to find your best session and explain why. Uses Claude Sonnet.
         </p>
-      )}
+      }
 
-      {loading && !result && (
-        <p className="text-xs text-muted-foreground animate-pulse">Analyzing all sessions to find the best one…</p>
-      )}
+      {loading && !result &&
+      <p className="text-xs text-muted-foreground animate-pulse">Analyzing all sessions to find the best one…</p>
+      }
 
-      {result && (
-        <div className="space-y-3">
+      {result &&
+      <div className="space-y-3">
           {/* Winner banner */}
-          {bestSession && (
-            <Link to={`/sessions/${bestSession.id}`}>
+          {bestSession &&
+        <Link to={`/sessions/${bestSession.id}`}>
               <div className="bg-primary/10 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-primary/15 transition-colors cursor-pointer">
                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
                   <Trophy className="w-5 h-5 text-primary-foreground" />
@@ -202,39 +202,39 @@ ${JSON.stringify(summaries, null, 2)}`,
                   </p>
                 </div>
                 <div className="ml-auto flex gap-2">
-                  {bestSession.intensity && (
-                    <div className="text-center">
+                  {bestSession.intensity &&
+              <div className="text-center">
                       <p className="text-base font-bold font-mono">{bestSession.intensity}</p>
                       <p className="text-[9px] text-muted-foreground">INT</p>
                     </div>
-                  )}
-                  {bestSession.satisfaction && (
-                    <div className="text-center">
+              }
+                  {bestSession.satisfaction &&
+              <div className="text-center">
                       <p className="text-base font-bold font-mono">{bestSession.satisfaction}</p>
                       <p className="text-[9px] text-muted-foreground">SAT</p>
                     </div>
-                  )}
-                  {bestSession.max_hr && (
-                    <div className="text-center">
+              }
+                  {bestSession.max_hr &&
+              <div className="text-center">
                       <p className="text-base font-bold font-mono">{bestSession.max_hr}</p>
                       <p className="text-[9px] text-muted-foreground">HR</p>
                     </div>
-                  )}
+              }
                 </div>
               </div>
             </Link>
-          )}
+        }
 
-          {result.headline && (
-            <p className="text-base font-semibold text-foreground">{result.headline}</p>
-          )}
+          {result.headline &&
+        <p className="text-base font-semibold text-foreground">{result.headline}</p>
+        }
 
-          {result.summary && (
-            <p className="text-sm text-foreground/90 leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
-          )}
+          {result.summary &&
+        <p className="text-sm text-foreground/90 leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
+        }
 
-          {result.physiological_reasons?.length > 0 && (
-            <div className="bg-muted/40 rounded-lg p-3 space-y-2">
+          {result.physiological_reasons?.length > 0 &&
+        <div className="bg-muted/40 rounded-lg p-3 space-y-2">
               <p className="text-xs font-semibold text-chart-1 flex items-center gap-1.5">
                 <Heart className="w-3.5 h-3.5" /> Physiological Factors
               </p>
@@ -242,10 +242,10 @@ ${JSON.stringify(summaries, null, 2)}`,
                 {result.physiological_reasons.map((s, i) => <Item key={i} text={s} />)}
               </ul>
             </div>
-          )}
+        }
 
-          {result.cascade_reasons?.length > 0 && (
-            <div className="bg-muted/40 rounded-lg p-3 space-y-2">
+          {result.cascade_reasons?.length > 0 &&
+        <div className="bg-muted/40 rounded-lg p-3 space-y-2">
               <p className="text-xs font-semibold text-accent flex items-center gap-1.5">
                 <Zap className="w-3.5 h-3.5" /> Cascade Quality
               </p>
@@ -253,10 +253,10 @@ ${JSON.stringify(summaries, null, 2)}`,
                 {result.cascade_reasons.map((s, i) => <Item key={i} text={s} />)}
               </ul>
             </div>
-          )}
+        }
 
-          {result.subjective_reasons?.length > 0 && (
-            <div className="bg-muted/40 rounded-lg p-3 space-y-2">
+          {result.subjective_reasons?.length > 0 &&
+        <div className="bg-muted/40 rounded-lg p-3 space-y-2">
               <p className="text-xs font-semibold text-chart-2 flex items-center gap-1.5">
                 <Star className="w-3.5 h-3.5" /> Subjective Factors
               </p>
@@ -264,10 +264,10 @@ ${JSON.stringify(summaries, null, 2)}`,
                 {result.subjective_reasons.map((s, i) => <Item key={i} text={s} />)}
               </ul>
             </div>
-          )}
+        }
 
-          {result.notable_details?.length > 0 && (
-            <div className="bg-muted/40 rounded-lg p-3 space-y-2">
+          {result.notable_details?.length > 0 &&
+        <div className="bg-muted/40 rounded-lg p-3 space-y-2">
               <p className="text-xs font-semibold text-chart-4 flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5" /> Notable Details
               </p>
@@ -275,16 +275,16 @@ ${JSON.stringify(summaries, null, 2)}`,
                 {result.notable_details.map((s, i) => <Item key={i} text={s} />)}
               </ul>
             </div>
-          )}
+        }
 
-          {result.runner_up && (
-            <div className="bg-muted/30 rounded-lg px-3 py-2">
+          {result.runner_up &&
+        <div className="bg-muted/30 rounded-lg px-3 py-2">
               <p className="text-xs font-semibold text-muted-foreground mb-0.5">Runner-up</p>
               <p className="text-sm text-foreground/80">{result.runner_up}</p>
             </div>
-          )}
+        }
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
