@@ -230,7 +230,7 @@ ${JSON.stringify(summaries, null, 2)}`,
         }
 
           {result.summary &&
-        <p className="text-sm text-foreground/90 leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
+        <p className="text-[#ffffff] pl-3 text-sm leading-relaxed border-l-2 border-primary">{result.summary}</p>
         }
 
           {result.physiological_reasons?.length > 0 &&
