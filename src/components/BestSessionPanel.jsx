@@ -280,7 +280,7 @@ ${JSON.stringify(summaries, null, 2)}`,
           {result.runner_up &&
         <div className="bg-muted/30 rounded-lg px-3 py-2">
               <p className="text-xs font-semibold text-muted-foreground mb-0.5">Runner-up</p>
-              <p className="text-sm text-foreground/80">{result.runner_up}</p>
+              <p className="text-[#ffffff] text-base">{result.runner_up}</p>
             </div>
         }
         </div>
