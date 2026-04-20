@@ -134,7 +134,7 @@ function ClusterCard({ cluster, index }) {
         </div>
       }
       {cluster.physiological_signature &&
-      <p className="text-sm text-foreground/75 border-l-2 border-border pl-2 italic leading-relaxed break-words">{cluster.physiological_signature}</p>
+      <p className="text-[#ffffff] pl-2 text-sm leading-relaxed border-l-2 border-border italic break-words">{cluster.physiological_signature}</p>
       }
       {cluster.recommendation &&
       <div className="bg-muted/60 rounded-lg p-3">
