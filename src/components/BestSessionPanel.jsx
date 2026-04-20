@@ -7,7 +7,7 @@ import moment from "moment";
 
 function Item({ text }) {
   return (
-    <li className="text-[#ffffff] pl-3 py-0.5 text-base leading-relaxed border-l-2 border-primary/40">
+    <li className="text-[#ffffff] pl-3 py-0.5 text-sm/3 leading-relaxed border-l-2 border-primary/40">
       {text}
     </li>);
 
