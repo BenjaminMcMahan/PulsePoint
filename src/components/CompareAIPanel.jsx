@@ -8,7 +8,7 @@ const SECTION_COLORS = {
   "chart-2": "hsl(var(--chart-2))",
   "chart-4": "hsl(var(--chart-4))",
   accent: "hsl(var(--accent))",
-  destructive: "hsl(var(--destructive))",
+  destructive: "hsl(var(--destructive))"
 };
 
 function Section({ icon, title, color, children }) {
@@ -18,14 +18,14 @@ function Section({ icon, title, color, children }) {
         {icon}{title}
       </p>
       <ul className="space-y-1.5">{children}</ul>
-    </div>
-  );
+    </div>);
+
 }
 
 function Item({ text }) {
   return (
-    <li className="text-sm text-foreground/90 leading-relaxed pl-3 border-l-2 border-primary/40 py-0.5">{text}</li>
-  );
+    <li className="text-[#ffffff] pl-3 py-0.5 text-sm leading-relaxed border-l-2 border-primary/40">{text}</li>);
+
 }
 
 export default function CompareAIPanel({ sessions }) {
@@ -58,29 +58,29 @@ export default function CompareAIPanel({ sessions }) {
     try {
       const summary = sessions.map((s) => {
         const h = s.start_time ? parseInt(s.start_time.split(":")[0], 10) : null;
-        const timeOfDay = h !== null
-          ? (h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night")
-          : undefined;
+        const timeOfDay = h !== null ?
+        h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night" :
+        undefined;
         return {
-        date: s.date?.slice(0, 10),
-        start_time_et: s.start_time || undefined,
-        time_of_day: timeOfDay,
-        duration_minutes: s.duration_minutes,
-        intensity: s.intensity,
-        satisfaction: s.satisfaction,
-        build_quality: s.build_quality,
-        build_type: s.build_type,
-        climax_duration: s.climax_duration,
-        mood: s.mood,
-        methods: s.methods,
-        avg_hr: s.avg_hr,
-        max_hr: s.max_hr,
-        hr_at_climax: s.hr_at_climax,
-        hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
-        hr_avg_at_climax_window: s.hr_avg_at_climax_window,
-        pre_climax_offset_s: s.pre_climax_offset_s,
-        climax_offset_s: s.climax_offset_s,
-        recovery_offset_s: s.recovery_offset_s,
+          date: s.date?.slice(0, 10),
+          start_time_et: s.start_time || undefined,
+          time_of_day: timeOfDay,
+          duration_minutes: s.duration_minutes,
+          intensity: s.intensity,
+          satisfaction: s.satisfaction,
+          build_quality: s.build_quality,
+          build_type: s.build_type,
+          climax_duration: s.climax_duration,
+          mood: s.mood,
+          methods: s.methods,
+          avg_hr: s.avg_hr,
+          max_hr: s.max_hr,
+          hr_at_climax: s.hr_at_climax,
+          hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
+          hr_avg_at_climax_window: s.hr_avg_at_climax_window,
+          pre_climax_offset_s: s.pre_climax_offset_s,
+          climax_offset_s: s.climax_offset_s,
+          recovery_offset_s: s.recovery_offset_s
         }; // closes the object literal
       }); // closes the .map()
 
@@ -104,10 +104,10 @@ Provide a structured comparative analysis.`,
             hr_comparison: { type: "array", items: { type: "string" } },
             phase_comparison: { type: "array", items: { type: "string" } },
             standout_session: { type: "string" },
-            recommendations: { type: "array", items: { type: "string" } },
+            recommendations: { type: "array", items: { type: "string" } }
           },
-          required: ["summary", "key_differences", "hr_comparison", "phase_comparison", "recommendations"],
-        },
+          required: ["summary", "key_differences", "hr_comparison", "phase_comparison", "recommendations"]
+        }
       });
 
       const raw = typeof res === "string" ? JSON.parse(res) : res;
@@ -134,60 +134,60 @@ Provide a structured comparative analysis.`,
         <div className="flex items-center gap-2">
           {result && <TTSButton getText={() => {
             const parts = [result.summary, result.standout_session];
-            result.key_differences?.forEach(s => parts.push(s));
-            result.hr_comparison?.forEach(s => parts.push(s));
-            result.phase_comparison?.forEach(s => parts.push(s));
-            result.recommendations?.forEach(s => parts.push(s));
+            result.key_differences?.forEach((s) => parts.push(s));
+            result.hr_comparison?.forEach((s) => parts.push(s));
+            result.phase_comparison?.forEach((s) => parts.push(s));
+            result.recommendations?.forEach((s) => parts.push(s));
             return parts.filter(Boolean).join('. ');
           }} />}
         <button
-          onClick={() => runAnalysis(savedId)}
-          disabled={loading}
-          className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 disabled:opacity-50"
-        >
-          {loading
-            ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
-            : <><Brain className="w-3 h-3" />Re-analyze</>}
+            onClick={() => runAnalysis(savedId)}
+            disabled={loading}
+            className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 disabled:opacity-50">
+            
+          {loading ?
+            <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</> :
+            <><Brain className="w-3 h-3" />Re-analyze</>}
         </button>
         </div>
       </div>
 
-      {loading && !result && (
-        <p className="text-xs text-muted-foreground animate-pulse">Running AI comparison analysis…</p>
-      )}
+      {loading && !result &&
+      <p className="text-xs text-muted-foreground animate-pulse">Running AI comparison analysis…</p>
+      }
 
-      {result && (
-        <div className="space-y-3">
-          {result.summary && (
-            <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
-          )}
-          {result.key_differences?.length > 0 && (
-            <Section icon={<AlertCircle className="w-3.5 h-3.5" />} title="Key Differences" color="chart-1">
+      {result &&
+      <div className="space-y-3">
+          {result.summary &&
+        <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
+        }
+          {result.key_differences?.length > 0 &&
+        <Section icon={<AlertCircle className="w-3.5 h-3.5" />} title="Key Differences" color="chart-1">
               {result.key_differences.map((s, i) => <Item key={i} text={s} />)}
             </Section>
-          )}
-          {result.hr_comparison?.length > 0 && (
-            <Section icon={<Activity className="w-3.5 h-3.5" />} title="Heart Rate Comparison" color="chart-2">
+        }
+          {result.hr_comparison?.length > 0 &&
+        <Section icon={<Activity className="w-3.5 h-3.5" />} title="Heart Rate Comparison" color="chart-2">
               {result.hr_comparison.map((s, i) => <Item key={i} text={s} />)}
             </Section>
-          )}
-          {result.phase_comparison?.length > 0 && (
-            <Section icon={<TrendingUp className="w-3.5 h-3.5" />} title="Phase Comparison" color="chart-4">
+        }
+          {result.phase_comparison?.length > 0 &&
+        <Section icon={<TrendingUp className="w-3.5 h-3.5" />} title="Phase Comparison" color="chart-4">
               {result.phase_comparison.map((s, i) => <Item key={i} text={s} />)}
             </Section>
-          )}
-          {result.standout_session && (
-            <Section icon={<Zap className="w-3.5 h-3.5" />} title="Standout Session" color="accent">
+        }
+          {result.standout_session &&
+        <Section icon={<Zap className="w-3.5 h-3.5" />} title="Standout Session" color="accent">
               <Item text={result.standout_session} />
             </Section>
-          )}
-          {result.recommendations?.length > 0 && (
-            <Section icon={<Lightbulb className="w-3.5 h-3.5" />} title="Recommendations" color="destructive">
+        }
+          {result.recommendations?.length > 0 &&
+        <Section icon={<Lightbulb className="w-3.5 h-3.5" />} title="Recommendations" color="destructive">
               {result.recommendations.map((s, i) => <Item key={i} text={s} />)}
             </Section>
-          )}
+        }
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
