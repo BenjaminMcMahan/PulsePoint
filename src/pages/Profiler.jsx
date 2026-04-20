@@ -497,7 +497,7 @@ Be interpretive and insightful — not just descriptive.`,
         <div className="bg-muted/60 rounded-lg p-3 space-y-2">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1 tracking-wider"><TrendingUp className="w-3 h-3" />Method → Build Type Correlations</p>
               {result.method_build_correlations.map((s, i) =>
-          <p key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</p>
+          <p key={i} className="text-[#ffffff] pl-3 text-sm leading-relaxed border-l-2 border-primary/40">• {s}</p>
           )}
             </div>
         }
@@ -505,7 +505,7 @@ Be interpretive and insightful — not just descriptive.`,
         <div className="bg-muted/60 rounded-lg p-3 space-y-2">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1 tracking-wider"><Activity className="w-3 h-3" />Cross-Cluster Insights</p>
               {result.cross_cluster_insights.map((s, i) =>
-          <p key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</p>
+          <p key={i} className="text-[#ffffff] pl-3 text-sm leading-relaxed border-l-2 border-primary/40">• {s}</p>
           )}
             </div>
         }
