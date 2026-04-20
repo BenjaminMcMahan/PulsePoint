@@ -303,7 +303,7 @@ Be interpretive, insightful, and research-oriented. Reference specific sessions 
           {result.physiological_interpretation &&
         <div className="bg-muted/60 rounded-lg p-3">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Physiological Interpretation</p>
-              <p className="text-sm text-foreground leading-relaxed">{result.physiological_interpretation}</p>
+              <p className="text-foreground text-base leading-relaxed">{result.physiological_interpretation}</p>
             </div>
         }
           {result.pattern_analysis?.length > 0 &&
