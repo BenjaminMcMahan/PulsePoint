@@ -25,9 +25,9 @@ function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
   const DROP_NEEDED = 6;
   const COOLDOWN_S = 30;
   const MIN_EVENT_DURATION_S = 10;
-  const MAX_EVENT_DURATION_S = (climaxOffsetS != null && preClimaxOffsetS != null)
-    ? Math.max(60, Math.abs(climaxOffsetS - preClimaxOffsetS) * 0.8)
-    : 180;
+  const MAX_EVENT_DURATION_S = climaxOffsetS != null && preClimaxOffsetS != null ?
+  Math.max(60, Math.abs(climaxOffsetS - preClimaxOffsetS) * 0.8) :
+  180;
   const climaxExcludeRadius = 90;
 
   let i = 0;
@@ -37,8 +37,8 @@ function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
     const t0 = Number(rows[i].time_offset_s);
     const hr0 = Number(rows[i].hr);
 
-    if (t0 < lastEventEnd + COOLDOWN_S) { i++; continue; }
-    if (climaxOffsetS != null && Math.abs(t0 - climaxOffsetS) < climaxExcludeRadius) { i++; continue; }
+    if (t0 < lastEventEnd + COOLDOWN_S) {i++;continue;}
+    if (climaxOffsetS != null && Math.abs(t0 - climaxOffsetS) < climaxExcludeRadius) {i++;continue;}
 
     let peakIdx = i;
     let peakHr = hr0;
@@ -51,7 +51,7 @@ function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
       }
     }
 
-    if (peakHr - hr0 < RISE_THRESHOLD || peakIdx === i) { i++; continue; }
+    if (peakHr - hr0 < RISE_THRESHOLD || peakIdx === i) {i++;continue;}
 
     const peakTime = Number(rows[peakIdx].time_offset_s);
 
@@ -61,7 +61,7 @@ function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
       if (Number(rows[j].hr) >= peakHr - DROP_NEEDED / 2) plateauEnd = j;
     }
     const plateauDuration = Number(rows[plateauEnd].time_offset_s) - peakTime;
-    if (plateauDuration < PLATEAU_MIN_S * 0.5) { i = peakIdx + 1; continue; }
+    if (plateauDuration < PLATEAU_MIN_S * 0.5) {i = peakIdx + 1;continue;}
 
     let dropped = false;
     let dropIdx = plateauEnd;
@@ -73,10 +73,10 @@ function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
       }
     }
 
-    if (!dropped) { i = peakIdx + 1; continue; }
+    if (!dropped) {i = peakIdx + 1;continue;}
 
     const eventDuration = Number(rows[dropIdx].time_offset_s) - t0;
-    if (eventDuration < MIN_EVENT_DURATION_S || eventDuration > MAX_EVENT_DURATION_S) { i++; continue; }
+    if (eventDuration < MIN_EVENT_DURATION_S || eventDuration > MAX_EVENT_DURATION_S) {i++;continue;}
 
     events.push({
       start_offset_s: t0,
@@ -85,7 +85,7 @@ function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
       base_hr: Math.round(hr0),
       peak_hr: Math.round(peakHr),
       rise_bpm: Math.round(peakHr - hr0),
-      duration_s: Math.round(eventDuration),
+      duration_s: Math.round(eventDuration)
     });
 
     lastEventEnd = Number(rows[dropIdx].time_offset_s);
@@ -104,8 +104,8 @@ function SectionCard({ icon, title, color, children }) {
         {icon}{title}
       </h3>
       {children}
-    </div>
-  );
+    </div>);
+
 }
 
 function ClusterCard({ cluster, index }) {
@@ -122,27 +122,27 @@ function ClusterCard({ cluster, index }) {
           {cluster.build_type_tendency || "Mixed"}
         </Badge>
       </div>
-      <p className="text-sm text-foreground/85 leading-relaxed break-words">{cluster.description}</p>
-      {cluster.defining_methods?.length > 0 && (
-        <div>
+      <p className="text-[#ffffff] text-base leading-relaxed break-words">{cluster.description}</p>
+      {cluster.defining_methods?.length > 0 &&
+      <div>
           <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Key Methods</p>
           <div className="flex flex-wrap gap-1">
-            {cluster.defining_methods.map((m, i) => (
-              <Badge key={i} variant="secondary" className="text-[9px]">{m}</Badge>
-            ))}
+            {cluster.defining_methods.map((m, i) =>
+          <Badge key={i} variant="secondary" className="text-[9px]">{m}</Badge>
+          )}
           </div>
         </div>
-      )}
-      {cluster.physiological_signature && (
-        <p className="text-sm text-foreground/75 border-l-2 border-border pl-2 italic leading-relaxed break-words">{cluster.physiological_signature}</p>
-      )}
-      {cluster.recommendation && (
-        <div className="bg-muted/60 rounded-lg p-3">
+      }
+      {cluster.physiological_signature &&
+      <p className="text-sm text-foreground/75 border-l-2 border-border pl-2 italic leading-relaxed break-words">{cluster.physiological_signature}</p>
+      }
+      {cluster.recommendation &&
+      <div className="bg-muted/60 rounded-lg p-3">
           <p className="text-sm text-foreground leading-relaxed break-words">{cluster.recommendation}</p>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
 
 function NearClimaxPanel({ sessions, allTimelines }) {
@@ -173,7 +173,7 @@ function NearClimaxPanel({ sessions, allTimelines }) {
       if (events.length > 0) {
         sessionEvents.push({
           date: session.date?.slice(0, 10),
-          session_duration_s: Math.round(Math.max(...rows.map(r => Number(r.time_offset_s)))),
+          session_duration_s: Math.round(Math.max(...rows.map((r) => Number(r.time_offset_s)))),
           climax_offset_s: session.climax_offset_s,
           methods: session.methods,
           intensity: session.intensity,
@@ -181,7 +181,7 @@ function NearClimaxPanel({ sessions, allTimelines }) {
           event_count: events.length,
           total_time_in_events_s: Math.round(events.reduce((a, e) => a + e.duration_s, 0)),
           avg_rise_bpm: Math.round(events.reduce((a, e) => a + e.rise_bpm, 0) / events.length),
-          max_peak_hr: Math.max(...events.map(e => e.peak_hr)),
+          max_peak_hr: Math.max(...events.map((e) => e.peak_hr))
         });
       }
     }
@@ -190,7 +190,7 @@ function NearClimaxPanel({ sessions, allTimelines }) {
     const stats = {
       sessions_with_events: sessionEvents.length,
       total_events: totalEvents,
-      avg_events_per_session: sessionEvents.length ? (totalEvents / sessionEvents.length).toFixed(1) : 0,
+      avg_events_per_session: sessionEvents.length ? (totalEvents / sessionEvents.length).toFixed(1) : 0
     };
     setEventStats(stats);
 
@@ -219,10 +219,10 @@ Be interpretive, insightful, and research-oriented. Reference specific sessions 
           pattern_analysis: { type: "array", items: { type: "string" } },
           contextual_triggers: { type: "array", items: { type: "string" } },
           role_in_arousal_arc: { type: "string" },
-          recommendations: { type: "array", items: { type: "string" } },
+          recommendations: { type: "array", items: { type: "string" } }
         },
-        required: ["summary", "physiological_interpretation", "pattern_analysis", "contextual_triggers", "role_in_arousal_arc", "recommendations"],
-      },
+        required: ["summary", "physiological_interpretation", "pattern_analysis", "contextual_triggers", "role_in_arousal_arc", "recommendations"]
+      }
     });
 
     const raw = typeof res === "string" ? JSON.parse(res) : res;
@@ -253,99 +253,99 @@ Be interpretive, insightful, and research-oriented. Reference specific sessions 
         <div className="flex items-center gap-2">
           {result && <TTSButton getText={() => {
             const parts = [result.summary, result.physiological_interpretation, result.role_in_arousal_arc];
-            result.pattern_analysis?.forEach(s => parts.push(s));
-            result.contextual_triggers?.forEach(s => parts.push(s));
-            result.recommendations?.forEach(s => parts.push(s));
+            result.pattern_analysis?.forEach((s) => parts.push(s));
+            result.contextual_triggers?.forEach((s) => parts.push(s));
+            result.recommendations?.forEach((s) => parts.push(s));
             return parts.filter(Boolean).join('. ');
           }} />}
         <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5 shrink-0 ml-2">
-          {loading
-            ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
-            : <><Brain className="w-3 h-3" />{result ? "Re-run" : "Analyze"}</>}
+          {loading ?
+            <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</> :
+            <><Brain className="w-3 h-3" />{result ? "Re-run" : "Analyze"}</>}
         </Button>
         </div>
       </div>
 
-      {displayStats && (
-        <div className="grid grid-cols-3 gap-2">
+      {displayStats &&
+      <div className="grid grid-cols-3 gap-2">
           {[
-            ["Sessions w/ Events", displayStats.sessions_with_events],
-            ["Total Events", displayStats.total_events],
-            ["Avg per Session", displayStats.avg_events_per_session],
-          ].map(([l, v]) => (
-            <div key={l} className="bg-muted/50 rounded-lg p-2 text-center">
+        ["Sessions w/ Events", displayStats.sessions_with_events],
+        ["Total Events", displayStats.total_events],
+        ["Avg per Session", displayStats.avg_events_per_session]].
+        map(([l, v]) =>
+        <div key={l} className="bg-muted/50 rounded-lg p-2 text-center">
               <p className="text-lg font-bold font-mono">{v}</p>
               <p className="text-[9px] text-muted-foreground">{l}</p>
             </div>
-          ))}
+        )}
         </div>
-      )}
+      }
 
-      {displaySessionEvents?.length > 0 && (
-        <div className="space-y-1.5">
+      {displaySessionEvents?.length > 0 &&
+      <div className="space-y-1.5">
           <p className="text-[10px] text-muted-foreground uppercase font-semibold">Per Session</p>
-          {displaySessionEvents.map((s, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2 text-[10px]">
+          {displaySessionEvents.map((s, i) =>
+        <div key={i} className="flex flex-wrap items-center gap-2 text-[10px]">
               <span className="font-mono text-muted-foreground w-14 shrink-0">{s.date}</span>
               <Badge variant="outline" className="text-[9px] h-4 px-1">{s.event_count} events</Badge>
               <Badge variant="outline" className="text-[9px] h-4 px-1">{fmtSec(s.total_time_in_events_s)} total</Badge>
               <Badge variant="outline" className="text-[9px] h-4 px-1">+{s.avg_rise_bpm} bpm avg rise</Badge>
             </div>
-          ))}
+        )}
         </div>
-      )}
+      }
 
-      {result && (
-        <div className="space-y-3 pt-1">
-          {result.summary && (
-            <p className="text-base text-foreground leading-relaxed border-l-2 border-chart-3 pl-3 font-medium">{result.summary}</p>
-          )}
-          {result.physiological_interpretation && (
-            <div className="bg-muted/60 rounded-lg p-3">
+      {result &&
+      <div className="space-y-3 pt-1">
+          {result.summary &&
+        <p className="text-base text-foreground leading-relaxed border-l-2 border-chart-3 pl-3 font-medium">{result.summary}</p>
+        }
+          {result.physiological_interpretation &&
+        <div className="bg-muted/60 rounded-lg p-3">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Physiological Interpretation</p>
               <p className="text-sm text-foreground leading-relaxed">{result.physiological_interpretation}</p>
             </div>
-          )}
-          {result.pattern_analysis?.length > 0 && (
-            <div>
+        }
+          {result.pattern_analysis?.length > 0 &&
+        <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Pattern Analysis</p>
               <ul className="space-y-2">
-                {result.pattern_analysis.map((s, i) => (
-                  <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
-                ))}
+                {result.pattern_analysis.map((s, i) =>
+            <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
+            )}
               </ul>
             </div>
-          )}
-          {result.contextual_triggers?.length > 0 && (
-            <div>
+        }
+          {result.contextual_triggers?.length > 0 &&
+        <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Contextual Triggers</p>
               <ul className="space-y-2">
-                {result.contextual_triggers.map((s, i) => (
-                  <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
-                ))}
+                {result.contextual_triggers.map((s, i) =>
+            <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
+            )}
               </ul>
             </div>
-          )}
-          {result.role_in_arousal_arc && (
-            <div className="bg-muted/60 rounded-lg p-3">
+        }
+          {result.role_in_arousal_arc &&
+        <div className="bg-muted/60 rounded-lg p-3">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Role in Arousal Arc</p>
               <p className="text-sm text-foreground leading-relaxed">{result.role_in_arousal_arc}</p>
             </div>
-          )}
-          {result.recommendations?.length > 0 && (
-            <div>
+        }
+          {result.recommendations?.length > 0 &&
+        <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Recommendations</p>
               <ul className="space-y-2">
-                {result.recommendations.map((s, i) => (
-                  <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
-                ))}
+                {result.recommendations.map((s, i) =>
+            <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
+            )}
               </ul>
             </div>
-          )}
+        }
         </div>
-      )}
-    </SectionCard>
-  );
+      }
+    </SectionCard>);
+
 }
 
 function ClusterPanel({ sessions }) {
@@ -395,7 +395,7 @@ function ClusterPanel({ sessions }) {
       environment: s.environment,
       substances: s.substances,
       hydration: s.hydration,
-      tags: s.tags,
+      tags: s.tags
     }));
 
     const res = await base44.integrations.Core.InvokeLLM({
@@ -430,16 +430,16 @@ Be interpretive and insightful — not just descriptive.`,
                 build_type_tendency: { type: "string" },
                 typical_duration: { type: "string" },
                 physiological_signature: { type: "string" },
-                recommendation: { type: "string" },
+                recommendation: { type: "string" }
               },
-              required: ["name", "session_count", "description", "defining_methods", "recommendation"],
-            },
+              required: ["name", "session_count", "description", "defining_methods", "recommendation"]
+            }
           },
           method_build_correlations: { type: "array", items: { type: "string" } },
-          cross_cluster_insights: { type: "array", items: { type: "string" } },
+          cross_cluster_insights: { type: "array", items: { type: "string" } }
         },
-        required: ["overview", "clusters", "method_build_correlations", "cross_cluster_insights"],
-      },
+        required: ["overview", "clusters", "method_build_correlations", "cross_cluster_insights"]
+      }
     });
 
     const raw = typeof res === "string" ? JSON.parse(res) : res;
@@ -464,55 +464,55 @@ Be interpretive and insightful — not just descriptive.`,
         <div className="flex items-center gap-2">
           {result && <TTSButton getText={() => {
             const parts = [result.overview];
-            result.clusters?.forEach(c => parts.push(c.name + ': ' + c.description + '. ' + c.recommendation));
-            result.method_build_correlations?.forEach(s => parts.push(s));
-            result.cross_cluster_insights?.forEach(s => parts.push(s));
+            result.clusters?.forEach((c) => parts.push(c.name + ': ' + c.description + '. ' + c.recommendation));
+            result.method_build_correlations?.forEach((s) => parts.push(s));
+            result.cross_cluster_insights?.forEach((s) => parts.push(s));
             return parts.filter(Boolean).join('. ');
           }} />}
         <Button size="sm" onClick={analyze} disabled={loading || sessions.length < 4} className="h-7 text-xs gap-1.5 shrink-0 ml-2">
-          {loading
-            ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
-            : <><Brain className="w-3 h-3" />{result ? "Re-run" : "Analyze"}</>}
+          {loading ?
+            <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</> :
+            <><Brain className="w-3 h-3" />{result ? "Re-run" : "Analyze"}</>}
         </Button>
         </div>
       </div>
 
-      {sessions.length < 4 && (
-        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+      {sessions.length < 4 &&
+      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
           <AlertCircle className="w-3.5 h-3.5" /> Need at least 4 sessions for meaningful cluster detection.
         </p>
-      )}
+      }
 
-      {result && (
-        <div className="space-y-4">
-          {result.overview && (
-            <p className="text-base text-foreground leading-relaxed border-l-2 border-primary pl-3 font-medium">{result.overview}</p>
-          )}
-          {result.clusters?.length > 0 && (
-            <div className="space-y-3">
+      {result &&
+      <div className="space-y-4">
+          {result.overview &&
+        <p className="text-base text-foreground leading-relaxed border-l-2 border-primary pl-3 font-medium">{result.overview}</p>
+        }
+          {result.clusters?.length > 0 &&
+        <div className="space-y-3">
               {result.clusters.map((cluster, i) => <ClusterCard key={i} cluster={cluster} index={i} />)}
             </div>
-          )}
-          {result.method_build_correlations?.length > 0 && (
-            <div className="bg-muted/60 rounded-lg p-3 space-y-2">
+        }
+          {result.method_build_correlations?.length > 0 &&
+        <div className="bg-muted/60 rounded-lg p-3 space-y-2">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1 tracking-wider"><TrendingUp className="w-3 h-3" />Method → Build Type Correlations</p>
-              {result.method_build_correlations.map((s, i) => (
-                <p key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</p>
-              ))}
-            </div>
+              {result.method_build_correlations.map((s, i) =>
+          <p key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</p>
           )}
-          {result.cross_cluster_insights?.length > 0 && (
-            <div className="bg-muted/60 rounded-lg p-3 space-y-2">
+            </div>
+        }
+          {result.cross_cluster_insights?.length > 0 &&
+        <div className="bg-muted/60 rounded-lg p-3 space-y-2">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1 tracking-wider"><Activity className="w-3 h-3" />Cross-Cluster Insights</p>
-              {result.cross_cluster_insights.map((s, i) => (
-                <p key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</p>
-              ))}
-            </div>
+              {result.cross_cluster_insights.map((s, i) =>
+          <p key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</p>
           )}
+            </div>
+        }
         </div>
-      )}
-    </SectionCard>
-  );
+      }
+    </SectionCard>);
+
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
@@ -531,11 +531,11 @@ export default function Profiler() {
       const withData = all.filter((s) => s.climax_offset_s != null || s.avg_hr != null);
       const pairs = await Promise.all(
         withData.map((s) =>
-          base44.entities.HeartRateTimeline.filter({ session: s.id }, "time_offset_s", 5000).then((rows) => [s.id, rows])
+        base44.entities.HeartRateTimeline.filter({ session: s.id }, "time_offset_s", 5000).then((rows) => [s.id, rows])
         )
       );
       const map = {};
-      pairs.forEach(([id, rows]) => { if (rows.length > 0) map[id] = rows; });
+      pairs.forEach(([id, rows]) => {if (rows.length > 0) map[id] = rows;});
       setAllTimelines(map);
       setLoading(false);
     })();
@@ -545,8 +545,8 @@ export default function Profiler() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -558,6 +558,6 @@ export default function Profiler() {
 
       <ClusterPanel sessions={sessions} />
       <NearClimaxPanel sessions={sessions} allTimelines={allTimelines} />
-    </div>
-  );
+    </div>);
+
 }
