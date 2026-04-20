@@ -249,7 +249,7 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
           {result.cascade_quality &&
         <div className="bg-primary/10 rounded-lg px-3 py-2.5">
               <p className="text-xs font-semibold text-primary mb-1">Cascade Quality Assessment</p>
-              <p className="text-sm text-foreground leading-relaxed">{result.cascade_quality}</p>
+              <p className="text-foreground text-base leading-relaxed">{result.cascade_quality}</p>
             </div>
         }
         </div>
