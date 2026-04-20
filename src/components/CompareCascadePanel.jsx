@@ -8,7 +8,7 @@ const PHASE_COLORS = {
   build: "#6366f1",
   pre_climax: "#a855f7",
   climax: "#ef4444",
-  recovery: "#3b82f6",
+  recovery: "#3b82f6"
 };
 
 function Section({ color, icon, title, items }) {
@@ -19,12 +19,12 @@ function Section({ color, icon, title, items }) {
         {icon}{title}
       </p>
       <ul className="space-y-1">
-        {items.map((s, i) => (
-          <li key={i} className="text-sm text-foreground/90 leading-relaxed pl-2">• {s}</li>
-        ))}
+        {items.map((s, i) =>
+        <li key={i} className="text-[#ffffff] pl-2 text-sm leading-relaxed">• {s}</li>
+        )}
       </ul>
-    </div>
-  );
+    </div>);
+
 }
 
 export default function CompareCascadePanel({ sessions, timelineMap }) {
@@ -57,7 +57,7 @@ export default function CompareCascadePanel({ sessions, timelineMap }) {
         let bestDist = Math.abs(Number(rows[0].time_offset_s) - time_s);
         for (const r of rows) {
           const d = Math.abs(Number(r.time_offset_s) - time_s);
-          if (d < bestDist) { bestDist = d; best = r; }
+          if (d < bestDist) {bestDist = d;best = r;}
         }
         return Math.round(Number(best.hr));
       };
@@ -67,10 +67,10 @@ export default function CompareCascadePanel({ sessions, timelineMap }) {
         const hrAtPre = s.pre_climax_offset_s != null ? nearestHR(rows, s.pre_climax_offset_s) : null;
         const hrAtClimax = s.hr_at_climax || (s.climax_offset_s != null ? nearestHR(rows, s.climax_offset_s) : null);
         const hrAtRecovery = s.recovery_offset_s != null ? nearestHR(rows, s.recovery_offset_s) : null;
-        const buildDur = s.pre_climax_offset_s != null && s.climax_offset_s != null
-          ? Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null;
-        const recoveryOnset = s.recovery_offset_s != null && s.climax_offset_s != null
-          ? Math.round(s.recovery_offset_s - s.climax_offset_s) : null;
+        const buildDur = s.pre_climax_offset_s != null && s.climax_offset_s != null ?
+        Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null;
+        const recoveryOnset = s.recovery_offset_s != null && s.climax_offset_s != null ?
+        Math.round(s.recovery_offset_s - s.climax_offset_s) : null;
 
         return {
           label: moment(s.date).format("MMM D, YYYY"),
@@ -94,7 +94,7 @@ export default function CompareCascadePanel({ sessions, timelineMap }) {
           build_duration_s: buildDur,
           recovery_onset_s: recoveryOnset,
           ejaculate_volume: s.ejaculate_volume,
-          event_count: (s.event_timeline || []).length,
+          event_count: (s.event_timeline || []).length
         };
       });
 
@@ -117,10 +117,10 @@ Provide structured findings per phase, cross-session notable findings, and a sta
             climax_differences: { type: "array", items: { type: "string" } },
             recovery_differences: { type: "array", items: { type: "string" } },
             notable_findings: { type: "array", items: { type: "string" } },
-            standout: { type: "string" },
+            standout: { type: "string" }
           },
-          required: ["summary", "build_differences", "pre_climax_differences", "climax_differences", "recovery_differences", "notable_findings"],
-        },
+          required: ["summary", "build_differences", "pre_climax_differences", "climax_differences", "recovery_differences", "notable_findings"]
+        }
       });
 
       const raw = typeof res === "string" ? JSON.parse(res) : res;
@@ -145,56 +145,56 @@ Provide structured findings per phase, cross-session notable findings, and a sta
           <TrendingUp className="w-4 h-4" /> Comparative Cascade Analysis
         </h3>
         <div className="flex items-center gap-2">
-          {result && (
-            <TTSButton getText={() => {
-              const parts = [result.summary];
-              [...(result.build_differences || []), ...(result.pre_climax_differences || []),
-               ...(result.climax_differences || []), ...(result.recovery_differences || []),
-               ...(result.notable_findings || [])].forEach((s) => parts.push(s));
-              if (result.standout) parts.push(result.standout);
-              return parts.filter(Boolean).join(". ");
-            }} />
-          )}
+          {result &&
+          <TTSButton getText={() => {
+            const parts = [result.summary];
+            [...(result.build_differences || []), ...(result.pre_climax_differences || []),
+            ...(result.climax_differences || []), ...(result.recovery_differences || []),
+            ...(result.notable_findings || [])].forEach((s) => parts.push(s));
+            if (result.standout) parts.push(result.standout);
+            return parts.filter(Boolean).join(". ");
+          }} />
+          }
           <button
             onClick={() => runAnalysis(savedId)}
             disabled={loading}
-            className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 disabled:opacity-50"
-          >
-            {loading
-              ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
-              : <><Brain className="w-3 h-3" />{result ? "Re-analyze" : "Analyze"}</>}
+            className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 disabled:opacity-50">
+            
+            {loading ?
+            <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</> :
+            <><Brain className="w-3 h-3" />{result ? "Re-analyze" : "Analyze"}</>}
           </button>
         </div>
       </div>
 
-      {!result && !loading && (
-        <p className="text-xs text-muted-foreground">
+      {!result && !loading &&
+      <p className="text-xs text-muted-foreground">
           Compare cascade phases across all selected sessions — build, pre-climax, climax, and recovery differences. Uses Claude Sonnet.
         </p>
-      )}
+      }
 
-      {loading && !result && (
-        <p className="text-xs text-muted-foreground animate-pulse">Running comparative cascade analysis…</p>
-      )}
+      {loading && !result &&
+      <p className="text-xs text-muted-foreground animate-pulse">Running comparative cascade analysis…</p>
+      }
 
-      {result && (
-        <div className="space-y-3">
-          {result.summary && (
-            <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
-          )}
+      {result &&
+      <div className="space-y-3">
+          {result.summary &&
+        <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
+        }
           <Section color={PHASE_COLORS.build} icon={<Activity className="w-3.5 h-3.5" />} title="Build Phase Differences" items={result.build_differences} />
           <Section color={PHASE_COLORS.pre_climax} icon={<Zap className="w-3.5 h-3.5" />} title="Pre-Climax Differences" items={result.pre_climax_differences} />
           <Section color={PHASE_COLORS.climax} icon={<Flag className="w-3.5 h-3.5" />} title="Climax Differences" items={result.climax_differences} />
           <Section color={PHASE_COLORS.recovery} icon={<TrendingUp className="w-3.5 h-3.5" />} title="Recovery Differences" items={result.recovery_differences} />
           <Section color="#f59e0b" icon={<Lightbulb className="w-3.5 h-3.5" />} title="Notable Findings" items={result.notable_findings} />
-          {result.standout && (
-            <div className="bg-accent/10 rounded-lg px-3 py-2.5">
+          {result.standout &&
+        <div className="bg-accent/10 rounded-lg px-3 py-2.5">
               <p className="text-xs font-semibold text-accent mb-1">Standout Observation</p>
               <p className="text-sm text-foreground leading-relaxed">{result.standout}</p>
             </div>
-          )}
+        }
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
