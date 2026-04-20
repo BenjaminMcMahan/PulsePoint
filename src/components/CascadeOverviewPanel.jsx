@@ -30,7 +30,7 @@ function PhaseBlock({ color, icon, title, items }) {
       </p>
       <ul className="space-y-1">
         {items.map((s, i) =>
-        <li key={i} className="text-[#ffffff] pl-2 leading-relaxed">• {s}</li>
+        <li key={i} className="text-[#ffffff] pl-2">• {s}</li>
         )}
       </ul>
     </div>);
