@@ -311,7 +311,7 @@ Be interpretive, insightful, and research-oriented. Reference specific sessions 
               <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Pattern Analysis</p>
               <ul className="space-y-2">
                 {result.pattern_analysis.map((s, i) =>
-            <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
+            <li key={i} className="text-[#ffffff] pl-3 text-sm leading-relaxed border-l-2 border-primary/40">• {s}</li>
             )}
               </ul>
             </div>
