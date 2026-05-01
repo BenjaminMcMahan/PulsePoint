@@ -25,6 +25,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   const chunkQueueRef = useRef([]);      // chunks for current paragraph
   const remainingIdxRef = useRef([]);    // paragraph indices yet to speak
   const keepAliveRef = useRef(null);
+  const currentChunkRef = useRef(null);  // chunk currently being spoken
 
   const setS = (s) => { stateRef.current = s; setState(s); };
   const setCP = (i) => { currentParaRef.current = i; setCurrentPara(i); };
@@ -68,6 +69,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
     // Speak remaining chunks of current paragraph first
     if (chunkQueueRef.current.length > 0) {
       const chunk = chunkQueueRef.current.shift();
+      currentChunkRef.current = chunk;
       const utt = new SpeechSynthesisUtterance(chunk);
       utt.lang = "en-US";
       utt.rate = 0.95;
@@ -97,6 +99,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
     clearInterval(keepAliveRef.current);
     window.speechSynthesis.cancel();
     chunkQueueRef.current = [];
+    currentChunkRef.current = null;
     remainingIdxRef.current = paragraphs.map((_, i) => i).filter(i => i > idx);
     setCP(idx);
     setS("playing");
@@ -109,16 +112,20 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   const handlePlayPause = () => {
     if (!window.speechSynthesis) return;
     if (state === "playing") {
-      // Android-safe pause: cancel speech but preserve remaining chunk queue
+      // Android-safe pause: cancel speech but preserve queue
       clearInterval(keepAliveRef.current);
       window.speechSynthesis.cancel();
-      // chunkQueueRef and remainingIdxRef are left intact so resume continues from next chunk
+      // Re-prepend the chunk that was interrupted so it replays on resume
+      if (currentChunkRef.current) {
+        chunkQueueRef.current = [currentChunkRef.current, ...chunkQueueRef.current];
+        currentChunkRef.current = null;
+      }
       setS("paused");
       return;
     }
     if (state === "paused") {
       setS("playing");
-      // Resume from wherever we left off (chunkQueueRef still has remaining chunks)
+      // Resume from the re-prepended chunk (or next chunk if nothing was interrupted)
       setTimeout(() => speakNext(), 80);
       return;
     }
@@ -131,6 +138,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
     window.speechSynthesis.cancel();
     chunkQueueRef.current = [];
     remainingIdxRef.current = [];
+    currentChunkRef.current = null;
     setS("idle");
     setCP(-1);
   };
