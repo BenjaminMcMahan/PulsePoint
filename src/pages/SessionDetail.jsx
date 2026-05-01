@@ -403,7 +403,7 @@ export default function SessionDetail() {
         })()}
 
         {/* Cascade Overview AI */}
-        <CascadeOverviewPanel session={s} timelineRows={timelineRows} />
+        <CascadeOverviewPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />
 
         {/* AI Analysis */}
         <SessionAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />

@@ -27,7 +27,7 @@ function Section({ color, icon, title, items }) {
 
 }
 
-export default function CompareCascadePanel({ sessions, timelineMap }) {
+export default function CompareCascadePanel({ sessions, timelineMap, userProfile }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [savedId, setSavedId] = useState(null);
@@ -102,9 +102,23 @@ export default function CompareCascadePanel({ sessions, timelineMap }) {
         };
       });
 
+      const arousalProfile = userProfile && (userProfile.arousal_response_style || userProfile.arousal_notes || userProfile.climax_sensitivity) ? `
+
+USER AROUSAL PROFILE:
+${JSON.stringify({
+  arousal_response_style: userProfile.arousal_response_style,
+  typical_build_duration: userProfile.typical_build_duration,
+  climax_sensitivity: userProfile.climax_sensitivity,
+  preferred_stimulation: userProfile.preferred_stimulation,
+  refractory_pattern: userProfile.refractory_pattern,
+  arousal_notes: userProfile.arousal_notes,
+}, null, 2)}
+
+Use this profile to interpret cascade phase differences — compare observed arc shapes against the user's typical response style, and flag sessions where the cascade deviated meaningfully from their norm.` : "";
+
       const res = await base44.integrations.Core.InvokeLLM({
         model: "claude_sonnet_4_6",
-        prompt: `You are a physiological research assistant. Perform a comparative cascade analysis across ${sessions.length} sexual response sessions.
+        prompt: `You are a physiological research assistant. Perform a comparative cascade analysis across ${sessions.length} sexual response sessions.${arousalProfile}
 
 For each of the four cascade phases — Build, Pre-Climax, Climax, Recovery — identify meaningful differences and patterns between the sessions. Reference specific values (HR, timings, ratings). Focus on what changed between sessions and what those changes imply physiologically.
 

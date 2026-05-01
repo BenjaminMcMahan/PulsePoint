@@ -37,7 +37,7 @@ function PhaseBlock({ color, icon, title, items }) {
 
 }
 
-export default function CascadeOverviewPanel({ session, timelineRows }) {
+export default function CascadeOverviewPanel({ session, timelineRows, userProfile }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(session.ai_cascade ?? null);
 
@@ -85,9 +85,23 @@ export default function CascadeOverviewPanel({ session, timelineRows }) {
     h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night" :
     null;
 
+    const arousalProfile = userProfile && (userProfile.arousal_response_style || userProfile.arousal_notes || userProfile.climax_sensitivity) ? `
+
+USER AROUSAL PROFILE:
+${JSON.stringify({
+  arousal_response_style: userProfile.arousal_response_style,
+  typical_build_duration: userProfile.typical_build_duration,
+  climax_sensitivity: userProfile.climax_sensitivity,
+  preferred_stimulation: userProfile.preferred_stimulation,
+  refractory_pattern: userProfile.refractory_pattern,
+  arousal_notes: userProfile.arousal_notes,
+}, null, 2)}
+
+Use this arousal profile to contextualize the cascade — compare the observed build arc, phase durations, and recovery against the user's known response style. Note deviations and what factors may have caused them.` : "";
+
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant. Analyze the climax cascade arc of this single sexual response session in depth.
+      prompt: `You are a physiological research assistant. Analyze the climax cascade arc of this single sexual response session in depth.${arousalProfile}
 
 Focus exclusively on the four phases:
 1. BUILD (start of session → pre-climax marker): how arousal built, HR trajectory, event patterns, pacing

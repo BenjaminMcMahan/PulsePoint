@@ -129,11 +129,16 @@ export default function Compare() {
   const [timelines, setTimelines] = useState([]);
   const [loadingTimelines, setLoadingTimelines] = useState(false);
   const [timelineMap, setTimelineMap] = useState({});
+  const [userProfile, setUserProfile] = useState(null);
 
   useEffect(() => {
     (async () => {
-      const data = await base44.entities.Session.list("-date", 200);
+      const [data, profile] = await Promise.all([
+        base44.entities.Session.list("-date", 200),
+        base44.auth.me().catch(() => null),
+      ]);
       setSessions(data);
+      setUserProfile(profile);
       setLoading(false);
     })();
   }, []);
@@ -212,8 +217,8 @@ export default function Compare() {
               <CompareHRTimelineChart timelines={timelines} sessions={selectedSessions} />
             ) : null}
             <CompareStats sessions={selectedSessions} />
-            <CompareAIPanel sessions={selectedSessions} />
-            <CompareCascadePanel sessions={selectedSessions} timelineMap={timelineMap} />
+            <CompareAIPanel sessions={selectedSessions} userProfile={userProfile} />
+            <CompareCascadePanel sessions={selectedSessions} timelineMap={timelineMap} userProfile={userProfile} />
             <div className="flex gap-3 overflow-x-auto pb-4 snap-x">
               {selectedSessions.map((s) => <CompareColumn key={s.id} session={s} />)}
             </div>
@@ -224,7 +229,7 @@ export default function Compare() {
               {selectedSessions.map((s) => (
                 <div key={s.id} className="space-y-1">
                   <p className="text-xs text-muted-foreground font-semibold">{moment(s.date).format("MMM D, YYYY")}</p>
-                  <CascadeOverviewPanel session={s} timelineRows={timelineMap[s.id] || []} />
+                  <CascadeOverviewPanel session={s} timelineRows={timelineMap[s.id] || []} userProfile={userProfile} />
                 </div>
               ))}
             </div>

@@ -78,6 +78,7 @@ function AIInsightPanel({ sessions }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [savedId, setSavedId] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
 
   useEffect(() => {
     base44.entities.CascadeAnalysisResult.list("-updated_date", 1).then((rows) => {
@@ -86,6 +87,7 @@ function AIInsightPanel({ sessions }) {
         setSavedId(rows[0].id);
       }
     });
+    base44.auth.me().then((u) => setUserProfile(u)).catch(() => {});
   }, []);
 
   const analyze = async () => {
@@ -162,9 +164,23 @@ function AIInsightPanel({ sessions }) {
     Math.round(withRecovery.reduce((a, s) => a + s.cascade_shape.recovery_onset_s, 0) / withRecovery.length) :
     null;
 
+    const arousalProfile = userProfile && (userProfile.arousal_response_style || userProfile.arousal_notes || userProfile.climax_sensitivity) ? `
+
+USER AROUSAL PROFILE:
+${JSON.stringify({
+  arousal_response_style: userProfile.arousal_response_style,
+  typical_build_duration: userProfile.typical_build_duration,
+  climax_sensitivity: userProfile.climax_sensitivity,
+  preferred_stimulation: userProfile.preferred_stimulation,
+  refractory_pattern: userProfile.refractory_pattern,
+  arousal_notes: userProfile.arousal_notes,
+}, null, 2)}
+
+Use this profile throughout the analysis — compare observed cascade patterns against the user's known arousal response style. Note sessions that align with or deviate from their typical build arc, sensitivity, and refractory pattern.` : "";
+
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant analyzing sexual response cascade data across ${sessions.length} sessions.
+      prompt: `You are a physiological research assistant analyzing sexual response cascade data across ${sessions.length} sessions.${arousalProfile}
 
 Each session includes the full cascade arc: pre-climax buildup → climax peak → recovery onset.
 Where available, event notes are annotated with HR values and their timing relative to the climax marker.

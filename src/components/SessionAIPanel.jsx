@@ -81,6 +81,20 @@ export default function SessionAIPanel({ session, timelineRows, userProfile }) {
       return `[${catMeta.label}] ${m}:${s}${relStr} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ''}`;
     });
 
+    const arousalProfile = userProfile && (userProfile.arousal_response_style || userProfile.arousal_notes || userProfile.climax_sensitivity) ? `
+
+USER AROUSAL PROFILE:
+${JSON.stringify({
+  arousal_response_style: userProfile.arousal_response_style,
+  typical_build_duration: userProfile.typical_build_duration,
+  climax_sensitivity: userProfile.climax_sensitivity,
+  preferred_stimulation: userProfile.preferred_stimulation,
+  refractory_pattern: userProfile.refractory_pattern,
+  arousal_notes: userProfile.arousal_notes,
+}, null, 2)}
+
+Use this arousal profile to personalize analysis: compare the observed build arc and climax pattern against the user's known response style. Note deviations (e.g. faster/slower than typical, more/less sensitive). Reference preferred methods when interpreting session effectiveness.` : "";
+
     const profileContext = userProfile && (userProfile.age || userProfile.resting_hr || userProfile.max_hr || userProfile.medications || userProfile.recovery_hr_60s) ? `
 
 USER PHYSIOLOGICAL PROFILE:
@@ -100,7 +114,7 @@ Use this profile to compute Karvonen HR reserve zones (if resting + max HR avail
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
-      prompt: `You are a physiological research assistant analyzing a single sexual response session.${profileContext}${estimScreenshots.length > 0 ? `
+      prompt: `You are a physiological research assistant analyzing a single sexual response session.${profileContext}${arousalProfile}${estimScreenshots.length > 0 ? `
 
 IMPORTANT: ${estimScreenshots.length} E-Stim settings screenshot(s) from the Howl app are attached. Analyze the visible waveform types, frequencies, pulse widths, channel configurations, and intensity levels shown. Incorporate these E-Stim settings as a key factor in your physiological analysis — note how the specific settings likely contributed to the observed heart rate patterns, build quality, and climax response.` : ""}${eventTimeline.length > 0 ? `
 

@@ -44,6 +44,57 @@
         "athlete"
       ],
       "description": "Self-rated fitness level"
+    },
+    "arousal_response_style": {
+      "type": "string",
+      "enum": [
+        "gradual",
+        "rapid",
+        "stepwise",
+        "plateau-heavy",
+        "erratic"
+      ],
+      "description": "How arousal typically builds for this user"
+    },
+    "typical_build_duration": {
+      "type": "string",
+      "enum": [
+        "short (<10min)",
+        "medium (10-30min)",
+        "long (>30min)"
+      ],
+      "description": "Typical session build duration to climax"
+    },
+    "climax_sensitivity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "moderate",
+        "high",
+        "very high"
+      ],
+      "description": "General sensitivity / ease of reaching climax"
+    },
+    "preferred_stimulation": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Stimulation methods that produce best results"
+    },
+    "refractory_pattern": {
+      "type": "string",
+      "enum": [
+        "short (<15min)",
+        "medium (15-60min)",
+        "long (>1hr)",
+        "variable"
+      ],
+      "description": "Typical refractory period length"
+    },
+    "arousal_notes": {
+      "type": "string",
+      "description": "Free-text notes on arousal patterns, what works, what doesn't, unique characteristics"
     }
   },
   "required": [

@@ -28,7 +28,7 @@ function Item({ text }) {
 
 }
 
-export default function CompareAIPanel({ sessions }) {
+export default function CompareAIPanel({ sessions, userProfile }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [savedId, setSavedId] = useState(null);
@@ -90,9 +90,23 @@ export default function CompareAIPanel({ sessions }) {
         }; // closes the object literal
       }); // closes the .map()
 
+      const arousalProfile = userProfile && (userProfile.arousal_response_style || userProfile.arousal_notes || userProfile.climax_sensitivity) ? `
+
+USER AROUSAL PROFILE:
+${JSON.stringify({
+  arousal_response_style: userProfile.arousal_response_style,
+  typical_build_duration: userProfile.typical_build_duration,
+  climax_sensitivity: userProfile.climax_sensitivity,
+  preferred_stimulation: userProfile.preferred_stimulation,
+  refractory_pattern: userProfile.refractory_pattern,
+  arousal_notes: userProfile.arousal_notes,
+}, null, 2)}
+
+Use this profile to contextualize the comparison — note which sessions aligned with or deviated from the user's known arousal patterns. Reference preferred methods and typical response style when interpreting differences.` : "";
+
       const res = await base44.integrations.Core.InvokeLLM({
         model: "claude_sonnet_4_6",
-        prompt: `You are a physiological research assistant. Compare the following ${sessions.length} sexual response sessions side-by-side.
+        prompt: `You are a physiological research assistant. Compare the following ${sessions.length} sexual response sessions side-by-side.${arousalProfile}
 
 For each session, analyze the full cascade arc: Build Phase → Pre-Climax → Climax → Recovery.
 Focus on: HR trajectories, phase durations, build types, climax quality, recovery speed, and any event notes.

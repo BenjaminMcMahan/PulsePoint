@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { User, Heart, Activity, Pill, RefreshCw, CheckCircle } from "lucide-react";
+import { User, Heart, Activity, Pill, RefreshCw, CheckCircle, Flame } from "lucide-react";
 
 function Field({ label, hint, children }) {
   return (
@@ -26,6 +26,39 @@ function NumInput({ value, onChange, placeholder, min, max }) {
     />
   );
 }
+
+const AROUSAL_RESPONSE_OPTIONS = [
+  { value: "gradual", label: "Gradual" },
+  { value: "rapid", label: "Rapid" },
+  { value: "stepwise", label: "Stepwise" },
+  { value: "plateau-heavy", label: "Plateau-heavy" },
+  { value: "erratic", label: "Erratic" },
+];
+
+const BUILD_DURATION_OPTIONS = [
+  { value: "short (<10min)", label: "Short (<10min)" },
+  { value: "medium (10-30min)", label: "Medium (10–30min)" },
+  { value: "long (>30min)", label: "Long (>30min)" },
+];
+
+const SENSITIVITY_OPTIONS = [
+  { value: "low", label: "Low" },
+  { value: "moderate", label: "Moderate" },
+  { value: "high", label: "High" },
+  { value: "very high", label: "Very High" },
+];
+
+const REFRACTORY_OPTIONS = [
+  { value: "short (<15min)", label: "Short (<15min)" },
+  { value: "medium (15-60min)", label: "Medium (15–60min)" },
+  { value: "long (>1hr)", label: "Long (>1hr)" },
+  { value: "variable", label: "Variable" },
+];
+
+const PREFERRED_STIM_OPTIONS = [
+  "Foley Catheter", "Coyote E-Stim", "Silicone Sleeve", "TENS",
+  "Manual", "Vibration", "Edging", "Other"
+];
 
 const FITNESS_OPTIONS = [
   { value: "sedentary", label: "Sedentary" },
@@ -54,6 +87,12 @@ export default function Profile() {
         recovery_hr_60s: u.recovery_hr_60s ?? null,
         medications: u.medications ?? "",
         fitness_level: u.fitness_level ?? "moderate",
+        arousal_response_style: u.arousal_response_style ?? null,
+        typical_build_duration: u.typical_build_duration ?? null,
+        climax_sensitivity: u.climax_sensitivity ?? null,
+        preferred_stimulation: u.preferred_stimulation ?? [],
+        refractory_pattern: u.refractory_pattern ?? null,
+        arousal_notes: u.arousal_notes ?? "",
       });
     });
   }, []);
@@ -210,6 +249,113 @@ export default function Profile() {
             onChange={(e) => setForm((f) => ({ ...f, medications: e.target.value }))}
             placeholder="e.g. Metoprolol 25mg daily (beta-blocker)"
             rows={3}
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+          />
+        </Field>
+      </div>
+
+      {/* Arousal Profile */}
+      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+            <Flame className="w-3.5 h-3.5" /> Arousal Profile
+          </h2>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Describes your personal arousal arc — used by AI to personalize physiological interpretation and pattern analysis.
+          </p>
+        </div>
+
+        <Field label="Arousal Response Style" hint="How does your arousal typically build?">
+          <div className="flex flex-wrap gap-2 mt-1">
+            {AROUSAL_RESPONSE_OPTIONS.map((opt) => (
+              <button key={opt.value}
+                onClick={() => setForm((f) => ({ ...f, arousal_response_style: opt.value }))}
+                className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+                style={form.arousal_response_style === opt.value
+                  ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", borderColor: "hsl(var(--primary))" }
+                  : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="Typical Build Duration" hint="How long does it usually take to reach climax?">
+          <div className="flex flex-wrap gap-2 mt-1">
+            {BUILD_DURATION_OPTIONS.map((opt) => (
+              <button key={opt.value}
+                onClick={() => setForm((f) => ({ ...f, typical_build_duration: opt.value }))}
+                className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+                style={form.typical_build_duration === opt.value
+                  ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", borderColor: "hsl(var(--primary))" }
+                  : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Climax Sensitivity" hint="How easily do you reach climax?">
+            <div className="flex flex-wrap gap-2 mt-1">
+              {SENSITIVITY_OPTIONS.map((opt) => (
+                <button key={opt.value}
+                  onClick={() => setForm((f) => ({ ...f, climax_sensitivity: opt.value }))}
+                  className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+                  style={form.climax_sensitivity === opt.value
+                    ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", borderColor: "hsl(var(--primary))" }
+                    : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Refractory Pattern" hint="Typical recovery time after climax">
+            <div className="flex flex-wrap gap-2 mt-1">
+              {REFRACTORY_OPTIONS.map((opt) => (
+                <button key={opt.value}
+                  onClick={() => setForm((f) => ({ ...f, refractory_pattern: opt.value }))}
+                  className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+                  style={form.refractory_pattern === opt.value
+                    ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", borderColor: "hsl(var(--primary))" }
+                    : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+
+        <Field label="Preferred Stimulation Methods" hint="Methods that consistently produce good results">
+          <div className="flex flex-wrap gap-2 mt-1">
+            {PREFERRED_STIM_OPTIONS.map((opt) => {
+              const selected = (form.preferred_stimulation || []).includes(opt);
+              return (
+                <button key={opt}
+                  onClick={() => setForm((f) => ({
+                    ...f,
+                    preferred_stimulation: selected
+                      ? (f.preferred_stimulation || []).filter((x) => x !== opt)
+                      : [...(f.preferred_stimulation || []), opt]
+                  }))}
+                  className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+                  style={selected
+                    ? { background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))", borderColor: "hsl(var(--accent))" }
+                    : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+
+        <Field label="Arousal Notes" hint="Unique patterns, what consistently works or doesn't, edge cases — used directly by AI">
+          <textarea
+            value={form.arousal_notes ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, arousal_notes: e.target.value }))}
+            placeholder="e.g. Arousal builds slowly but climax is intense and long. E-stim on low frequency always extends the plateau phase. High stress days reduce sensitivity significantly."
+            rows={4}
             className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
           />
         </Field>
