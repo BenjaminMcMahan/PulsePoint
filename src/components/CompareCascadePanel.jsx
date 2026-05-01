@@ -94,7 +94,11 @@ export default function CompareCascadePanel({ sessions, timelineMap }) {
           build_duration_s: buildDur,
           recovery_onset_s: recoveryOnset,
           ejaculate_volume: s.ejaculate_volume,
-          event_count: (s.event_timeline || []).length
+          unusual_sensations: s.unusual_sensations || undefined,
+          discomfort_entries: s.discomfort_entries?.length ? s.discomfort_entries : undefined,
+          notes: s.notes || undefined,
+          tags: s.tags?.length ? s.tags : undefined,
+          event_count: (s.event_timeline || []).length,
         };
       });
 

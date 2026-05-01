@@ -80,7 +80,13 @@ export default function CompareAIPanel({ sessions }) {
           hr_avg_at_climax_window: s.hr_avg_at_climax_window,
           pre_climax_offset_s: s.pre_climax_offset_s,
           climax_offset_s: s.climax_offset_s,
-          recovery_offset_s: s.recovery_offset_s
+          recovery_offset_s: s.recovery_offset_s,
+          ejaculate_volume: s.ejaculate_volume,
+          unusual_sensations: s.unusual_sensations || undefined,
+          discomfort_entries: s.discomfort_entries?.length ? s.discomfort_entries : undefined,
+          notes: s.notes || undefined,
+          tags: s.tags?.length ? s.tags : undefined,
+          event_count: (s.event_timeline || []).length,
         }; // closes the object literal
       }); // closes the .map()
 
