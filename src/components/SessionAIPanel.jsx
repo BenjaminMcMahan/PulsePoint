@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Brain, AlertCircle, Activity, Lightbulb, TrendingUp, Zap } from "lucide-react";
-import TTSButton from "./TTSButton";
+import TTSReader from "./TTSReader";
 import { Button } from "@/components/ui/button";
 import { EVENT_CATEGORIES } from "./session-form/EventTimelineSection";
 
@@ -179,21 +179,11 @@ Provide a thorough physiological analysis of this individual session. Be specifi
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
           <Brain className="w-4 h-4" /> AI Session Analysis
         </h3>
-        <div className="flex items-center gap-2">
-          {result && <TTSButton getText={() => {
-            const parts = [result.summary];
-            result.hr_analysis?.forEach(s => parts.push(s));
-            result.phase_analysis?.forEach(s => parts.push(s));
-            result.notable_findings?.forEach(s => parts.push(s));
-            result.recommendations?.forEach(s => parts.push(s));
-            return parts.filter(Boolean).join('. ');
-          }} />}
         <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5">
           {loading
             ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
             : <><Brain className="w-3 h-3" />Analyze</>}
         </Button>
-        </div>
       </div>
 
       {!result && !loading && (
@@ -202,35 +192,50 @@ Provide a thorough physiological analysis of this individual session. Be specifi
         </p>
       )}
 
-      {result && (
-        <div className="space-y-3">
-          {result.summary && (
-            <p className="text-base text-foreground font-medium leading-relaxed border-l-2 border-primary pl-3">
-              {result.summary}
-            </p>
-          )}
-          {result.hr_analysis?.length > 0 && (
-            <Section icon={<Activity className="w-3.5 h-3.5" />} title="Heart Rate Analysis" color="chart-1">
-              {result.hr_analysis.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-          )}
-          {result.phase_analysis?.length > 0 && (
-            <Section icon={<TrendingUp className="w-3.5 h-3.5" />} title="Phase Analysis" color="chart-2">
-              {result.phase_analysis.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-          )}
-          {result.notable_findings?.length > 0 && (
-            <Section icon={<Zap className="w-3.5 h-3.5" />} title="Notable Findings" color="chart-4">
-              {result.notable_findings.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-          )}
-          {result.recommendations?.length > 0 && (
-            <Section icon={<Lightbulb className="w-3.5 h-3.5" />} title="Recommendations" color="accent">
-              {result.recommendations.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-          )}
-        </div>
-      )}
+      {result && (() => {
+        const paras = [
+          result.summary,
+          ...(result.hr_analysis || []),
+          ...(result.phase_analysis || []),
+          ...(result.notable_findings || []),
+          ...(result.recommendations || []),
+        ].filter(Boolean);
+
+        // Build a flat index → section label map for rendering
+        let idx = 0;
+        const sections = [];
+        if (result.summary) sections.push({ label: null, color: "primary", items: [result.summary], start: idx++ });
+        if (result.hr_analysis?.length) { sections.push({ label: "Heart Rate Analysis", color: "chart-1", icon: <Activity className="w-3.5 h-3.5" />, items: result.hr_analysis, start: idx }); idx += result.hr_analysis.length; }
+        if (result.phase_analysis?.length) { sections.push({ label: "Phase Analysis", color: "chart-2", icon: <TrendingUp className="w-3.5 h-3.5" />, items: result.phase_analysis, start: idx }); idx += result.phase_analysis.length; }
+        if (result.notable_findings?.length) { sections.push({ label: "Notable Findings", color: "chart-4", icon: <Zap className="w-3.5 h-3.5" />, items: result.notable_findings, start: idx }); idx += result.notable_findings.length; }
+        if (result.recommendations?.length) { sections.push({ label: "Recommendations", color: "accent", icon: <Lightbulb className="w-3.5 h-3.5" />, items: result.recommendations, start: idx }); }
+
+        return (
+          <TTSReader
+            paragraphs={paras}
+            renderParagraph={(text, paraIdx, isActive) => {
+              // Find which section this paragraph belongs to
+              let section = sections[0];
+              for (const sec of sections) {
+                if (paraIdx >= sec.start) section = sec;
+              }
+              const isSummary = section.label === null;
+              if (isSummary) {
+                return (
+                  <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md ${isActive ? "border-primary bg-primary/8 text-foreground" : "border-primary/50 text-foreground"}`}>
+                    {text}
+                  </p>
+                );
+              }
+              return (
+                <li className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md list-none ${isActive ? "border-primary bg-primary/8 text-foreground font-medium" : "border-primary/30 text-foreground"}`}>
+                  {text}
+                </li>
+              );
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

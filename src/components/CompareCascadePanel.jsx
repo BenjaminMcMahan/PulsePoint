@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { TrendingUp, Activity, Zap, Flag, Brain, Lightbulb } from "lucide-react";
-import TTSButton from "./TTSButton";
+import TTSReader from "./TTSReader";
 import moment from "moment";
 
 const PHASE_COLORS = {
@@ -145,16 +145,6 @@ Provide structured findings per phase, cross-session notable findings, and a sta
           <TrendingUp className="w-4 h-4" /> Comparative Cascade Analysis
         </h3>
         <div className="flex items-center gap-2">
-          {result &&
-          <TTSButton getText={() => {
-            const parts = [result.summary];
-            [...(result.build_differences || []), ...(result.pre_climax_differences || []),
-            ...(result.climax_differences || []), ...(result.recovery_differences || []),
-            ...(result.notable_findings || [])].forEach((s) => parts.push(s));
-            if (result.standout) parts.push(result.standout);
-            return parts.filter(Boolean).join(". ");
-          }} />
-          }
           <button
             onClick={() => runAnalysis(savedId)}
             disabled={loading}
@@ -177,24 +167,42 @@ Provide structured findings per phase, cross-session notable findings, and a sta
       <p className="text-xs text-muted-foreground animate-pulse">Running comparative cascade analysis…</p>
       }
 
-      {result &&
-      <div className="space-y-3">
-          {result.summary &&
-        <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
+      {result && (() => {
+        const PHASES = [
+          { key: "build_differences", color: PHASE_COLORS.build },
+          { key: "pre_climax_differences", color: PHASE_COLORS.pre_climax },
+          { key: "climax_differences", color: PHASE_COLORS.climax },
+          { key: "recovery_differences", color: PHASE_COLORS.recovery },
+          { key: "notable_findings", color: "#f59e0b" },
+        ];
+        const paras = [];
+        if (result.summary) paras.push({ text: result.summary, color: null });
+        for (const ph of PHASES) {
+          for (const item of (result[ph.key] || [])) paras.push({ text: item, color: ph.color });
         }
-          <Section color={PHASE_COLORS.build} icon={<Activity className="w-3.5 h-3.5" />} title="Build Phase Differences" items={result.build_differences} />
-          <Section color={PHASE_COLORS.pre_climax} icon={<Zap className="w-3.5 h-3.5" />} title="Pre-Climax Differences" items={result.pre_climax_differences} />
-          <Section color={PHASE_COLORS.climax} icon={<Flag className="w-3.5 h-3.5" />} title="Climax Differences" items={result.climax_differences} />
-          <Section color={PHASE_COLORS.recovery} icon={<TrendingUp className="w-3.5 h-3.5" />} title="Recovery Differences" items={result.recovery_differences} />
-          <Section color="#f59e0b" icon={<Lightbulb className="w-3.5 h-3.5" />} title="Notable Findings" items={result.notable_findings} />
-          {result.standout &&
-        <div className="bg-accent/10 rounded-lg px-3 py-2.5">
-              <p className="text-xs font-semibold text-accent mb-1">Standout Observation</p>
-              <p className="text-sm text-foreground leading-relaxed">{result.standout}</p>
-            </div>
-        }
-        </div>
-      }
+        if (result.standout) paras.push({ text: result.standout, color: "accent" });
+
+        return (
+          <TTSReader
+            paragraphs={paras.map(p => p.text)}
+            renderParagraph={(text, idx, isActive) => {
+              const meta = paras[idx];
+              return (
+                <p
+                  className={`text-sm pl-3 border-l-2 py-1 leading-relaxed transition-all duration-200 rounded-r-md ${isActive ? "font-medium" : ""}`}
+                  style={{
+                    borderColor: isActive ? (meta.color || "hsl(var(--primary))") : (meta.color ? meta.color + "66" : "hsl(var(--primary) / 0.4)"),
+                    background: isActive ? (meta.color ? meta.color + "18" : "hsl(var(--primary) / 0.08)") : "transparent",
+                    color: isActive ? "#fff" : meta.color ? "#ffffff" : "hsl(var(--foreground))",
+                  }}
+                >
+                  {text}
+                </p>
+              );
+            }}
+          />
+        );
+      })()}
     </div>);
 
 }

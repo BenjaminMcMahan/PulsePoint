@@ -1,24 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import { Play, Pause, Square } from "lucide-react";
 
-// Clean text for natural speech — replace symbols and units with spoken equivalents
-function cleanTextForSpeech(text) {
+// Clean text for natural speech
+export function cleanTextForSpeech(text) {
   return text
-    // Punctuation / bullets first
     .replace(/•/g, ". ")
     .replace(/·/g, ". ")
     .replace(/–|—/g, ", ")
-    // HR / physiological units
     .replace(/(\d+)\s*bpm/gi, "$1 beats per minute")
     .replace(/(\d+)\s*m(\d+)s/g, (_, m, s) => `${m} minute${m !== '1' ? 's' : ''} ${s} seconds`)
     .replace(/(\d+)\s*m(?=\b)/g, "$1 minutes")
     .replace(/(\d+)\s*s(?=\b)/g, "$1 seconds")
-    // Comparison symbols
     .replace(/>=/g, " greater than or equal to ")
     .replace(/<=/g, " less than or equal to ")
     .replace(/>/g, " greater than ")
     .replace(/</g, " less than ")
-    // Common symbols
     .replace(/±/g, " plus or minus ")
     .replace(/\+/g, " plus ")
     .replace(/\*/g, " times ")
@@ -28,7 +24,6 @@ function cleanTextForSpeech(text) {
     .replace(/←/g, " from ")
     .replace(/≈/g, " approximately ")
     .replace(/~(\d)/g, "approximately $1")
-    // Abbreviations
     .replace(/\bHR\b/g, "heart rate")
     .replace(/\bhr\b/g, "heart rate")
     .replace(/\bavg\b/gi, "average")
@@ -36,15 +31,13 @@ function cleanTextForSpeech(text) {
     .replace(/\bmin\b/g, "minimum")
     .replace(/\bI:(\d+)/g, "intensity $1")
     .replace(/♥/g, "heart rate")
-    // Remove leftover markdown-ish chars
     .replace(/[#_*`]/g, "")
-    // Collapse extra whitespace
     .replace(/\s{2,}/g, " ")
     .trim();
 }
 
-// Android Chrome silently drops long utterances — split into sentence chunks
-function splitIntoChunks(text, maxLen = 200) {
+// Split text into chunks safe for Android (< 180 chars)
+export function splitIntoChunks(text, maxLen = 180) {
   const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
   const chunks = [];
   let current = "";
@@ -60,24 +53,35 @@ function splitIntoChunks(text, maxLen = 200) {
   return chunks.length ? chunks : [text];
 }
 
+/**
+ * TTSButton — simple play/pause/stop button.
+ * Uses cancel+re-queue instead of pause/resume for Android compatibility.
+ * Includes background keepAlive to prevent Chrome from suspending speech.
+ */
 export default function TTSButton({ getText }) {
   const [state, setState] = useState("idle"); // idle | playing | paused
+  const stateRef = useRef("idle");
   const queueRef = useRef([]);
-  const pausedRef = useRef(false);
+  const keepAliveRef = useRef(null);
 
-  useEffect(() => () => window.speechSynthesis?.cancel(), []);
+  const setS = (s) => { stateRef.current = s; setState(s); };
+
+  useEffect(() => () => {
+    clearInterval(keepAliveRef.current);
+    window.speechSynthesis?.cancel();
+  }, []);
 
   const stop = () => {
+    clearInterval(keepAliveRef.current);
     queueRef.current = [];
-    pausedRef.current = false;
     window.speechSynthesis.cancel();
-    setState("idle");
+    setS("idle");
   };
 
   const speakNext = () => {
-    if (pausedRef.current) return;
+    if (stateRef.current !== "playing") return;
     const chunk = queueRef.current.shift();
-    if (!chunk) { setState("idle"); return; }
+    if (!chunk) { setS("idle"); return; }
 
     const utt = new SpeechSynthesisUtterance(chunk);
     utt.lang = "en-US";
@@ -85,42 +89,58 @@ export default function TTSButton({ getText }) {
     utt.volume = 1;
     utt.onend = () => speakNext();
     utt.onerror = (e) => {
-      if (e.error === "interrupted") return;
-      speakNext(); // skip bad chunk, continue
+      if (e.error !== "interrupted" && e.error !== "canceled") speakNext();
     };
     window.speechSynthesis.speak(utt);
   };
 
+  // Background keepAlive: poll every 8s while blurred to restart stalled synthesis
+  const startKeepAlive = () => {
+    clearInterval(keepAliveRef.current);
+    keepAliveRef.current = setInterval(() => {
+      if (stateRef.current !== "playing") { clearInterval(keepAliveRef.current); return; }
+      if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending && queueRef.current.length > 0) {
+        speakNext();
+      }
+    }, 8000);
+  };
+
+  useEffect(() => {
+    const onBlur = () => { if (stateRef.current === "playing") startKeepAlive(); };
+    const onFocus = () => {
+      clearInterval(keepAliveRef.current);
+      if (stateRef.current === "playing" && !window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+        setTimeout(() => speakNext(), 150);
+      }
+    };
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []); // eslint-disable-line
+
   const handlePress = () => {
     if (state === "playing") {
-      pausedRef.current = true;
-      window.speechSynthesis.pause();
-      setState("paused");
+      // Android-safe pause: cancel and keep remaining queue intact
+      clearInterval(keepAliveRef.current);
+      window.speechSynthesis.cancel();
+      setS("paused");
       return;
     }
-
     if (state === "paused") {
-      pausedRef.current = false;
-      window.speechSynthesis.resume();
-      // If resume doesn't work (Android bug), re-speak remaining queue
-      setTimeout(() => {
-        if (!window.speechSynthesis.speaking) speakNext();
-      }, 200);
-      setState("playing");
+      setS("playing");
+      setTimeout(() => speakNext(), 80);
       return;
     }
-
-    // idle → start
-    const rawText = getText();
-    if (!rawText?.trim()) return;
-
-    const text = cleanTextForSpeech(rawText);
+    // idle → start fresh
+    const raw = getText?.();
+    if (!raw?.trim()) return;
     window.speechSynthesis.cancel();
-    queueRef.current = splitIntoChunks(text);
-    pausedRef.current = false;
-    setState("playing");
-    // Small delay so cancel() settles before we start speaking
-    setTimeout(() => speakNext(), 100);
+    queueRef.current = splitIntoChunks(cleanTextForSpeech(raw));
+    setS("playing");
+    setTimeout(() => speakNext(), 80);
   };
 
   if (state === "idle") {

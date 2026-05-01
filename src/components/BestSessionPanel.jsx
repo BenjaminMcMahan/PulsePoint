@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Trophy, Brain, Star, Activity, Heart, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
-import TTSButton from "./TTSButton";
+import TTSReader from "./TTSReader";
 import moment from "moment";
 
 function Item({ text }) {
@@ -153,15 +153,6 @@ ${JSON.stringify(summaries, null, 2)}`,
           <Trophy className="w-4 h-4" /> AI Best Session
         </h3>
         <div className="flex items-center gap-2">
-          {result &&
-          <TTSButton getText={() => {
-            const parts = [result.headline, result.summary];
-            [...(result.physiological_reasons || []), ...(result.subjective_reasons || []),
-            ...(result.cascade_reasons || []), ...(result.notable_details || [])].forEach((s) => parts.push(s));
-            if (result.runner_up) parts.push(result.runner_up);
-            return parts.filter(Boolean).join(". ");
-          }} />
-          }
           <button
             onClick={runAnalysis}
             disabled={loading}
@@ -228,61 +219,28 @@ ${JSON.stringify(summaries, null, 2)}`,
           {result.headline &&
         <p className="text-base font-semibold text-foreground">{result.headline}</p>
         }
-
-          {result.summary &&
-        <p className="text-[#ffffff] pl-3 text-sm leading-relaxed border-l-2 border-primary">{result.summary}</p>
-        }
-
-          {result.physiological_reasons?.length > 0 &&
-        <div className="bg-muted/40 rounded-lg p-3 space-y-2">
-              <p className="text-xs font-semibold text-chart-1 flex items-center gap-1.5">
-                <Heart className="w-3.5 h-3.5" /> Physiological Factors
-              </p>
-              <ul className="space-y-1">
-                {result.physiological_reasons.map((s, i) => <Item key={i} text={s} />)}
-              </ul>
-            </div>
-        }
-
-          {result.cascade_reasons?.length > 0 &&
-        <div className="bg-muted/40 rounded-lg p-3 space-y-2">
-              <p className="text-xs font-semibold text-accent flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5" /> Cascade Quality
-              </p>
-              <ul className="space-y-1">
-                {result.cascade_reasons.map((s, i) => <Item key={i} text={s} />)}
-              </ul>
-            </div>
-        }
-
-          {result.subjective_reasons?.length > 0 &&
-        <div className="bg-muted/40 rounded-lg p-3 space-y-2">
-              <p className="text-xs font-semibold text-chart-2 flex items-center gap-1.5">
-                <Star className="w-3.5 h-3.5" /> Subjective Factors
-              </p>
-              <ul className="space-y-1">
-                {result.subjective_reasons.map((s, i) => <Item key={i} text={s} />)}
-              </ul>
-            </div>
-        }
-
-          {result.notable_details?.length > 0 &&
-        <div className="bg-muted/40 rounded-lg p-3 space-y-2">
-              <p className="text-xs font-semibold text-chart-4 flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5" /> Notable Details
-              </p>
-              <ul className="space-y-1">
-                {result.notable_details.map((s, i) => <Item key={i} text={s} />)}
-              </ul>
-            </div>
-        }
-
-          {result.runner_up &&
-        <div className="bg-muted/30 rounded-lg px-3 py-2">
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Runner-up</p>
-              <p className="text-[#ffffff] text-base">{result.runner_up}</p>
-            </div>
-        }
+          {(() => {
+            const paras = [
+              result.summary,
+              ...(result.physiological_reasons || []),
+              ...(result.cascade_reasons || []),
+              ...(result.subjective_reasons || []),
+              ...(result.notable_details || []),
+              ...(result.runner_up ? [result.runner_up] : []),
+            ].filter(Boolean);
+            return (
+              <TTSReader
+                paragraphs={paras}
+                renderParagraph={(text, idx, isActive) => (
+                  <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md ${
+                    isActive ? "border-primary bg-primary/10 text-foreground font-medium" : "border-primary/30 text-[#ffffff]"
+                  }`}>
+                    {text}
+                  </p>
+                )}
+              />
+            );
+          })()}
         </div>
       }
     </div>);

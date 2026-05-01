@@ -7,7 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Activity, TrendingDown, Clock, Zap, AlertCircle } from "lucide-react";
-import TTSButton from "../components/TTSButton";
+import TTSReader from "../components/TTSReader";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -232,16 +232,6 @@ Be specific, research-oriented, and reference actual data values where relevant.
           <Brain className="w-4 h-4" /> AI Cascade Analysis
         </h3>
         <div className="flex items-center gap-2">
-          {result && <TTSButton getText={() => {
-            const parts = [result.summary];
-            result.cascade_overview?.forEach((s) => parts.push(s));
-            result.event_note_patterns?.forEach((s) => parts.push(s));
-            result.common_signatures?.forEach((s) => parts.push(s));
-            result.predictive_insights?.forEach((s) => parts.push(s));
-            result.phenotype_clusters?.forEach((s) => parts.push(s));
-            result.anomalies?.forEach((a) => parts.push(`${a.session_date}: ${a.finding}`));
-            return parts.filter(Boolean).join('. ');
-          }} />}
         <Button size="sm" onClick={analyze} disabled={loading || sessions.length < 2} className="h-7 text-xs gap-1.5">
           {loading ?
             <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</> :
@@ -262,48 +252,34 @@ Be specific, research-oriented, and reference actual data values where relevant.
         </p>
       }
 
-      {result &&
-      <div className="space-y-4 text-xs">
-          {result.summary ?
-        <p className="text-base text-foreground font-medium leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p> :
+      {result && (() => {
+        const paras = [
+          result.summary,
+          ...(result.cascade_overview || []),
+          ...(result.event_note_patterns || []),
+          ...(result.common_signatures || []),
+          ...(result.predictive_insights || []),
+          ...(result.phenotype_clusters || []),
+          ...(result.anomalies || []).map((a) => `${a.session_date}: ${a.finding}`),
+        ].filter(Boolean);
 
-        <p className="text-xs text-muted-foreground italic">Analysis complete — no summary returned.</p>
-        }
-          {result.cascade_overview?.length > 0 &&
-        <Section icon={<Activity className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-1"] }} />} title="Cascade Overview" color="chart-1">
-              {result.cascade_overview.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-        }
-          {result.event_note_patterns?.length > 0 &&
-        <Section icon={<Clock className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-2"] }} />} title="Event Note Patterns" color="chart-2">
-              {result.event_note_patterns.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-        }
-          {result.common_signatures?.length > 0 &&
-        <Section icon={<TrendingDown className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["accent"] }} />} title="Common Signatures" color="accent">
-              {result.common_signatures.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-        }
-          {result.predictive_insights?.length > 0 &&
-        <Section icon={<Zap className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["chart-4"] }} />} title="Predictive Insights" color="chart-4">
-              {result.predictive_insights.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-        }
-          {result.phenotype_clusters?.length > 0 &&
-        <Section icon={<TrendingDown className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["accent"] }} />} title="Phenotype Clusters" color="accent">
-              {result.phenotype_clusters.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-        }
-          {result.anomalies?.length > 0 &&
-        <Section icon={<AlertCircle className="w-3.5 h-3.5" style={{ color: SECTION_COLORS["destructive"] }} />} title="Anomalies" color="destructive">
-              {result.anomalies.map((a, i) => <Item key={i} text={`${a.session_date}: ${a.finding}`} />)}
-            </Section>
-        }
-          {!result.summary && !result.cascade_overview?.length && !result.predictive_insights?.length &&
-        <p className="text-xs text-muted-foreground italic">Analysis returned no content. Please try again.</p>
-        }
-        </div>
-      }
+        if (!paras.length) return <p className="text-xs text-muted-foreground italic">Analysis returned no content. Please try again.</p>;
+
+        return (
+          <TTSReader
+            paragraphs={paras}
+            renderParagraph={(text, idx, isActive) => (
+              <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md ${
+                idx === 0
+                  ? isActive ? "border-primary bg-primary/10 text-foreground font-bold" : "border-primary text-foreground font-medium"
+                  : isActive ? "border-primary bg-primary/8 text-foreground font-medium" : "border-primary/30 text-[#ffffff]"
+              }`}>
+                {text}
+              </p>
+            )}
+          />
+        );
+      })()}
     </div>);
 
 }

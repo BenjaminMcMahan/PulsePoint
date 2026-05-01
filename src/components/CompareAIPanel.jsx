@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Brain, Activity, TrendingUp, Zap, Lightbulb, AlertCircle } from "lucide-react";
-import TTSButton from "./TTSButton";
+import TTSReader from "./TTSReader";
 
 const SECTION_COLORS = {
   "chart-1": "hsl(var(--chart-1))",
@@ -132,14 +132,6 @@ Provide a structured comparative analysis.`,
           <Brain className="w-4 h-4" /> AI Comparison Analysis
         </h3>
         <div className="flex items-center gap-2">
-          {result && <TTSButton getText={() => {
-            const parts = [result.summary, result.standout_session];
-            result.key_differences?.forEach((s) => parts.push(s));
-            result.hr_comparison?.forEach((s) => parts.push(s));
-            result.phase_comparison?.forEach((s) => parts.push(s));
-            result.recommendations?.forEach((s) => parts.push(s));
-            return parts.filter(Boolean).join('. ');
-          }} />}
         <button
             onClick={() => runAnalysis(savedId)}
             disabled={loading}
@@ -156,38 +148,36 @@ Provide a structured comparative analysis.`,
       <p className="text-xs text-muted-foreground animate-pulse">Running AI comparison analysis…</p>
       }
 
-      {result &&
-      <div className="space-y-3">
-          {result.summary &&
-        <p className="text-sm text-foreground leading-relaxed border-l-2 border-primary pl-3">{result.summary}</p>
-        }
-          {result.key_differences?.length > 0 &&
-        <Section icon={<AlertCircle className="w-3.5 h-3.5" />} title="Key Differences" color="chart-1">
-              {result.key_differences.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-        }
-          {result.hr_comparison?.length > 0 &&
-        <Section icon={<Activity className="w-3.5 h-3.5" />} title="Heart Rate Comparison" color="chart-2">
-              {result.hr_comparison.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-        }
-          {result.phase_comparison?.length > 0 &&
-        <Section icon={<TrendingUp className="w-3.5 h-3.5" />} title="Phase Comparison" color="chart-4">
-              {result.phase_comparison.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-        }
-          {result.standout_session &&
-        <Section icon={<Zap className="w-3.5 h-3.5" />} title="Standout Session" color="accent">
-              <Item text={result.standout_session} />
-            </Section>
-        }
-          {result.recommendations?.length > 0 &&
-        <Section icon={<Lightbulb className="w-3.5 h-3.5" />} title="Recommendations" color="destructive">
-              {result.recommendations.map((s, i) => <Item key={i} text={s} />)}
-            </Section>
-        }
-        </div>
-      }
+      {result && (() => {
+        const paras = [
+          result.summary,
+          ...(result.key_differences || []),
+          ...(result.hr_comparison || []),
+          ...(result.phase_comparison || []),
+          ...(result.standout_session ? [result.standout_session] : []),
+          ...(result.recommendations || []),
+        ].filter(Boolean);
+
+        return (
+          <TTSReader
+            paragraphs={paras}
+            renderParagraph={(text, idx, isActive) => {
+              const isSummary = text === result.summary;
+              return (
+                <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md ${
+                  isActive
+                    ? "border-primary bg-primary/10 text-foreground font-medium"
+                    : isSummary
+                    ? "border-primary/60 text-foreground"
+                    : "border-primary/30 text-[#ffffff]"
+                }`}>
+                  {text}
+                </p>
+              );
+            }}
+          />
+        );
+      })()}
     </div>);
 
 }

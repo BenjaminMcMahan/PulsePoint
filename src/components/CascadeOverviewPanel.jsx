@@ -2,7 +2,7 @@ import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Zap, Activity, Flag, Brain } from "lucide-react";
-import TTSButton from "./TTSButton";
+import TTSReader from "./TTSReader";
 import { EVENT_CATEGORIES } from "./session-form/EventTimelineSection";
 
 function getCategoryMeta(value) {
@@ -157,17 +157,6 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
           <TrendingUp className="w-4 h-4" /> Cascade Overview
         </h3>
         <div className="flex items-center gap-2">
-          {result &&
-          <TTSButton getText={() => {
-            const parts = [result.summary];
-            result.build_phase?.forEach((s) => parts.push(s));
-            result.pre_climax_phase?.forEach((s) => parts.push(s));
-            result.climax_phase?.forEach((s) => parts.push(s));
-            result.recovery_phase?.forEach((s) => parts.push(s));
-            if (result.cascade_quality) parts.push(result.cascade_quality);
-            return parts.filter(Boolean).join(". ");
-          }} />
-          }
           <Button
             size="sm"
             onClick={analyze}
@@ -215,45 +204,61 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
         </div>
       }
 
-      {result &&
-      <div className="space-y-3">
-          {result.summary &&
-        <p className="text-base text-foreground font-medium leading-relaxed border-l-2 border-primary pl-3">
-              {result.summary}
-            </p>
+      {result && (() => {
+        const PHASES = [
+          { key: "build_phase", color: "#6366f1", title: "Build Phase", icon: <Activity className="w-3.5 h-3.5" /> },
+          { key: "pre_climax_phase", color: "#a855f7", title: "Pre-Climax", icon: <Zap className="w-3.5 h-3.5" /> },
+          { key: "climax_phase", color: "#ef4444", title: "Climax", icon: <Flag className="w-3.5 h-3.5" /> },
+          { key: "recovery_phase", color: "#3b82f6", title: "Recovery", icon: <TrendingUp className="w-3.5 h-3.5" style={{ transform: "scaleY(-1)" }} /> },
+        ];
+
+        // Build flat paragraph list with metadata for rendering
+        const paras = [];
+        if (result.summary) paras.push({ text: result.summary, type: "summary", color: null });
+        for (const ph of PHASES) {
+          for (const item of (result[ph.key] || [])) {
+            paras.push({ text: item, type: "phase", color: ph.color, title: ph.title });
+          }
         }
-          <PhaseBlock
-          color="#6366f1"
-          icon={<Activity className="w-3.5 h-3.5" />}
-          title="Build Phase"
-          items={result.build_phase} />
-        
-          <PhaseBlock
-          color="#a855f7"
-          icon={<Zap className="w-3.5 h-3.5" />}
-          title="Pre-Climax"
-          items={result.pre_climax_phase} />
-        
-          <PhaseBlock
-          color="#ef4444"
-          icon={<Flag className="w-3.5 h-3.5" />}
-          title="Climax"
-          items={result.climax_phase} />
-        
-          <PhaseBlock
-          color="#3b82f6"
-          icon={<TrendingUp className="w-3.5 h-3.5" style={{ transform: "scaleY(-1)" }} />}
-          title="Recovery"
-          items={result.recovery_phase} />
-        
-          {result.cascade_quality &&
-        <div className="bg-primary/10 rounded-lg px-3 py-2.5">
-              <p className="text-xs font-semibold text-primary mb-1">Cascade Quality Assessment</p>
-              <p className="text-foreground text-base leading-relaxed">{result.cascade_quality}</p>
-            </div>
-        }
-        </div>
-      }
+        if (result.cascade_quality) paras.push({ text: result.cascade_quality, type: "quality", color: null });
+
+        return (
+          <TTSReader
+            paragraphs={paras.map(p => p.text)}
+            renderParagraph={(text, idx, isActive) => {
+              const meta = paras[idx];
+              if (meta.type === "summary") {
+                return (
+                  <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md ${isActive ? "border-primary bg-primary/8 text-foreground" : "border-primary/50 text-foreground"}`}>
+                    {text}
+                  </p>
+                );
+              }
+              if (meta.type === "quality") {
+                return (
+                  <div className={`rounded-lg px-3 py-2.5 transition-all duration-200 ${isActive ? "bg-primary/20" : "bg-primary/10"}`}>
+                    <p className="text-xs font-semibold text-primary mb-1">Cascade Quality Assessment</p>
+                    <p className="text-foreground text-sm leading-relaxed">{text}</p>
+                  </div>
+                );
+              }
+              // phase item
+              return (
+                <li
+                  className={`text-sm pl-3 border-l-2 py-1 leading-relaxed list-none transition-all duration-200 rounded-r-md`}
+                  style={{
+                    borderColor: isActive ? meta.color : meta.color + "66",
+                    background: isActive ? meta.color + "18" : "transparent",
+                    color: isActive ? "#fff" : "#a8b4cc",
+                  }}
+                >
+                  • {text}
+                </li>
+              );
+            }}
+          />
+        );
+      })()}
     </div>);
 
 }
