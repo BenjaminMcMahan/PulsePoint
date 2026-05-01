@@ -1,6 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { Play, Pause, Square } from "lucide-react";
 
+// Convert large raw-second values to spoken minutes + seconds
+function secondsToSpeech(n) {
+  const sec = Math.round(Number(n));
+  if (sec < 100) return `${sec} seconds`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return s === 0
+    ? `${m} minute${m !== 1 ? 's' : ''}`
+    : `${m} minute${m !== 1 ? 's' : ''} and ${s} seconds`;
+}
+
 // Clean text for natural speech
 export function cleanTextForSpeech(text) {
   return text
@@ -8,6 +19,9 @@ export function cleanTextForSpeech(text) {
     .replace(/·/g, ". ")
     .replace(/–|—/g, ", ")
     .replace(/(\d+)\s*bpm/gi, "$1 beats per minute")
+    // Convert "NNNs" or "NNN seconds" where NNN >= 100 into minutes+seconds
+    .replace(/\b(\d{3,})\s*seconds\b/gi, (_, n) => secondsToSpeech(n))
+    .replace(/\b(\d{3,})s\b/g, (_, n) => secondsToSpeech(n))
     .replace(/(\d+)\s*m(\d+)s/g, (_, m, s) => `${m} minute${m !== '1' ? 's' : ''} ${s} seconds`)
     .replace(/(\d+)\s*m(?=\b)/g, "$1 minutes")
     .replace(/(\d+)\s*s(?=\b)/g, "$1 seconds")
