@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Play, Pause, Square } from "lucide-react";
 import { cleanTextForSpeech, splitIntoChunks } from "./TTSButton";
+import { fmtSecondsInText } from "@/utils/formatSeconds";
 
 /**
  * TTSReader — paragraph-aware TTS component.
@@ -168,6 +169,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
 
       {/* Paragraphs */}
       {paragraphs.map((text, idx) => {
+        const displayText = fmtSecondsInText(text);
         const active = currentPara === idx && state === "playing";
         if (renderParagraph) {
           return (
@@ -176,7 +178,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
               onClick={() => isActive && startFrom(idx)}
               className={isActive ? "cursor-pointer" : ""}
             >
-              {renderParagraph(text, idx, active)}
+              {renderParagraph(displayText, idx, active)}
             </div>
           );
         }
@@ -192,7 +194,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
               isActive ? "cursor-pointer hover:border-primary/60 hover:bg-muted/40" : "",
             ].join(" ")}
           >
-            {text}
+            {displayText}
           </p>
         );
       })}
