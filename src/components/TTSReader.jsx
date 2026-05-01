@@ -93,6 +93,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   };
 
   const startFrom = (idx) => {
+    if (!window.speechSynthesis) return;
     clearInterval(keepAliveRef.current);
     window.speechSynthesis.cancel();
     chunkQueueRef.current = [];
@@ -106,6 +107,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   };
 
   const handlePlayPause = () => {
+    if (!window.speechSynthesis) return;
     if (state === "playing") {
       // Android-safe pause: cancel speech but preserve remaining chunk queue
       clearInterval(keepAliveRef.current);
