@@ -107,20 +107,16 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
 
   const handlePlayPause = () => {
     if (state === "playing") {
-      // Android-safe pause
+      // Android-safe pause: cancel speech but preserve remaining chunk queue
       clearInterval(keepAliveRef.current);
       window.speechSynthesis.cancel();
-      // Keep chunkQueueRef and remainingIdxRef intact — resume will restart current paragraph
-      chunkQueueRef.current = []; // restart current para from beginning (safest on Android)
+      // chunkQueueRef and remainingIdxRef are left intact so resume continues from next chunk
       setS("paused");
       return;
     }
     if (state === "paused") {
       setS("playing");
-      // Re-queue current paragraph from start, then remaining
-      const cur = currentParaRef.current >= 0 ? currentParaRef.current : 0;
-      remainingIdxRef.current = paragraphs.map((_, i) => i).filter(i => i > cur);
-      chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(paragraphs[cur] || ""));
+      // Resume from wherever we left off (chunkQueueRef still has remaining chunks)
       setTimeout(() => speakNext(), 80);
       return;
     }
