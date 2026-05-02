@@ -35,16 +35,22 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   const setS = (s) => { stateRef.current = s; setState(s); };
   const setCP = (i) => { currentParaRef.current = i; setCurrentPara(i); };
 
-  // Load voices (they may load async)
+  // Load voices (they may load async — Chrome fires voiceschanged, Safari has them immediately)
   useEffect(() => {
     const loadVoices = () => {
       resetVoiceCache();
       const voices = getEnglishVoices();
-      setAvailableVoices(voices);
+      if (voices.length > 0) setAvailableVoices(voices);
     };
+    // Try immediately
     loadVoices();
+    // Also try after a short delay (Chrome needs this)
+    const t = setTimeout(loadVoices, 200);
     window.speechSynthesis?.addEventListener("voiceschanged", loadVoices);
-    return () => window.speechSynthesis?.removeEventListener("voiceschanged", loadVoices);
+    return () => {
+      clearTimeout(t);
+      window.speechSynthesis?.removeEventListener("voiceschanged", loadVoices);
+    };
   }, []);
 
   // Keep selectedVoiceRef in sync
@@ -194,8 +200,8 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
             Tap any paragraph to jump
           </span>
         )}
-        {/* Voice picker */}
-        {availableVoices.length > 1 && (
+        {/* Voice picker — always show if any voices loaded */}
+        {availableVoices.length > 0 && (
           <div className="relative ml-auto">
             <button
               onClick={() => setShowVoicePicker(v => !v)}
