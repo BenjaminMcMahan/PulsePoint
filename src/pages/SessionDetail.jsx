@@ -263,7 +263,7 @@ export default function SessionDetail() {
         </AlertDialog>
       </div>
 
-      <div className="px-4 py-4 space-y-4 pb-8">
+      <div className="px-2 md:px-4 py-4 space-y-4 pb-8">
         {/* Executive Summary */}
         <SessionExecutiveSummary session={s} timelineRows={timelineRows} />
 
