@@ -140,6 +140,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
   };
 
   const startAddAtPlayhead = () => {
+    if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
     setNewMin(String(Math.floor(playheadS / 60)));
     setNewSec(String(Math.round(playheadS % 60)));
     setAddingNew(true);
@@ -397,6 +398,16 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
           </div>
         )}
 
+        {/* Add event button — above most recent */}
+        {!addingNew && (
+          <button
+            onClick={startAddAtPlayhead}
+            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors border border-primary/20"
+          >
+            <Plus className="w-4 h-4" /> Add Event at {fmtMmSs(playheadS)}
+          </button>
+        )}
+
         {/* Most recent events relative to playhead */}
         {events.length > 0 && (() => {
           // Events sorted by distance to playhead, most recent first (past only), up to 3
@@ -453,19 +464,9 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
 
         {/* All event notes — nearby ones highlighted, with add/edit/delete */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-              Event Notes ({events.length}) — nearby highlighted
-            </p>
-            {!addingNew && (
-              <button
-                onClick={startAddAtPlayhead}
-                className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors"
-              >
-                <Plus className="w-3 h-3" /> Add at {fmtMmSs(playheadS)}
-              </button>
-            )}
-          </div>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            Event Notes ({events.length}) — nearby highlighted
+          </p>
 
           {/* New event form */}
           {addingNew && (
