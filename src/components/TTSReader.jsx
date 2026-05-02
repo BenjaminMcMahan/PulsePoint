@@ -20,7 +20,7 @@ import { getBestVoice, getEnglishVoices, resetVoiceCache } from "@/lib/ttsVoice"
 export default function TTSReader({ paragraphs, renderParagraph }) {
   const [state, setState] = useState("idle"); // idle | playing | paused
   const [currentPara, setCurrentPara] = useState(-1);
-  const [selectedVoice, setSelectedVoice] = useState(null); // null = auto
+  const [selectedVoice, setSelectedVoice] = useState(null); // null = auto; loaded from localStorage below
   const [availableVoices, setAvailableVoices] = useState([]);
   const [showVoicePicker, setShowVoicePicker] = useState(false);
 
@@ -35,16 +35,22 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   const setS = (s) => { stateRef.current = s; setState(s); };
   const setCP = (i) => { currentParaRef.current = i; setCurrentPara(i); };
 
-  // Load voices (they may load async — Chrome fires voiceschanged, Safari has them immediately)
+  // Load voices and restore saved preference from localStorage
   useEffect(() => {
     const loadVoices = () => {
       resetVoiceCache();
       const voices = getEnglishVoices();
-      if (voices.length > 0) setAvailableVoices(voices);
+      if (voices.length > 0) {
+        setAvailableVoices(voices);
+        // Restore saved voice preference
+        const savedName = localStorage.getItem("tts_voice_name");
+        if (savedName) {
+          const match = voices.find(v => v.name === savedName);
+          if (match) setSelectedVoice(match);
+        }
+      }
     };
-    // Try immediately
     loadVoices();
-    // Also try after a short delay (Chrome needs this)
     const t = setTimeout(loadVoices, 200);
     window.speechSynthesis?.addEventListener("voiceschanged", loadVoices);
     return () => {
@@ -215,7 +221,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
               <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[200px] max-h-48 overflow-y-auto">
                 <button
                   className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors text-muted-foreground"
-                  onClick={() => { setSelectedVoice(null); setShowVoicePicker(false); }}
+                  onClick={() => { setSelectedVoice(null); localStorage.removeItem("tts_voice_name"); setShowVoicePicker(false); }}
                 >
                   Auto (best available)
                 </button>
@@ -223,7 +229,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
                   <button
                     key={v.name}
                     className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors ${selectedVoice?.name === v.name ? "text-primary font-medium" : "text-foreground"}`}
-                    onClick={() => { setSelectedVoice(v); setShowVoicePicker(false); }}
+                    onClick={() => { setSelectedVoice(v); localStorage.setItem("tts_voice_name", v.name); setShowVoicePicker(false); }}
                   >
                     {v.name}
                   </button>
