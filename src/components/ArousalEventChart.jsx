@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine, Scatter, CartesianGrid,
@@ -110,6 +111,8 @@ const PHASE_LINES = [
 
 export default function ArousalEventChart({ session, timelineRows }) {
   const [hiddenCats, setHiddenCats] = useState(new Set());
+  const [collapsed, setCollapsed] = useState(false);
+  const [showAllEvents, setShowAllEvents] = useState(false);
 
   const arousalCurve = useMemo(
     () => buildArousalCurve(timelineRows, session),
@@ -159,122 +162,141 @@ export default function ArousalEventChart({ session, timelineRows }) {
     ? arousalCurve[arousalCurve.length - 1].time_s
     : Math.max(...(session.event_timeline || []).map((e) => e.time_s), 0);
 
+  const visibleEvents = showAllEvents ? eventPoints : eventPoints.slice(0, 8);
+
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
-        Arousal Arc &amp; Event Correlation
-      </h3>
+      <button
+        className="w-full flex items-center justify-between"
+        onClick={() => setCollapsed((v) => !v)}
+      >
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+          Arousal Arc &amp; Event Correlation
+        </h3>
+        {collapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
+      </button>
 
-      {/* Category filter pills */}
-      {presentCats.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {presentCats.map((c) => {
-            const hidden = hiddenCats.has(c.value);
-            return (
-              <button
-                key={c.value}
-                onClick={() => toggleCat(c.value)}
-                className="text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all"
-                style={hidden
-                  ? { background: "transparent", color: c.color + "88", borderColor: c.color + "33" }
-                  : { background: c.color + "22", color: c.color, borderColor: c.color + "66" }
-                }
-              >
-                {c.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="w-full" style={{ height: 200 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
-            <XAxis
-              dataKey="time_s"
-              type="number"
-              domain={[0, maxT]}
-              tickFormatter={fmtMmSs}
-              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-              tickCount={7}
-              allowDataOverflow
-            />
-            <YAxis
-              domain={[0, 10]}
-              ticks={[1, 3, 5, 7, 10]}
-              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-              width={28}
-            />
-            <Tooltip content={<CustomTooltip />} />
-
-            {/* Phase reference lines */}
-            {PHASE_LINES.map(({ key, label, color }) =>
-              session[key] != null ? (
-                <ReferenceLine
-                  key={key}
-                  x={session[key]}
-                  stroke={color}
-                  strokeWidth={1.5}
-                  strokeDasharray="4 3"
-                  label={{ value: label, position: "top", fontSize: 8, fill: color, offset: 4 }}
-                />
-              ) : null
-            )}
-
-            {/* Arousal curve */}
-            {hasCurve && (
-              <Line
-                data={arousalCurve}
-                dataKey="arousal"
-                type="monotone"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-              />
-            )}
-
-            {/* Event scatter */}
-            {eventPoints.length > 0 && (
-              <Scatter
-                data={eventPoints}
-                dataKey="arousal"
-                shape={<EventDot />}
-                isAnimationActive={false}
-              />
-            )}
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-
-      {!hasCurve && hasEvents && (
-        <p className="text-xs text-muted-foreground text-center">
-          Upload a HR file to see the full arousal arc. Events shown at estimated positions.
-        </p>
-      )}
-
-      {/* Event legend below chart */}
-      {eventPoints.length > 0 && (
-        <div className="space-y-1 pt-1 border-t border-border">
-          {eventPoints.slice(0, 8).map((ev, i) => {
-            const cats = normalizeCategoryArray(ev.category);
-            const meta = getCategoryMeta(cats[0]);
-            return (
-              <div key={i} className="flex items-start gap-2 text-xs">
-                <span className="font-mono text-primary shrink-0 w-8 mt-0.5">{fmtMmSs(ev.time_s)}</span>
-                <span className="shrink-0 mt-0.5 font-semibold" style={{ color: meta.color }}>
-                  {cats.map(c => getCategoryMeta(c).label).join("+")}
-                </span>
-                <span className="text-muted-foreground leading-snug line-clamp-1">{ev.note}</span>
-                <span className="ml-auto shrink-0 font-mono font-bold text-primary">{ev.arousal}/10</span>
-              </div>
-            );
-          })}
-          {eventPoints.length > 8 && (
-            <p className="text-[10px] text-muted-foreground">+{eventPoints.length - 8} more events</p>
+      {!collapsed && (
+        <>
+          {/* Category filter pills */}
+          {presentCats.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {presentCats.map((c) => {
+                const hidden = hiddenCats.has(c.value);
+                return (
+                  <button
+                    key={c.value}
+                    onClick={() => toggleCat(c.value)}
+                    className="text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all"
+                    style={hidden
+                      ? { background: "transparent", color: c.color + "88", borderColor: c.color + "33" }
+                      : { background: c.color + "22", color: c.color, borderColor: c.color + "66" }
+                    }
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
           )}
-        </div>
+
+          <div className="w-full" style={{ height: 200 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                <XAxis
+                  dataKey="time_s"
+                  type="number"
+                  domain={[0, maxT]}
+                  tickFormatter={fmtMmSs}
+                  tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                  tickCount={7}
+                  allowDataOverflow
+                />
+                <YAxis
+                  domain={[0, 10]}
+                  ticks={[1, 3, 5, 7, 10]}
+                  tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                  width={28}
+                />
+                <Tooltip content={<CustomTooltip />} />
+
+                {/* Phase reference lines */}
+                {PHASE_LINES.map(({ key, label, color }) =>
+                  session[key] != null ? (
+                    <ReferenceLine
+                      key={key}
+                      x={session[key]}
+                      stroke={color}
+                      strokeWidth={1.5}
+                      strokeDasharray="4 3"
+                      label={{ value: label, position: "top", fontSize: 8, fill: color, offset: 4 }}
+                    />
+                  ) : null
+                )}
+
+                {/* Arousal curve */}
+                {hasCurve && (
+                  <Line
+                    data={arousalCurve}
+                    dataKey="arousal"
+                    type="monotone"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                )}
+
+                {/* Event scatter */}
+                {eventPoints.length > 0 && (
+                  <Scatter
+                    data={eventPoints}
+                    dataKey="arousal"
+                    shape={<EventDot />}
+                    isAnimationActive={false}
+                  />
+                )}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {!hasCurve && hasEvents && (
+            <p className="text-xs text-muted-foreground text-center">
+              Upload a HR file to see the full arousal arc. Events shown at estimated positions.
+            </p>
+          )}
+
+          {/* Event legend below chart */}
+          {eventPoints.length > 0 && (
+            <div className="space-y-1 pt-1 border-t border-border">
+              {visibleEvents.map((ev, i) => {
+                const cats = normalizeCategoryArray(ev.category);
+                const meta = getCategoryMeta(cats[0]);
+                return (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <span className="font-mono text-primary shrink-0 w-8 mt-0.5">{fmtMmSs(ev.time_s)}</span>
+                    <span className="shrink-0 mt-0.5 font-semibold" style={{ color: meta.color }}>
+                      {cats.map(c => getCategoryMeta(c).label).join("+")}
+                    </span>
+                    <span className="text-muted-foreground leading-snug line-clamp-1">{ev.note}</span>
+                    {ev.arousal != null && (
+                      <span className="ml-auto shrink-0 font-mono font-bold text-primary">{ev.arousal}/10</span>
+                    )}
+                  </div>
+                );
+              })}
+              {eventPoints.length > 8 && (
+                <button
+                  onClick={() => setShowAllEvents((v) => !v)}
+                  className="text-[10px] text-primary font-medium mt-1 hover:underline"
+                >
+                  {showAllEvents ? "Show less" : `Show all ${eventPoints.length} events`}
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
