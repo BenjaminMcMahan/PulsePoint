@@ -14,6 +14,7 @@ import NearClimaxEvents, { detectNearClimaxEvents } from "../components/NearClim
 import SessionAIPanel from "../components/SessionAIPanel";
 import SessionExecutiveSummary from "../components/SessionExecutiveSummary";
 import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
+import ArousalEventChart from "../components/ArousalEventChart";
 import { EVENT_CATEGORIES } from "../components/session-form/EventTimelineSection";
 
 function getCategoryMeta(value) {
@@ -403,6 +404,11 @@ export default function SessionDetail() {
             </div>
           );
         })()}
+
+        {/* Arousal Arc + Event Correlation */}
+        {((session.event_timeline || []).length > 0 || timelineRows.length > 0) && (
+          <ArousalEventChart session={s} timelineRows={timelineRows} />
+        )}
 
         {/* Cascade Overview AI */}
         <CascadeOverviewPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />
