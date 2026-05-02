@@ -261,7 +261,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
             <video
               ref={videoRef}
               src={videoSrc}
-              className="w-full rounded-lg bg-black max-h-64 object-contain"
+              className="w-full rounded-lg bg-black max-h-[70vh] object-contain"
               playsInline
             />
             {/* Playback controls */}
@@ -398,8 +398,35 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
           </div>
         )}
 
-        {/* Add event button — above most recent */}
-        {!addingNew && (
+        {/* Add event button + form — above most recent */}
+        {addingNew ? (
+          <div className="rounded-lg px-3 py-2.5 space-y-2 bg-muted/40 border border-primary/30">
+            <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event</p>
+            <div className="flex items-center gap-2">
+              <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
+                placeholder="min" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+              <span className="text-muted-foreground font-bold">:</span>
+              <input type="number" min={0} max={59} value={newSec} onChange={(e) => setNewSec(e.target.value)}
+                placeholder="sec" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+            </div>
+            <CategorySelector selected={newCats} onChange={setNewCats} />
+            <textarea
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="Describe the event…"
+              rows={2}
+              className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
+            />
+            <div className="flex gap-2">
+              <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
+                <Check className="w-3 h-3" /> Save
+              </button>
+              <button onClick={() => setAddingNew(false)} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
+                <X className="w-3 h-3" /> Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
           <button
             onClick={startAddAtPlayhead}
             className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors border border-primary/20"
@@ -467,36 +494,6 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
             Event Notes ({events.length}) — nearby highlighted
           </p>
-
-          {/* New event form */}
-          {addingNew && (
-            <div className="rounded-lg px-3 py-2.5 space-y-2 bg-muted/40 border border-primary/30">
-              <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event</p>
-              <div className="flex items-center gap-2">
-                <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
-                  placeholder="min" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
-                <span className="text-muted-foreground font-bold">:</span>
-                <input type="number" min={0} max={59} value={newSec} onChange={(e) => setNewSec(e.target.value)}
-                  placeholder="sec" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
-              </div>
-              <CategorySelector selected={newCats} onChange={setNewCats} />
-              <textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Describe the event…"
-                rows={2}
-                className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
-              />
-              <div className="flex gap-2">
-                <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
-                  <Check className="w-3 h-3" /> Save
-                </button>
-                <button onClick={() => setAddingNew(false)} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
-                  <X className="w-3 h-3" /> Cancel
-                </button>
-              </div>
-            </div>
-          )}
 
           {events.map((ev, i) => {
             const color = EVENT_COLORS[i % EVENT_COLORS.length];
