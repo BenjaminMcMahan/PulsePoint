@@ -268,11 +268,24 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
             {words.map((word, wordIdx) => {
               const isWhitespace = /^\s+$/.test(word);
               if (isWhitespace) return word;
+
+              // Count non-whitespace words before this one
+              const wordCount = words.slice(0, wordIdx).filter(w => !/^\s+$/.test(w)).length;
+
+              const handleTap = (e) => {
+                if (isActive) {
+                  e.preventDefault();
+                  startFrom(paraIdx, wordCount);
+                }
+              };
+
               return (
                 <span
                   key={wordIdx}
-                  onClick={() => isActive && startFrom(paraIdx, words.slice(0, wordIdx).join("").trim().split(/\s+/).filter(w => w).length)}
-                  className={isActive ? "cursor-pointer hover:bg-primary/20 rounded px-0.5 transition-colors" : ""}
+                  onTouchStart={handleTap}
+                  onClick={handleTap}
+                  className={isActive ? "cursor-pointer hover:bg-primary/20 rounded px-0.5 transition-colors select-none" : ""}
+                  style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
                 >
                   {word}
                 </span>
