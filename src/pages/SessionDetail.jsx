@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PageHeader from "../components/PageHeader";
 import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil } from "lucide-react";
+import SessionExportButton from "../components/SessionExportButton";
 import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
 import HRZoneAnalysis from "../components/HRZoneAnalysis";
@@ -167,6 +168,7 @@ export default function SessionDetail() {
         <Button variant="ghost" size="icon" onClick={() => navigate(`/sessions/${id}/edit`)}>
           <Pencil className="w-5 h-5 text-muted-foreground" />
         </Button>
+        <SessionExportButton session={s} timelineRows={timelineRows} />
         <Button variant="ghost" size="icon" onClick={toggleFav}>
           <Star className={`w-5 h-5 ${s.is_favorite ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
         </Button>
