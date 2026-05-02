@@ -527,6 +527,139 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                 </div>
               );
             })()}
+
+            {/* Add event form */}
+            {addingNew ? (
+              <div className="rounded-lg px-3 py-2.5 space-y-2 bg-muted/40 border border-primary/30">
+                <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event at {fmtMmSs(playheadS)}</p>
+                <div className="flex items-center gap-2">
+                  <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
+                    placeholder="min" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+                  <span className="text-muted-foreground font-bold">:</span>
+                  <input type="number" min={0} max={59} value={newSec} onChange={(e) => setNewSec(e.target.value)}
+                    placeholder="sec" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+                </div>
+                <CategorySelector selected={newCats} onChange={setNewCats} />
+                <textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}
+                  placeholder="Describe the event…"
+                  rows={2}
+                  className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
+                />
+                <div className="flex gap-2">
+                  <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
+                    <Check className="w-3 h-3" /> Save
+                  </button>
+                  <button onClick={() => setAddingNew(false)} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
+                    <X className="w-3 h-3" /> Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={startAddAtPlayhead}
+                className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors border border-primary/20"
+              >
+                <Plus className="w-4 h-4" /> Add Event at {fmtMmSs(playheadS)}
+              </button>
+            )}
+
+            {/* Event notes list — nearby ones highlighted, with edit/delete */}
+            {events.length > 0 && (
+              <div className="space-y-1.5 border-t border-border pt-2">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  All Events ({events.length})
+                </p>
+                {events.map((ev, i) => {
+                  const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                  const cats = normalizeCategoryArray(ev.category);
+                  const dist = Math.abs(ev.time_s - playheadS);
+                  const isNearby = dist <= 30;
+                  const isCurrent = dist < 5;
+                  const isActive = activeEventIdx === i;
+                  const isEditing = editingIdx === i;
+
+                  if (isEditing) {
+                    return (
+                      <div key={i} className="rounded-lg px-3 py-2.5 space-y-2"
+                        style={{ background: color + "18", borderLeft: `3px solid ${color}` }}>
+                        <div className="flex items-center gap-2">
+                          <input type="number" min={0} value={editMin} onChange={(e) => setEditMin(e.target.value)}
+                            className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+                          <span className="text-muted-foreground font-bold">:</span>
+                          <input type="number" min={0} max={59} value={editSec} onChange={(e) => setEditSec(e.target.value)}
+                            className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+                        </div>
+                        <CategorySelector selected={editCats} onChange={setEditCats} />
+                        <textarea
+                          value={editNote}
+                          onChange={(e) => setEditNote(e.target.value)}
+                          rows={2}
+                          className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={commitEdit} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
+                            <Check className="w-3 h-3" /> Save
+                          </button>
+                          <button onClick={cancelEdit} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
+                            <X className="w-3 h-3" /> Cancel
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={i}
+                      className="w-full text-left flex items-start gap-2 rounded-lg px-3 py-2 transition-all"
+                      style={{
+                        background: isActive || isCurrent ? color + "28" : isNearby ? color + "18" : color + "08",
+                        borderLeft: `3px solid ${isNearby ? color : color + "55"}`,
+                        outline: isCurrent ? `1px solid ${color}66` : "none",
+                        opacity: isNearby ? 1 : 0.55,
+                      }}
+                    >
+                      <button onClick={() => seekToEvent(ev, i)} className="font-mono text-[11px] font-bold shrink-0 mt-0.5" style={{ color: isNearby ? color : color + "99" }}>
+                        {fmtMmSs(ev.time_s)}
+                      </button>
+                      <button onClick={() => seekToEvent(ev, i)} className="flex-1 min-w-0 text-left">
+                        <div className="flex flex-wrap gap-1 mb-0.5">
+                          {cats.map((c) => {
+                            const meta = getCategoryMeta(c);
+                            return (
+                              <span key={c} className="text-[9px] px-1.5 rounded-full font-medium"
+                                style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
+                                {meta.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <span className="text-xs text-foreground leading-snug">{ev.note}</span>
+                      </button>
+                      <div className="shrink-0 flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => startEdit(ev, i)} className="text-muted-foreground hover:text-primary transition-colors p-0.5">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => deleteEvent(i)} className="text-muted-foreground hover:text-destructive transition-colors p-0.5">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <span className="text-[10px] font-mono text-muted-foreground">
+                          {dist < 1 ? "now" : isNearby ? `${Math.round(dist)}s ${ev.time_s < playheadS ? "ago" : "ahead"}` : fmtMmSs(ev.time_s)}
+                        </span>
+                        {nearestHR(chartData, ev.time_s) != null && (
+                          <span className="text-[10px] font-mono font-bold text-primary/70">{nearestHR(chartData, ev.time_s)} bpm</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -552,100 +685,6 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
               </button>
             ))}
           </div>
-        </div>
-
-        {/* All event notes — nearby ones highlighted, with add/edit/delete */}
-        <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-            Event Notes ({events.length}) — nearby highlighted
-          </p>
-
-          {events.map((ev, i) => {
-            const color = EVENT_COLORS[i % EVENT_COLORS.length];
-            const cats = normalizeCategoryArray(ev.category);
-            const dist = Math.abs(ev.time_s - playheadS);
-            const isNearby = dist <= 30;
-            const isCurrent = dist < 5;
-            const isActive = activeEventIdx === i;
-            const isEditing = editingIdx === i;
-
-            if (isEditing) {
-              return (
-                <div key={i} className="rounded-lg px-3 py-2.5 space-y-2"
-                  style={{ background: color + "18", borderLeft: `3px solid ${color}` }}>
-                  <div className="flex items-center gap-2">
-                    <input type="number" min={0} value={editMin} onChange={(e) => setEditMin(e.target.value)}
-                      className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
-                    <span className="text-muted-foreground font-bold">:</span>
-                    <input type="number" min={0} max={59} value={editSec} onChange={(e) => setEditSec(e.target.value)}
-                      className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
-                  </div>
-                  <CategorySelector selected={editCats} onChange={setEditCats} />
-                  <textarea
-                    value={editNote}
-                    onChange={(e) => setEditNote(e.target.value)}
-                    rows={2}
-                    className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
-                  />
-                  <div className="flex gap-2">
-                    <button onClick={commitEdit} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
-                      <Check className="w-3 h-3" /> Save
-                    </button>
-                    <button onClick={cancelEdit} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
-                      <X className="w-3 h-3" /> Cancel
-                    </button>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div
-                key={i}
-                className="w-full text-left flex items-start gap-2 rounded-lg px-3 py-2 transition-all"
-                style={{
-                  background: isActive || isCurrent ? color + "28" : isNearby ? color + "18" : color + "08",
-                  borderLeft: `3px solid ${isNearby ? color : color + "55"}`,
-                  outline: isCurrent ? `1px solid ${color}66` : "none",
-                  opacity: isNearby ? 1 : 0.55,
-                }}
-              >
-                <button onClick={() => seekToEvent(ev, i)} className="font-mono text-[11px] font-bold shrink-0 mt-0.5" style={{ color: isNearby ? color : color + "99" }}>
-                  {fmtMmSs(ev.time_s)}
-                </button>
-                <button onClick={() => seekToEvent(ev, i)} className="flex-1 min-w-0 text-left">
-                  <div className="flex flex-wrap gap-1 mb-0.5">
-                    {cats.map((c) => {
-                      const meta = getCategoryMeta(c);
-                      return (
-                        <span key={c} className="text-[9px] px-1.5 rounded-full font-medium"
-                          style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
-                          {meta.label}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  <span className="text-xs text-foreground leading-snug">{ev.note}</span>
-                </button>
-                <div className="shrink-0 flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => startEdit(ev, i)} className="text-muted-foreground hover:text-primary transition-colors p-0.5">
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button onClick={() => deleteEvent(i)} className="text-muted-foreground hover:text-destructive transition-colors p-0.5">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <span className="text-[10px] font-mono text-muted-foreground">
-                    {dist < 1 ? "now" : isNearby ? `${Math.round(dist)}s ${ev.time_s < playheadS ? "ago" : "ahead"}` : fmtMmSs(ev.time_s)}
-                  </span>
-                  {nearestHR(chartData, ev.time_s) != null && (
-                    <span className="text-[10px] font-mono font-bold text-primary/70">{nearestHR(chartData, ev.time_s)} bpm</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>
