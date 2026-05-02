@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Play, Pause, Video, ChevronLeft, ChevronRight, Pencil, Trash2, Plus, Check, X } from "lucide-react";
+import { Play, Pause, Video, ChevronLeft, ChevronRight, Pencil, Trash2, Plus, Check, X, SkipBack, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -79,6 +79,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
   const [playheadS, setPlayheadS] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [zoomWindow, setZoomWindow] = useState(60);
   const [activeEventIdx, setActiveEventIdx] = useState(null);
 
@@ -225,6 +226,19 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
     v.currentTime = Math.max(0, v.currentTime + seconds);
   };
 
+  const setSpeed = (speed) => {
+    setPlaybackSpeed(speed);
+    if (videoRef.current) videoRef.current.playbackRate = speed;
+  };
+
+  const handleTimelineScrub = (e) => {
+    const v = videoRef.current;
+    if (!v || !videoDuration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    v.currentTime = frac * videoDuration;
+  };
+
   // Nearby events relative to playhead
   const nearby = useMemo(() => nearbyEvents(events, playheadS, 30), [events, playheadS]);
   // eslint-disable-next-line no-unused-vars
@@ -264,19 +278,99 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
               className="w-full rounded-lg bg-black max-h-[70vh] object-contain"
               playsInline
             />
+            {/* Video timeline scrubber */}
+            {videoDuration > 0 && (
+              <div className="space-y-1">
+                <div
+                  className="relative h-3 bg-muted rounded-full cursor-pointer group"
+                  onClick={handleTimelineScrub}
+                >
+                  <div
+                    className="absolute inset-y-0 left-0 bg-primary rounded-full transition-none"
+                    style={{ width: `${((videoRef.current?.currentTime || 0) / videoDuration) * 100}%` }}
+                  />
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-primary rounded-full shadow -translate-x-1/2"
+                    style={{ left: `${((videoRef.current?.currentTime || 0) / videoDuration) * 100}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] font-mono text-muted-foreground px-0.5">
+                  <span>{fmtMmSs(videoRef.current?.currentTime || 0)}</span>
+                  <span>{fmtMmSs(videoDuration)}</span>
+                </div>
+              </div>
+            )}
+
             {/* Playback controls */}
             <div className="flex items-center gap-2">
-              <button onClick={() => stepFrames(-5)} className="p-1.5 rounded-lg bg-muted hover:bg-muted/70 transition-colors">
+              <button onClick={() => stepFrames(-10)} className="p-1.5 rounded-lg bg-muted hover:bg-muted/70 transition-colors" title="-10s">
+                <SkipBack className="w-4 h-4" />
+              </button>
+              <button onClick={() => stepFrames(-5)} className="p-1.5 rounded-lg bg-muted hover:bg-muted/70 transition-colors" title="-5s">
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button onClick={togglePlay} className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-primary text-primary-foreground font-medium text-sm transition-colors hover:bg-primary/90">
                 {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 {isPlaying ? "Pause" : "Play"}
               </button>
-              <button onClick={() => stepFrames(5)} className="p-1.5 rounded-lg bg-muted hover:bg-muted/70 transition-colors">
+              <button onClick={() => stepFrames(5)} className="p-1.5 rounded-lg bg-muted hover:bg-muted/70 transition-colors" title="+5s">
                 <ChevronRight className="w-4 h-4" />
               </button>
+              <button onClick={() => stepFrames(10)} className="p-1.5 rounded-lg bg-muted hover:bg-muted/70 transition-colors" title="+10s">
+                <SkipForward className="w-4 h-4" />
+              </button>
             </div>
+
+            {/* Playback speed */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider shrink-0">Speed:</span>
+              {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSpeed(s)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${playbackSpeed === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
+                >
+                  {s}×
+                </button>
+              ))}
+            </div>
+
+            {/* Add event — right below controls */}
+            {addingNew ? (
+              <div className="rounded-lg px-3 py-2.5 space-y-2 bg-muted/40 border border-primary/30">
+                <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event at {fmtMmSs(playheadS)}</p>
+                <div className="flex items-center gap-2">
+                  <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
+                    placeholder="min" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+                  <span className="text-muted-foreground font-bold">:</span>
+                  <input type="number" min={0} max={59} value={newSec} onChange={(e) => setNewSec(e.target.value)}
+                    placeholder="sec" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+                </div>
+                <CategorySelector selected={newCats} onChange={setNewCats} />
+                <textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="Describe the event…"
+                  rows={2}
+                  className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
+                />
+                <div className="flex gap-2">
+                  <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
+                    <Check className="w-3 h-3" /> Save
+                  </button>
+                  <button onClick={() => setAddingNew(false)} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
+                    <X className="w-3 h-3" /> Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={startAddAtPlayhead}
+                className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors border border-primary/20"
+              >
+                <Plus className="w-4 h-4" /> Add Event at {fmtMmSs(playheadS)}
+              </button>
+            )}
 
             {/* Video offset alignment */}
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
@@ -396,43 +490,6 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
               </ResponsiveContainer>
             </div>
           </div>
-        )}
-
-        {/* Add event button + form — above most recent */}
-        {addingNew ? (
-          <div className="rounded-lg px-3 py-2.5 space-y-2 bg-muted/40 border border-primary/30">
-            <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event</p>
-            <div className="flex items-center gap-2">
-              <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
-                placeholder="min" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
-              <span className="text-muted-foreground font-bold">:</span>
-              <input type="number" min={0} max={59} value={newSec} onChange={(e) => setNewSec(e.target.value)}
-                placeholder="sec" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
-            </div>
-            <CategorySelector selected={newCats} onChange={setNewCats} />
-            <textarea
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Describe the event…"
-              rows={2}
-              className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
-            />
-            <div className="flex gap-2">
-              <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
-                <Check className="w-3 h-3" /> Save
-              </button>
-              <button onClick={() => setAddingNew(false)} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
-                <X className="w-3 h-3" /> Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={startAddAtPlayhead}
-            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors border border-primary/20"
-          >
-            <Plus className="w-4 h-4" /> Add Event at {fmtMmSs(playheadS)}
-          </button>
         )}
 
         {/* Most recent events relative to playhead */}
