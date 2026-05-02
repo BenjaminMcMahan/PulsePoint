@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PageHeader from "../components/PageHeader";
 import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil } from "lucide-react";
+import AITagSuggester from "../components/AITagSuggester";
 import SessionExportButton from "../components/SessionExportButton";
 import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
@@ -417,11 +418,18 @@ export default function SessionDetail() {
         <SessionAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />
 
         {/* Tags */}
-        {(s.tags || []).length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-          {s.tags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
-          </div>
-        )}
+        <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Tags</h3>
+          {(s.tags || []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {s.tags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
+            </div>
+          )}
+          <AITagSuggester
+            session={s}
+            onTagsAdded={(merged) => setSession((prev) => ({ ...prev, tags: merged }))}
+          />
+        </div>
       </div>
     </div>
   );
