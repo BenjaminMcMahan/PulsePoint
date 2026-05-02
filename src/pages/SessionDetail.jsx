@@ -315,9 +315,7 @@ export default function SessionDetail() {
               <span className="text-sm font-mono font-bold text-chart-3">{Math.round(elevatedTime)}s</span>
             </div>
           )}
-          <div className="grid grid-cols-3 gap-4">
-            {/* HR Chart - 2/3 width */}
-            <div className="col-span-2 space-y-3">
+          <div className="space-y-3">
               {timelineRows.length > 0 && (
                 <HRTimelineChart
                   rows={timelineRows}
@@ -366,10 +364,8 @@ export default function SessionDetail() {
                   </ResponsiveContainer>
                 </div>
               )}
-            </div>
+        </div>
 
-
-          </div>
         </div>
         </div>
 
