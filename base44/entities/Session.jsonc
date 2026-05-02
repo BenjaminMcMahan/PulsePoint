@@ -15,6 +15,10 @@
     "duration_minutes": {
       "type": "number"
     },
+    "no_climax": {
+      "type": "boolean",
+      "description": "True if this session did not result in climax"
+    },
     "avg_hr": {
       "type": "number"
     },
@@ -275,6 +279,10 @@
     "ai_cascade": {
       "type": "object",
       "description": "Stored AI cascade overview result"
+    },
+    "ai_no_climax": {
+      "type": "object",
+      "description": "Stored AI analysis for no-climax sessions"
     }
   },
   "required": [

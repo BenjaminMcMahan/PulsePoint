@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Star, Heart, Zap, Clock, Brain, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, Heart, Zap, Clock, Brain, ChevronDown, ChevronUp, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import moment from "moment";
 import { computeSessionScore, gradeFromPct } from "@/utils/sessionScore";
@@ -43,6 +43,11 @@ export default function SessionCard({ session, selectable, selected, onSelect })
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          {session.no_climax && (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+              <XCircle className="w-2.5 h-2.5" /> NC
+            </span>
+          )}
           {session.is_quick_entry && <Zap className="w-4 h-4 text-primary" />}
           {session.is_favorite && <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />}
         </div>
@@ -55,7 +60,9 @@ export default function SessionCard({ session, selectable, selected, onSelect })
           <span className="text-xs font-mono">{session.max_hr || "—"}</span>
         </div>
         <div className="bg-primary/10 rounded-full px-2 py-0.5">
-          <span className="text-xs font-bold text-primary">{session.intensity}/10</span>
+          <span className="text-xs font-bold text-primary">
+            {session.no_climax ? "Arousal" : "Int"}: {session.intensity}/10
+          </span>
         </div>
         {session.satisfaction && (
           <span className="text-xs text-muted-foreground">Sat: {session.satisfaction}/10</span>

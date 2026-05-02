@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PageHeader from "../components/PageHeader";
-import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil } from "lucide-react";
+import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil, XCircle } from "lucide-react";
 import AITagSuggester from "../components/AITagSuggester";
 import SessionExportButton from "../components/SessionExportButton";
 import moment from "moment";
@@ -16,6 +16,7 @@ import SessionAIPanel from "../components/SessionAIPanel";
 import SessionExecutiveSummary from "../components/SessionExecutiveSummary";
 import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import ArousalEventChart from "../components/ArousalEventChart";
+import NoClimaxAIPanel from "../components/NoClimaxAIPanel";
 import { EVENT_CATEGORIES } from "../components/session-form/EventTimelineSection";
 
 function getCategoryMeta(value) {
@@ -160,11 +161,16 @@ export default function SessionDetail() {
         </Button>
         <div className="flex-1">
           <h1 className="text-lg font-bold">{moment(s.date).format("MMM D, YYYY")}</h1>
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
             {s.start_time && <><Clock className="w-3 h-3" />{s.start_time}</>}
             {s.end_time && ` – ${s.end_time}`}
             {s.duration_minutes && <> · <strong>{s.duration_minutes}m</strong></>}
             {s.is_quick_entry && <><Zap className="w-3 h-3 ml-1" /> Quick</>}
+            {s.no_climax && (
+              <span className="inline-flex items-center gap-1 ml-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                <XCircle className="w-3 h-3" /> No Climax
+              </span>
+            )}
           </p>
         </div>
         <Button variant="ghost" size="icon" onClick={() => navigate(`/sessions/${id}/edit`)}>
@@ -198,12 +204,11 @@ export default function SessionDetail() {
         {/* Subjective Metrics */}
         <div className="bg-card rounded-xl border border-border p-4 space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Metrics</h3>
-          <MetricBadge label="Intensity" value={s.intensity} />
+          <MetricBadge label={s.no_climax ? "Peak Arousal" : "Intensity"} value={s.intensity} />
           <MetricBadge label="Build Quality" value={s.build_quality} />
-
           <MetricBadge label="Satisfaction" value={s.satisfaction} />
           {s.build_type && <InfoRow label="Build Type" value={s.build_type === "Other" && s.custom_build_type ? s.custom_build_type : s.build_type} />}
-          {s.climax_duration && (
+          {!s.no_climax && s.climax_duration && (
             <InfoRow label="Climax Duration" value={cap(s.climax_duration)} />
           )}
         </div>
@@ -221,7 +226,7 @@ export default function SessionDetail() {
               </div>
             ))}
           </div>
-          {(s.hr_avg_pre_to_climax || s.hr_avg_at_climax_window) && (
+          {!s.no_climax && (s.hr_avg_pre_to_climax || s.hr_avg_at_climax_window) && (
             <div className="grid grid-cols-2 gap-2">
               {s.hr_avg_pre_to_climax && (
                 <div className="flex items-center justify-between rounded-lg bg-chart-2/10 px-3 py-2">
@@ -258,7 +263,7 @@ export default function SessionDetail() {
               highlightRange={highlightRange}
             />
           )}
-          {timelineRows.length > 0 && (
+          {timelineRows.length > 0 && !s.no_climax && (
             <NearClimaxEvents
               timelineRows={timelineRows}
               session={s}
@@ -411,11 +416,12 @@ export default function SessionDetail() {
           <ArousalEventChart session={s} timelineRows={timelineRows} />
         )}
 
-        {/* Cascade Overview AI */}
-        <CascadeOverviewPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />
+        {/* Cascade + AI — only for climax sessions */}
+        {!s.no_climax && <CascadeOverviewPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
+        {!s.no_climax && <SessionAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
 
-        {/* AI Analysis */}
-        <SessionAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />
+        {/* No-Climax AI Analysis */}
+        {s.no_climax && <NoClimaxAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
 
         {/* Tags */}
         <div className="bg-card rounded-xl border border-border p-4 space-y-3">

@@ -8,11 +8,12 @@ import SessionInfoSection from "../components/session-form/SessionInfoSection";
 import HeartRateSection from "../components/session-form/HeartRateSection";
 import MethodsSection from "../components/session-form/MethodsSection";
 import SubjectiveSection from "../components/session-form/SubjectiveSection";
+import NoClimaxSubjectiveSection from "../components/session-form/NoClimaxSubjectiveSection";
 import PhysiologicalSection from "../components/session-form/PhysiologicalSection";
 import ContextSection from "../components/session-form/ContextSection";
 import NotesMediaSection from "../components/session-form/NotesMediaSection";
 import EventTimelineSection from "../components/session-form/EventTimelineSection";
-import { Zap, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { Zap, Save, ChevronDown, ChevronUp, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const SECTIONS = [
@@ -90,7 +91,7 @@ export default function NewSession() {
       case "info": return <SessionInfoSection {...props} />;
       case "hr": return <HeartRateSection {...props} />;
       case "methods": return <MethodsSection {...props} />;
-      case "subjective": return <SubjectiveSection {...props} />;
+      case "subjective": return data.no_climax ? <NoClimaxSubjectiveSection {...props} /> : <SubjectiveSection {...props} />;
       case "physio": return <PhysiologicalSection {...props} />;
       case "context": return <ContextSection {...props} />;
       case "events": return <EventTimelineSection {...props} />;
@@ -114,6 +115,25 @@ export default function NewSession() {
       />
 
       <div className="px-4 space-y-2 pb-6">
+        {/* No-Climax Toggle */}
+        <button
+          type="button"
+          onClick={() => setData((d) => ({ ...d, no_climax: !d.no_climax }))}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border font-medium text-sm transition-all ${
+            data.no_climax
+              ? "bg-chart-4/15 border-chart-4/60 text-chart-4"
+              : "bg-card border-border text-muted-foreground"
+          }`}
+        >
+          <XCircle className="w-4 h-4 shrink-0" />
+          <span className="flex-1 text-left">
+            {data.no_climax ? "No Climax Session — toggled on" : "Mark as No-Climax Session"}
+          </span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${data.no_climax ? "bg-chart-4/20 text-chart-4" : "bg-muted text-muted-foreground"}`}>
+            {data.no_climax ? "ON" : "OFF"}
+          </span>
+        </button>
+
         {SECTIONS.map(({ id, label }) => (
           <div key={id} className="bg-card rounded-xl border border-border overflow-hidden">
             <button
