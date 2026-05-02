@@ -365,8 +365,8 @@ export default function SessionDetail() {
             </div>
 
             {/* Most Recent Events - 1/3 width sidebar */}
-            {events.length > 0 && (() => {
-              const past = events
+            {(s.event_timeline || []).length > 0 && (() => {
+              const past = (s.event_timeline || [])
                 .map((ev, i) => ({ ev, i, diff: s.climax_offset_s ? s.climax_offset_s - ev.time_s : 0 }))
                 .filter(({ diff }) => diff >= 0)
                 .sort((a, b) => a.diff - b.diff)
