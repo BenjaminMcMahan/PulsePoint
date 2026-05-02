@@ -221,7 +221,7 @@ export default function SessionDetail() {
 
   return (
     <div>
-      <div className="px-4 pt-4 flex items-center gap-2">
+      <div className="px-2 md:px-4 pt-4 flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
