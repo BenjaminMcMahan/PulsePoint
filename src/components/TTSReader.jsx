@@ -242,18 +242,23 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
       {paragraphs.map((text, paraIdx) => {
         const displayText = fmtSecondsInText(text);
         const active = currentPara === paraIdx && state === "playing";
-        const words = displayText.split(/(\s+)/);
 
         if (renderParagraph) {
           return (
             <div
               key={paraIdx}
               className={isActive ? "cursor-pointer" : ""}
+              onClick={() => isActive && startFrom(paraIdx, 0)}
+              onTouchStart={(e) => { if (isActive) { e.preventDefault(); startFrom(paraIdx, 0); } }}
             >
               {renderParagraph(displayText, paraIdx, active)}
             </div>
           );
         }
+
+        // Split into sentences for tappable regions
+        const sentences = displayText.match(/[^.!?]+[.!?]+/g) || [displayText];
+        let wordOffset = 0;
 
         return (
           <p
@@ -265,29 +270,20 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
                 : "border-primary/30 text-foreground/80",
             ].join(" ")}
           >
-            {words.map((word, wordIdx) => {
-              const isWhitespace = /^\s+$/.test(word);
-              if (isWhitespace) return word;
-
-              // Count non-whitespace words before this one
-              const wordCount = words.slice(0, wordIdx).filter(w => !/^\s+$/.test(w)).length;
-
-              const handleTap = (e) => {
-                if (isActive) {
-                  e.preventDefault();
-                  startFrom(paraIdx, wordCount);
-                }
-              };
+            {sentences.map((sentence, sentIdx) => {
+              const sentenceStart = wordOffset;
+              const wordCount = sentence.split(/\s+/).filter(w => w).length;
+              wordOffset += wordCount;
 
               return (
                 <span
-                  key={wordIdx}
-                  onTouchStart={handleTap}
-                  onClick={handleTap}
-                  className={isActive ? "cursor-pointer hover:bg-primary/20 rounded px-0.5 transition-colors select-none" : ""}
+                  key={sentIdx}
+                  onClick={() => isActive && startFrom(paraIdx, sentenceStart)}
+                  onTouchStart={(e) => { if (isActive) { e.preventDefault(); startFrom(paraIdx, sentenceStart); } }}
+                  className={isActive ? "cursor-pointer hover:bg-primary/20 transition-colors select-none" : ""}
                   style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
                 >
-                  {word}
+                  {sentence}
                 </span>
               );
             })}
