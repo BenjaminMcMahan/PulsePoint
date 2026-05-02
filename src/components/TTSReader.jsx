@@ -31,6 +31,8 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   const remainingIdxRef = useRef([]);    // paragraph indices yet to speak
   const currentChunkRef = useRef(null);
   const selectedVoiceRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const touchMovedRef = useRef(false);
 
   const setS = (s) => { stateRef.current = s; setState(s); };
   const setCP = (i) => { currentParaRef.current = i; setCurrentPara(i); };
@@ -256,10 +258,28 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
           );
         }
 
+        const handleTouchStart = (e) => {
+          touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          touchMovedRef.current = false;
+        };
+
+        const handleTouchMove = (e) => {
+          if (!touchStartRef.current) return;
+          const dx = Math.abs(e.touches[0].clientX - touchStartRef.current.x);
+          const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
+          if (dx > 5 || dy > 5) touchMovedRef.current = true;
+        };
+
+        const handleClick = () => {
+          if (isActive && !touchMovedRef.current) startFrom(paraIdx, 0);
+        };
+
         return (
           <p
             key={paraIdx}
-            onClick={() => isActive && startFrom(paraIdx, 0)}
+            onClick={handleClick}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
             className={[
               "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200",
               isActive ? "cursor-pointer border-primary bg-primary/8 text-foreground font-medium rounded-r-md" : "border-primary/30 text-foreground/80",
