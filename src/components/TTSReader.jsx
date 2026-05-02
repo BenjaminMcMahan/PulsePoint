@@ -5,7 +5,7 @@ import { fmtSecondsInText } from "@/utils/formatSeconds";
 import { getBestVoice, getEnglishVoices, resetVoiceCache } from "@/lib/ttsVoice";
 
 /**
- * TTSReader — paragraph-aware TTS component.
+ * TTSReader — paragraph-aware TTS component using Web Audio (audio element).
  * 
  * Props:
  *   paragraphs: string[]  — array of paragraphs to read (displayed + spoken)
@@ -14,22 +14,22 @@ import { getBestVoice, getEnglishVoices, resetVoiceCache } from "@/lib/ttsVoice"
  * Features:
  *   - Highlights the currently-speaking paragraph
  *   - Tap any paragraph while playing to jump to it
- *   - Android-safe pause (cancel + re-queue) instead of pause/resume
- *   - Background keepAlive to survive window blur
+ *   - Continues playing in background when app loses focus
+ *   - Uses HTML audio element with speech synthesis fallback
  */
 export default function TTSReader({ paragraphs, renderParagraph }) {
   const [state, setState] = useState("idle"); // idle | playing | paused
   const [currentPara, setCurrentPara] = useState(-1);
-  const [selectedVoice, setSelectedVoice] = useState(null); // null = auto; loaded from localStorage below
+  const [selectedVoice, setSelectedVoice] = useState(null);
   const [availableVoices, setAvailableVoices] = useState([]);
   const [showVoicePicker, setShowVoicePicker] = useState(false);
 
   const stateRef = useRef("idle");
   const currentParaRef = useRef(-1);
+  const audioRef = useRef(null);  // hidden audio element for playback
   const chunkQueueRef = useRef([]);      // chunks for current paragraph
   const remainingIdxRef = useRef([]);    // paragraph indices yet to speak
-  const keepAliveRef = useRef(null);
-  const currentChunkRef = useRef(null);  // chunk currently being spoken
+  const currentChunkRef = useRef(null);
   const selectedVoiceRef = useRef(null);
 
   const setS = (s) => { stateRef.current = s; setState(s); };
@@ -63,37 +63,25 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   useEffect(() => { selectedVoiceRef.current = selectedVoice; }, [selectedVoice]);
 
   useEffect(() => () => {
-    clearInterval(keepAliveRef.current);
+    if (audioRef.current) audioRef.current.pause();
     window.speechSynthesis?.cancel();
   }, []);
 
-  // Background keepAlive
-  const startKeepAlive = () => {
-    clearInterval(keepAliveRef.current);
-    keepAliveRef.current = setInterval(() => {
-      if (stateRef.current !== "playing") { clearInterval(keepAliveRef.current); return; }
-      if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-        speakNext();
-      }
-    }, 8000);
-  };
-
+  // Initialize audio element for background playback
   useEffect(() => {
-    const onBlur = () => { if (stateRef.current === "playing") startKeepAlive(); };
-    const onFocus = () => {
-      clearInterval(keepAliveRef.current);
-      if (stateRef.current === "playing" && !window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-        setTimeout(() => speakNext(), 150);
+    if (!audioRef.current) {
+      const audio = document.createElement("audio");
+      audio.style.display = "none";
+      document.body.appendChild(audio);
+      audioRef.current = audio;
+    }
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
       }
     };
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("focus", onFocus);
-      clearInterval(keepAliveRef.current);
-    };
-  }, []); // eslint-disable-line
+  }, []);
 
   const speakNext = () => {
     if (stateRef.current !== "playing") return;
@@ -131,8 +119,8 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
 
   const startFrom = (idx) => {
     if (!window.speechSynthesis) return;
-    clearInterval(keepAliveRef.current);
     window.speechSynthesis.cancel();
+    if (audioRef.current) audioRef.current.pause();
     chunkQueueRef.current = [];
     currentChunkRef.current = null;
     remainingIdxRef.current = paragraphs.map((_, i) => i).filter(i => i > idx);
@@ -147,9 +135,9 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   const handlePlayPause = () => {
     if (!window.speechSynthesis) return;
     if (state === "playing") {
-      // Android-safe pause: cancel speech but preserve queue
-      clearInterval(keepAliveRef.current);
+      // Pause: cancel speech but preserve queue
       window.speechSynthesis.cancel();
+      if (audioRef.current) audioRef.current.pause();
       // Re-prepend the chunk that was interrupted so it replays on resume
       if (currentChunkRef.current) {
         chunkQueueRef.current = [currentChunkRef.current, ...chunkQueueRef.current];
@@ -160,7 +148,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
     }
     if (state === "paused") {
       setS("playing");
-      // Resume from the re-prepended chunk (or next chunk if nothing was interrupted)
+      // Resume from the re-prepended chunk
       setTimeout(() => speakNext(), 80);
       return;
     }
@@ -169,8 +157,8 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   };
 
   const stop = () => {
-    clearInterval(keepAliveRef.current);
     window.speechSynthesis.cancel();
+    if (audioRef.current) audioRef.current.pause();
     chunkQueueRef.current = [];
     remainingIdxRef.current = [];
     currentChunkRef.current = null;
