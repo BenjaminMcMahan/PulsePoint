@@ -96,7 +96,8 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
   // Add-new state
   const [addingNew, setAddingNew] = useState(false);
   const [newNote, setNewNote] = useState("");
-  const [newCats, setNewCats] = useState(["stimulation"]);
+  const [lastUsedCat, setLastUsedCat] = useState("stimulation");
+  const [newCats, setNewCats] = useState([lastUsedCat]);
   const [newMin, setNewMin] = useState("");
   const [newSec, setNewSec] = useState("");
 
@@ -135,8 +136,9 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
     const m = parseInt(newMin, 10) || 0;
     const s = Math.min(59, parseInt(newSec, 10) || 0);
     const ev = { time_s: m * 60 + s, note: newNote.trim(), category: newCats };
+    setLastUsedCat(newCats[0]);
     setAddingNew(false);
-    setNewNote(""); setNewMin(""); setNewSec(""); setNewCats(["stimulation"]);
+    setNewNote(""); setNewMin(""); setNewSec(""); setNewCats([newCats[0]]);
     await saveEvents([...events, ev]);
   };
 
@@ -144,6 +146,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
     if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
     setNewMin(String(Math.floor(playheadS / 60)));
     setNewSec(String(Math.round(playheadS % 60)));
+    setNewCats([lastUsedCat]);
     setAddingNew(true);
   };
 
@@ -269,7 +272,10 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Video player */}
+        {/* Video player + side panels */}
+        <div className="grid grid-cols-5 gap-4">
+          {/* Video player - 3/5 width */}
+          <div className="col-span-3 space-y-2">
         {videoSrc ? (
           <div className="space-y-2">
             <video
@@ -350,6 +356,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                 <textarea
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}
                   placeholder="Describe the event…"
                   rows={2}
                   className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
@@ -396,6 +403,132 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
             <span className="text-xs">Syncs playhead with HR and events</span>
           </button>
         )}
+          </div>
+
+          {/* HR Timeline + Most Recent Events - 2/5 width */}
+          <div className="col-span-2 space-y-3">
+            {chartData.length > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">HR Timeline — click to seek</p>
+                <div className="h-48 cursor-pointer">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={visibleChartData}
+                      margin={{ top: 8, right: 4, bottom: 0, left: -20 }}
+                      onClick={handleChartClick}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                      <XAxis
+                        dataKey="t"
+                        type="number"
+                        domain={xDomain}
+                        tick={{ fontSize: 9 }}
+                        tickFormatter={fmtMmSs}
+                        tickCount={8}
+                        allowDataOverflow
+                      />
+                      <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
+                      <Tooltip
+                        formatter={(val) => [`${val} bpm`, "HR"]}
+                        labelFormatter={(v) => fmtMmSs(Math.round(Number(v)))}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+
+                      {/* Phase markers */}
+                      {PHASE_LINES.map(({ key, label, color }) =>
+                        session[key] != null ? (
+                          <ReferenceLine key={key} x={session[key]} stroke={color} strokeWidth={1.5}
+                            strokeDasharray="4 2"
+                            label={{ value: label, fontSize: 7, fill: color, position: "top" }}
+                          />
+                        ) : null
+                      )}
+
+                      {/* Event markers */}
+                      {events.map((ev, i) => {
+                        const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                        return (
+                          <ReferenceLine key={i} x={ev.time_s} stroke={color} strokeWidth={1.5}
+                            strokeDasharray="2 3"
+                            label={{ value: `E${i + 1}`, fontSize: 7, fill: color, position: "insideTopLeft" }}
+                          />
+                        );
+                      })}
+
+                      {/* Live playhead */}
+                      <ReferenceLine
+                        x={playheadS}
+                        stroke="hsl(var(--foreground))"
+                        strokeWidth={2}
+                        label={{ value: "▶", fontSize: 10, fill: "hsl(var(--foreground))", position: "top" }}
+                      />
+
+                      <Line
+                        type="monotone"
+                        dataKey="hr"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Most Recent Events */}
+            {events.length > 0 && (() => {
+              const past = events
+                .map((ev, i) => ({ ev, i, diff: playheadS - ev.time_s }))
+                .filter(({ diff }) => diff >= 0)
+                .sort((a, b) => a.diff - b.diff)
+                .slice(0, 3);
+              if (!past.length) return null;
+              return (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Most Recent</p>
+                  {past.map(({ ev, i, diff }) => {
+                    const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                    const cats = normalizeCategoryArray(ev.category);
+                    const isCurrent = diff < 5;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => seekToEvent(ev, i)}
+                        className="w-full text-left flex flex-col gap-1 rounded-lg px-3 py-2 transition-all"
+                        style={{
+                          background: isCurrent ? color + "30" : color + "1a",
+                          borderLeft: `3px solid ${color}`,
+                          outline: isCurrent ? `1px solid ${color}66` : "none",
+                        }}
+                      >
+                        <span className="font-mono text-[10px] font-bold" style={{ color }}>
+                          {fmtMmSs(ev.time_s)}
+                        </span>
+                        <div className="flex flex-wrap gap-1 mb-0.5">
+                          {cats.map((c) => {
+                            const meta = getCategoryMeta(c);
+                            return (
+                              <span key={c} className="text-[8px] px-1 rounded-full font-medium"
+                                style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
+                                {meta.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <span className="text-xs text-foreground leading-tight">{ev.note}</span>
+                        <span className="text-[9px] font-mono text-muted-foreground">
+                          {diff < 1 ? "now" : `${Math.round(diff)}s ago`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
 
         {/* Playhead status bar */}
         <div className="flex items-center gap-3 bg-muted/40 rounded-lg px-3 py-2">
@@ -419,131 +552,6 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
               </button>
             ))}
           </div>
-        </div>
-
-        {/* HR Timeline + Most Recent Side-by-Side */}
-        <div className="grid grid-cols-3 gap-4">
-          {/* HR Chart - 2/3 width */}
-          {chartData.length > 0 && (
-            <div className="col-span-2">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">HR Timeline — click to seek</p>
-              <div className="h-48 cursor-pointer">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart
-                    data={visibleChartData}
-                    margin={{ top: 8, right: 4, bottom: 0, left: -20 }}
-                    onClick={handleChartClick}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
-                    <XAxis
-                      dataKey="t"
-                      type="number"
-                      domain={xDomain}
-                      tick={{ fontSize: 9 }}
-                      tickFormatter={fmtMmSs}
-                      tickCount={8}
-                      allowDataOverflow
-                    />
-                    <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
-                    <Tooltip
-                      formatter={(val) => [`${val} bpm`, "HR"]}
-                      labelFormatter={(v) => fmtMmSs(Math.round(Number(v)))}
-                      contentStyle={{ fontSize: 11 }}
-                    />
-
-                    {/* Phase markers */}
-                    {PHASE_LINES.map(({ key, label, color }) =>
-                      session[key] != null ? (
-                        <ReferenceLine key={key} x={session[key]} stroke={color} strokeWidth={1.5}
-                          strokeDasharray="4 2"
-                          label={{ value: label, fontSize: 7, fill: color, position: "top" }}
-                        />
-                      ) : null
-                    )}
-
-                    {/* Event markers */}
-                    {events.map((ev, i) => {
-                      const color = EVENT_COLORS[i % EVENT_COLORS.length];
-                      return (
-                        <ReferenceLine key={i} x={ev.time_s} stroke={color} strokeWidth={1.5}
-                          strokeDasharray="2 3"
-                          label={{ value: `E${i + 1}`, fontSize: 7, fill: color, position: "insideTopLeft" }}
-                        />
-                      );
-                    })}
-
-                    {/* Live playhead */}
-                    <ReferenceLine
-                      x={playheadS}
-                      stroke="hsl(var(--foreground))"
-                      strokeWidth={2}
-                      label={{ value: "▶", fontSize: 10, fill: "hsl(var(--foreground))", position: "top" }}
-                    />
-
-                    <Line
-                      type="monotone"
-                      dataKey="hr"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-
-          {/* Most Recent Events - 1/3 width sidebar */}
-          {events.length > 0 && (() => {
-            const past = events
-              .map((ev, i) => ({ ev, i, diff: playheadS - ev.time_s }))
-              .filter(({ diff }) => diff >= 0)
-              .sort((a, b) => a.diff - b.diff)
-              .slice(0, 3);
-            if (!past.length) return null;
-            return (
-              <div className="col-span-1 space-y-1.5">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Most Recent</p>
-                {past.map(({ ev, i, diff }) => {
-                  const color = EVENT_COLORS[i % EVENT_COLORS.length];
-                  const cats = normalizeCategoryArray(ev.category);
-                  const isCurrent = diff < 5;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => seekToEvent(ev, i)}
-                      className="w-full text-left flex flex-col gap-1 rounded-lg px-3 py-2 transition-all"
-                      style={{
-                        background: isCurrent ? color + "30" : color + "1a",
-                        borderLeft: `3px solid ${color}`,
-                        outline: isCurrent ? `1px solid ${color}66` : "none",
-                      }}
-                    >
-                      <span className="font-mono text-[10px] font-bold" style={{ color }}>
-                        {fmtMmSs(ev.time_s)}
-                      </span>
-                      <div className="flex flex-wrap gap-1 mb-0.5">
-                        {cats.map((c) => {
-                          const meta = getCategoryMeta(c);
-                          return (
-                            <span key={c} className="text-[8px] px-1 rounded-full font-medium"
-                              style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
-                              {meta.label}
-                            </span>
-                          );
-                        })}
-                      </div>
-                      <span className="text-xs text-foreground leading-tight">{ev.note}</span>
-                      <span className="text-[9px] font-mono text-muted-foreground">
-                        {diff < 1 ? "now" : `${Math.round(diff)}s ago`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })()}
         </div>
 
         {/* All event notes — nearby ones highlighted, with add/edit/delete */}
