@@ -97,6 +97,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
   const defaultWindow = durationMins > 10 ? 5 : "full";
   const [window, setWindow] = useState(defaultWindow);
   const [showBuild, setShowBuild] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
   const [visibleLines, setVisibleLines] = useState({ hr: true, smoothed: true, baseline: true });
   const toggleLine = (key) => setVisibleLines((v) => ({ ...v, [key]: !v[key] }));
   const [markingPhase, setMarkingPhase] = useState(null); // null | 'pre_climax' | 'climax' | 'recovery'
@@ -140,6 +141,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
     if (!r.marker) return;
     if (!KNOWN_DATA_MARKERS.has(r.marker)) return; // skip unknown/gray markers
     if (r.marker === "build" && !showBuild) return;
+    if (r.marker === "recovery" && !showRecovery) return;
     const key = `${r.marker}-${r.time_offset_s}`;
     if (!seen.has(key)) {
       seen.add(key);
@@ -296,6 +298,14 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
           onClick={() => setShowBuild((b) => !b)}
         >
           Build {showBuild ? "ON" : "OFF"}
+        </Button>
+        <Button
+          size="sm"
+          variant={showRecovery ? "default" : "outline"}
+          className="h-6 text-[10px] px-2"
+          onClick={() => setShowRecovery((b) => !b)}
+        >
+          Recovery {showRecovery ? "ON" : "OFF"}
         </Button>
       </div>
 
