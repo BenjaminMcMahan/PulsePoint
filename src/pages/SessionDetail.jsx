@@ -11,6 +11,7 @@ import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
 import HRZoneAnalysis from "../components/HRZoneAnalysis";
 import HREventOverlayChart from "../components/HREventOverlayChart";
+import HRPhysiologicalAnalysis from "../components/HRPhysiologicalAnalysis";
 import NearClimaxEvents, { detectNearClimaxEvents } from "../components/NearClimaxEvents";
 import SessionAIPanel from "../components/SessionAIPanel";
 import SessionExecutiveSummary from "../components/SessionExecutiveSummary";
@@ -342,6 +343,9 @@ export default function SessionDetail() {
               )}
               {timelineRows.length > 0 && (
                 <HRZoneAnalysis rows={timelineRows} sessionMaxHR={s.max_hr} userProfile={userProfile} />
+              )}
+              {timelineRows.length > 0 && (
+                <HRPhysiologicalAnalysis timelineRows={timelineRows} session={s} />
               )}
               {timelineRows.length > 0 && (s.event_timeline || []).length > 0 && (
                 <HREventOverlayChart
