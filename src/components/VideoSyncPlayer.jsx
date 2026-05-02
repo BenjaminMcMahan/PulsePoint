@@ -397,6 +397,60 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
           </div>
         )}
 
+        {/* Most recent events relative to playhead */}
+        {events.length > 0 && (() => {
+          // Events sorted by distance to playhead, most recent first (past only), up to 3
+          const past = events
+            .map((ev, i) => ({ ev, i, diff: playheadS - ev.time_s }))
+            .filter(({ diff }) => diff >= 0)
+            .sort((a, b) => a.diff - b.diff)
+            .slice(0, 3);
+          if (!past.length) return null;
+          return (
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Most Recent</p>
+              {past.map(({ ev, i, diff }) => {
+                const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                const cats = normalizeCategoryArray(ev.category);
+                const isCurrent = diff < 5;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => seekToEvent(ev, i)}
+                    className="w-full text-left flex items-start gap-2 rounded-lg px-3 py-2 transition-all"
+                    style={{
+                      background: isCurrent ? color + "30" : color + "1a",
+                      borderLeft: `3px solid ${color}`,
+                      outline: isCurrent ? `1px solid ${color}66` : "none",
+                    }}
+                  >
+                    <span className="font-mono text-[11px] font-bold shrink-0 mt-0.5" style={{ color }}>
+                      {fmtMmSs(ev.time_s)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap gap-1 mb-0.5">
+                        {cats.map((c) => {
+                          const meta = getCategoryMeta(c);
+                          return (
+                            <span key={c} className="text-[9px] px-1.5 rounded-full font-medium"
+                              style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
+                              {meta.label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <span className="text-xs text-foreground leading-snug">{ev.note}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-muted-foreground shrink-0 mt-0.5">
+                      {diff < 1 ? "now" : `${Math.round(diff)}s ago`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
         {/* All event notes — nearby ones highlighted, with add/edit/delete */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
