@@ -21,6 +21,7 @@ import LongTermTrends from './pages/LongTermTrends';
 import Profile from './pages/Profile';
 import CorrelationMatrix from './pages/CorrelationMatrix';
 import EventCorrelations from './pages/EventCorrelations';
+import VideoPlayer from './pages/VideoPlayer';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -64,6 +65,7 @@ const AuthenticatedApp = () => {
         <Route path="/profile" element={<Profile />} />
         <Route path="/correlations" element={<CorrelationMatrix />} />
         <Route path="/event-correlations" element={<EventCorrelations />} />
+        <Route path="/video" element={<VideoPlayer />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

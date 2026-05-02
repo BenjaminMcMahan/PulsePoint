@@ -17,7 +17,6 @@ import SessionExecutiveSummary from "../components/SessionExecutiveSummary";
 import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import ArousalEventChart from "../components/ArousalEventChart";
 import NoClimaxAIPanel from "../components/NoClimaxAIPanel";
-import VideoSyncPlayer from "../components/VideoSyncPlayer";
 import { EVENT_CATEGORIES } from "../components/session-form/EventTimelineSection";
 
 function getCategoryMeta(value) {
@@ -372,11 +371,6 @@ export default function SessionDetail() {
               </a>
             )}
           </div>
-        )}
-
-        {/* Video Sync Player */}
-        {(timelineRows.length > 0 || (s.event_timeline || []).length > 0) && (
-          <VideoSyncPlayer session={s} timelineRows={timelineRows} />
         )}
 
         {/* Pause / Active Time */}
