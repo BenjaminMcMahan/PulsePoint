@@ -260,12 +260,10 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
           <p
             key={paraIdx}
             onClick={() => isActive && startFrom(paraIdx, 0)}
-            onTouchStart={(e) => { if (isActive) { e.preventDefault(); startFrom(paraIdx, 0); } }}
             className={[
               "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200",
-              isActive ? "cursor-pointer border-primary bg-primary/8 text-foreground font-medium rounded-r-md select-none" : "border-primary/30 text-foreground/80",
+              isActive ? "cursor-pointer border-primary bg-primary/8 text-foreground font-medium rounded-r-md" : "border-primary/30 text-foreground/80",
             ].join(" ")}
-            style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
           >
             {displayText}
           </p>
