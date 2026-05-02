@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 
 export default function PhysiologicalSection({ data, onChange }) {
+  const noClimax = !!data.no_climax;
   const update = (field, value) => onChange({ ...data, [field]: value });
   const discomfortEntries = data.discomfort_entries || [];
   const [noteInput, setNoteInput] = useState("");
@@ -39,28 +40,32 @@ export default function PhysiologicalSection({ data, onChange }) {
         />
       </div>
 
-      <div>
-        <Label className="text-xs text-muted-foreground">Refractory Period Notes</Label>
-        <Textarea
-          value={data.refractory_notes || ""}
-          onChange={(e) => update("refractory_notes", e.target.value)}
-          placeholder="Recovery time, sensations after..."
-          rows={2}
-          className="mt-1"
-        />
-      </div>
+      {!noClimax && (
+        <div>
+          <Label className="text-xs text-muted-foreground">Refractory Period Notes</Label>
+          <Textarea
+            value={data.refractory_notes || ""}
+            onChange={(e) => update("refractory_notes", e.target.value)}
+            placeholder="Recovery time, sensations after..."
+            rows={2}
+            className="mt-1"
+          />
+        </div>
+      )}
 
-      <div>
-        <Label className="text-xs text-muted-foreground">Ejaculate Volume</Label>
-        <Select value={data.ejaculate_volume || ""} onValueChange={(v) => update("ejaculate_volume", v)}>
-          <SelectTrigger className="h-12 mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="low">Low</SelectItem>
-            <SelectItem value="normal">Normal</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {!noClimax && (
+        <div>
+          <Label className="text-xs text-muted-foreground">Ejaculate Volume</Label>
+          <Select value={data.ejaculate_volume || ""} onValueChange={(v) => update("ejaculate_volume", v)}>
+            <SelectTrigger className="h-12 mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="normal">Normal</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div>
         <Label className="text-xs text-muted-foreground mb-2 block">Discomfort Log</Label>

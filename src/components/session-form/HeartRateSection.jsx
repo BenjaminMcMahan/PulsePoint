@@ -181,7 +181,7 @@ export default function HeartRateSection({ data, onChange }) {
     <div className="space-y-4">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-primary">Heart Rate</h3>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid gap-3 ${data.no_climax ? "grid-cols-2" : "grid-cols-3"}`}>
         <div>
           <Label className="text-xs text-muted-foreground">Avg HR</Label>
           <Input type="number" placeholder="72" value={data.avg_hr || ""} onChange={(e) => update({ avg_hr: Number(e.target.value) })} className="h-12 mt-1 font-mono text-center" />
@@ -190,10 +190,12 @@ export default function HeartRateSection({ data, onChange }) {
           <Label className="text-xs text-muted-foreground">Max HR</Label>
           <Input type="number" placeholder="140" value={data.max_hr || ""} onChange={(e) => update({ max_hr: Number(e.target.value) })} className="h-12 mt-1 font-mono text-center" />
         </div>
-        <div>
-          <Label className="text-xs text-muted-foreground">At Climax</Label>
-          <Input type="number" placeholder="135" value={data.hr_at_climax || ""} onChange={(e) => update({ hr_at_climax: Number(e.target.value) })} className="h-12 mt-1 font-mono text-center" />
-        </div>
+        {!data.no_climax && (
+          <div>
+            <Label className="text-xs text-muted-foreground">At Climax</Label>
+            <Input type="number" placeholder="135" value={data.hr_at_climax || ""} onChange={(e) => update({ hr_at_climax: Number(e.target.value) })} className="h-12 mt-1 font-mono text-center" />
+          </div>
+        )}
       </div>
 
       {/* Climax suggestion */}

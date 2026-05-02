@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Brain, Activity, Lightbulb, TrendingUp, Zap, Target } from "lucide-react";
+import { Brain, Activity, Lightbulb, TrendingUp, Zap, Target, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TTSReader from "./TTSReader";
 import { EVENT_CATEGORIES } from "./session-form/EventTimelineSection";
@@ -10,11 +10,12 @@ function getCategoryMeta(value) {
 }
 
 const SECTION_DEFS = [
-  { key: "arousal_assessment", label: "Arousal Assessment", color: "hsl(var(--chart-2))", icon: <TrendingUp className="w-3.5 h-3.5" /> },
-  { key: "event_analysis", label: "Event Analysis", color: "hsl(var(--chart-1))", icon: <Activity className="w-3.5 h-3.5" /> },
-  { key: "near_climax_estimate", label: "Near-Climax Estimate", color: "hsl(var(--accent))", icon: <Target className="w-3.5 h-3.5" /> },
+  { key: "arousal_assessment",     label: "Arousal Assessment",     color: "hsl(var(--chart-2))", icon: <TrendingUp className="w-3.5 h-3.5" /> },
+  { key: "event_analysis",         label: "Event Analysis",         color: "hsl(var(--chart-1))", icon: <Activity className="w-3.5 h-3.5" /> },
+  { key: "near_climax_estimate",   label: "Near-Climax Estimate",   color: "hsl(var(--accent))",  icon: <Target className="w-3.5 h-3.5" /> },
   { key: "physiological_findings", label: "Physiological Findings", color: "hsl(var(--chart-3))", icon: <Zap className="w-3.5 h-3.5" /> },
-  { key: "recommendations", label: "Recommendations", color: "hsl(var(--primary))", icon: <Lightbulb className="w-3.5 h-3.5" /> },
+  { key: "discomfort_analysis",    label: "Discomfort Analysis",    color: "hsl(var(--destructive))", icon: <AlertCircle className="w-3.5 h-3.5" /> },
+  { key: "recommendations",        label: "Recommendations",        color: "hsl(var(--primary))", icon: <Lightbulb className="w-3.5 h-3.5" /> },
 ];
 
 export default function NoClimaxAIPanel({ session, timelineRows, userProfile }) {
@@ -25,6 +26,7 @@ export default function NoClimaxAIPanel({ session, timelineRows, userProfile }) 
     setLoading(true);
     setResult(null);
 
+    // HR summary
     const hrSummary = timelineRows.length > 0 ? {
       total_points: timelineRows.length,
       duration_s: Math.round(Math.max(...timelineRows.map(r => Number(r.time_offset_s) || 0))),
@@ -33,6 +35,7 @@ export default function NoClimaxAIPanel({ session, timelineRows, userProfile }) 
       hr_avg: session.avg_hr,
     } : null;
 
+    // Nearest HR lookup
     const sortedRows = [...timelineRows].sort((a, b) => Number(a.time_offset_s) - Number(b.time_offset_s));
     const nearestHR = (time_s) => {
       if (!sortedRows.length) return null;
@@ -41,10 +44,12 @@ export default function NoClimaxAIPanel({ session, timelineRows, userProfile }) 
       for (const r of sortedRows) {
         const d = Math.abs(Number(r.time_offset_s) - time_s);
         if (d < bestDist) { bestDist = d; best = r; }
+        if (Number(r.time_offset_s) > time_s + 10) break;
       }
       return Math.round(Number(best.hr));
     };
 
+    // Annotated event timeline
     const eventTimeline = (session.event_timeline || []).map(e => {
       const m = Math.floor(e.time_s / 60);
       const s = (e.time_s % 60).toString().padStart(2, '0');
@@ -54,7 +59,7 @@ export default function NoClimaxAIPanel({ session, timelineRows, userProfile }) 
       return `[${catLabels}] ${m}:${s} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ''}`;
     });
 
-    // HR trajectory analysis for near-climax estimation
+    // Detect HR peaks as potential near-climax moments
     let hrPeaks = [];
     if (sortedRows.length > 10) {
       const windowSize = Math.max(3, Math.floor(sortedRows.length / 20));
@@ -66,52 +71,65 @@ export default function NoClimaxAIPanel({ session, timelineRows, userProfile }) 
           hrPeaks.push({ time_s: Number(sortedRows[i].time_offset_s), hr: Math.round(curr) });
         }
       }
-      // Deduplicate peaks that are close together (within 60s)
       hrPeaks = hrPeaks.reduce((acc, pk) => {
         if (!acc.length || pk.time_s - acc[acc.length - 1].time_s > 60) acc.push(pk);
         return acc;
       }, []);
     }
 
-    const arousalProfile = userProfile && (userProfile.arousal_response_style || userProfile.climax_sensitivity)
+    // E-Stim screenshots
+    const estimScreenshots = [
+      ...(session.estim_screenshots || []),
+      ...(session.estim_screenshot && !(session.estim_screenshots?.includes(session.estim_screenshot)) ? [session.estim_screenshot] : []),
+    ].filter(Boolean);
+
+    // User arousal profile
+    const arousalProfile = userProfile && (userProfile.arousal_response_style || userProfile.climax_sensitivity || userProfile.arousal_notes)
       ? `\nUSER AROUSAL PROFILE:\n${JSON.stringify({
           arousal_response_style: userProfile.arousal_response_style,
           typical_build_duration: userProfile.typical_build_duration,
           climax_sensitivity: userProfile.climax_sensitivity,
           preferred_stimulation: userProfile.preferred_stimulation,
+          refractory_pattern: userProfile.refractory_pattern,
           arousal_notes: userProfile.arousal_notes,
-        }, null, 2)}`
+        }, null, 2)}\nUse this profile to contextualize the incomplete arc — compare peak arousal, build pattern, and events against the user's known response style. Note deviations.`
       : "";
+
+    const timeOfDay = (() => {
+      if (!session.start_time) return undefined;
+      const h = parseInt(session.start_time.split(":")[0], 10);
+      if (h >= 5 && h < 12) return "morning";
+      if (h >= 12 && h < 17) return "afternoon";
+      if (h >= 17 && h < 21) return "evening";
+      return "night";
+    })();
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are an expert sexual arousal physiologist. Analyze this INCOMPLETE session — one that did NOT result in climax. Your goal is to:
-
-1. Assess the arousal arc and how far toward climax the user progressed
-2. Analyze event timeline notes for physiological and arousal insights
-3. ESTIMATE how many near-climax threshold events occurred (moments where the user was likely close to climax based on HR spikes, event notes, and arousal progression) — give a specific number estimate with reasoning
-4. Identify physiological patterns and findings from the incomplete session
-5. Provide specific recommendations for what might have enabled climax in this session
-
-This is NOT a climax session — DO NOT reference climax as having occurred. Focus on the arousal trajectory and what the data reveals about the incomplete arc.
+      ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
+      prompt: `You are an expert sexual arousal physiologist. Analyze this INCOMPLETE session — it did NOT result in climax. Provide a full-depth analysis as if this were a complete session, replacing climax metrics with arousal arc and near-threshold assessments. Do NOT treat this as a failed session — it is a rich physiological dataset.
 ${arousalProfile}
-${hrPeaks.length > 0 ? `\nDETECTED HR PEAK EVENTS (potential near-climax moments):\n${hrPeaks.map(p => `- ${Math.floor(p.time_s/60)}:${String(Math.round(p.time_s%60)).padStart(2,'0')} — HR spike to ${p.hr} bpm`).join('\n')}` : ''}
-${eventTimeline.length > 0 ? `\nEVENT TIMELINE:\n${eventTimeline.join('\n')}` : ''}
+${estimScreenshots.length > 0 ? `\nE-STIM SCREENSHOTS ATTACHED (${estimScreenshots.length}): Analyze waveform types, frequencies, pulse widths, and channel configurations. Interpret how these settings shaped the arousal experience and whether they were approaching climax-sufficient intensity.` : ""}
+${hrPeaks.length > 0 ? `\nDETECTED HR PEAK EVENTS (potential near-threshold moments):\n${hrPeaks.map(p => `- ${Math.floor(p.time_s/60)}:${String(Math.round(p.time_s%60)).padStart(2,'0')} — HR spike to ${p.hr} bpm`).join('\n')}` : ""}
+${eventTimeline.length > 0 ? `\nSESSION EVENT TIMELINE:\n${eventTimeline.join('\n')}\nFor each event: what does it reveal about arousal state, stimulation dynamics, and physiological response at that moment? Identify the narrative arc.` : ""}
 
 Session data:
 ${JSON.stringify({
   date: session.date?.slice(0, 10),
+  time_of_day: timeOfDay,
   duration_minutes: session.duration_minutes,
   peak_arousal_level: session.intensity,
   build_quality: session.build_quality,
-  build_type: session.build_type,
-  satisfaction: session.satisfaction,
+  build_type: session.build_type === "Other" && session.custom_build_type ? session.custom_build_type : session.build_type,
+  overall_satisfaction: session.satisfaction,
   mood: session.mood,
   environment: session.environment,
   methods: session.methods,
   foley_size: session.foley_size,
   foley_type: session.foley_type,
   estim_notes: session.estim_notes,
+  sleeve_type: session.sleeve_type,
+  tens_placement: session.tens_placement,
   hydration: session.hydration,
   substances: session.substances,
   discomfort_entries: session.discomfort_entries?.length > 0 ? session.discomfort_entries : undefined,
@@ -122,12 +140,13 @@ ${JSON.stringify({
       response_json_schema: {
         type: "object",
         properties: {
-          summary: { type: "string" },
-          arousal_assessment: { type: "array", items: { type: "string" } },
-          event_analysis: { type: "array", items: { type: "string" } },
-          near_climax_estimate: { type: "array", items: { type: "string" }, description: "Estimated number of near-climax events with reasoning" },
-          physiological_findings: { type: "array", items: { type: "string" } },
-          recommendations: { type: "array", items: { type: "string" } },
+          summary:                 { type: "string" },
+          arousal_assessment:      { type: "array", items: { type: "string" } },
+          event_analysis:          { type: "array", items: { type: "string" } },
+          near_climax_estimate:    { type: "array", items: { type: "string" }, description: "How many near-threshold events occurred, with specific reasoning per moment" },
+          physiological_findings:  { type: "array", items: { type: "string" } },
+          discomfort_analysis:     { type: "array", items: { type: "string" } },
+          recommendations:         { type: "array", items: { type: "string" } },
         },
         required: ["summary", "arousal_assessment", "event_analysis", "near_climax_estimate", "physiological_findings", "recommendations"],
       },
@@ -140,16 +159,17 @@ ${JSON.stringify({
     setLoading(false);
   };
 
-  const paragraphs = result
-    ? [result.summary, ...SECTION_DEFS.flatMap(s => result[s.key] || [])].filter(Boolean)
-    : [];
-
-  // Build idx → section meta for TTS rendering
-  let pIdx = 0;
-  const paraMap = result ? [] : [];
+  // Build flat paragraph list + metadata for TTSReader rendering
+  const paras = [];
+  const paraMeta = [];
   if (result) {
-    if (result.summary) paraMap.push({ type: "summary" });
-    SECTION_DEFS.forEach(s => (result[s.key] || []).forEach(() => paraMap.push({ type: "section", sec: s })));
+    if (result.summary) { paras.push(result.summary); paraMeta.push({ type: "summary" }); }
+    for (const sec of SECTION_DEFS) {
+      for (const item of (result[sec.key] || [])) {
+        paras.push(item);
+        paraMeta.push({ type: "section", sec });
+      }
+    }
   }
 
   return (
@@ -161,41 +181,73 @@ ${JSON.stringify({
         <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5">
           {loading
             ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
-            : <><Brain className="w-3 h-3" />Analyze</>}
+            : <><Brain className="w-3 h-3" />{result ? "Re-analyze" : "Analyze"}</>}
         </Button>
       </div>
 
       {!result && !loading && (
         <p className="text-xs text-muted-foreground">
-          AI analysis for non-climax sessions: arousal arc assessment, near-climax event estimation, event notes review, physiological findings, and recommendations. Uses Claude Sonnet.
+          Full-depth AI analysis: arousal arc assessment, event timeline review, near-climax threshold estimation, physiological findings, and targeted recommendations. Uses Claude Sonnet.
         </p>
       )}
 
-      {result && (
-        <div className="space-y-3">
-          {result.summary && (
-            <p className="text-base font-medium leading-relaxed border-l-2 border-primary/50 pl-3 py-1 text-foreground">
-              {result.summary}
-            </p>
-          )}
-          {SECTION_DEFS.map((sec) =>
-            (result[sec.key] || []).length > 0 ? (
-              <div key={sec.key} className="bg-muted/50 rounded-lg p-3 space-y-1.5">
-                <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: sec.color }}>
-                  {sec.icon}{sec.label}
-                </p>
-                <ul className="space-y-1">
-                  {result[sec.key].map((item, i) => (
-                    <li key={i} className="text-sm text-foreground pl-3 border-l-2 border-primary/30 leading-relaxed py-0.5">
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null
-          )}
-        </div>
-      )}
+      {result && (() => {
+        // Group section items by section key for visual headers + TTS
+        const sections = [];
+        let curSec = null;
+        paras.forEach((text, i) => {
+          const meta = paraMeta[i];
+          if (meta.type === "summary") return;
+          if (!curSec || curSec.key !== meta.sec.key) {
+            curSec = { key: meta.sec.key, sec: meta.sec, items: [{ text, i }] };
+            sections.push(curSec);
+          } else {
+            curSec.items.push({ text, i });
+          }
+        });
+
+        return (
+          <TTSReader
+            paragraphs={paras}
+            renderParagraph={(text, idx, isActive) => {
+              const meta = paraMeta[idx];
+              if (!meta) return null;
+
+              if (meta.type === "summary") {
+                return (
+                  <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md ${isActive ? "border-primary bg-primary/8 text-foreground" : "border-primary/50 text-foreground"}`}>
+                    {text}
+                  </p>
+                );
+              }
+
+              const { sec } = meta;
+              // Check if this is the first item in its section → render section header above
+              const isFirstInSection = sections.find(s => s.key === sec.key)?.items[0]?.i === idx;
+
+              return (
+                <div key={idx}>
+                  {isFirstInSection && (
+                    <p className="text-xs font-semibold flex items-center gap-1.5 mt-3 mb-1.5 pt-2 border-t border-border" style={{ color: sec.color }}>
+                      {sec.icon}{sec.label}
+                    </p>
+                  )}
+                  <li
+                    className="text-sm pl-3 border-l-2 py-1 leading-relaxed list-none transition-all duration-200 rounded-r-md"
+                    style={{
+                      borderColor: isActive ? sec.color : sec.color + "55",
+                      background: isActive ? sec.color + "18" : "transparent",
+                      color: "hsl(var(--foreground))",
+                    }}
+                  >
+                    {text}
+                  </li>
+                </div>
+              );
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
