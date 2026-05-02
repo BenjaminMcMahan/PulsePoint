@@ -528,6 +528,58 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
               </div>
             )}
 
+            {/* Nearby Events */}
+            {events.length > 0 && (() => {
+              const nearby = events
+                .map((ev, i) => ({ ev, i, dist: Math.abs(ev.time_s - playheadS) }))
+                .filter(({ dist }) => dist <= 60)
+                .sort((a, b) => a.dist - b.dist);
+              if (!nearby.length) return null;
+              return (
+                <div className="space-y-1.5 border-t border-border pt-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Nearby (±60s)</p>
+                  {nearby.map(({ ev, i, dist }) => {
+                    const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                    const cats = normalizeCategoryArray(ev.category);
+                    const isCurrent = dist < 5;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => seekToEvent(ev, i)}
+                        className="w-full text-left flex items-start gap-2 rounded-lg px-2 py-1.5 transition-all text-xs"
+                        style={{
+                          background: isCurrent ? color + "30" : color + "18",
+                          borderLeft: `3px solid ${color}`,
+                          outline: isCurrent ? `1px solid ${color}66` : "none",
+                        }}
+                      >
+                        <span className="font-mono text-[9px] font-bold shrink-0 mt-0.5" style={{ color }}>
+                          {fmtMmSs(ev.time_s)}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap gap-1 mb-0.5">
+                            {cats.map((c) => {
+                              const meta = getCategoryMeta(c);
+                              return (
+                                <span key={c} className="text-[7px] px-0.5 rounded-full font-medium"
+                                  style={{ background: meta.color + "22", color: meta.color, border: `0.5px solid ${meta.color}44` }}>
+                                  {meta.label}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <span className="text-[10px] text-foreground leading-tight line-clamp-2">{ev.note}</span>
+                        </div>
+                        <span className="text-[8px] font-mono text-muted-foreground shrink-0 mt-0.5">
+                          {dist < 1 ? "now" : `${Math.round(dist)}s`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             {/* Most Recent Events */}
             {events.length > 0 && (() => {
               const past = events
