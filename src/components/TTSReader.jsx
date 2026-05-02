@@ -258,6 +258,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
 
         // Split into sentences for tappable regions
         const sentences = displayText.match(/[^.!?]+[.!?]+/g) || [displayText];
+        const allWords = displayText.split(/\s+/).filter(w => w);
         let wordOffset = 0;
 
         return (
@@ -272,14 +273,17 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
           >
             {sentences.map((sentence, sentIdx) => {
               const sentenceStart = wordOffset;
-              const wordCount = sentence.split(/\s+/).filter(w => w).length;
-              wordOffset += wordCount;
+              const sentenceWords = sentence.split(/\s+/).filter(w => w).length;
+              const handleSentenceTap = () => {
+                if (isActive) startFrom(paraIdx, sentenceStart);
+              };
+              wordOffset += sentenceWords;
 
               return (
                 <span
                   key={sentIdx}
-                  onClick={() => isActive && startFrom(paraIdx, sentenceStart)}
-                  onTouchStart={(e) => { if (isActive) { e.preventDefault(); startFrom(paraIdx, sentenceStart); } }}
+                  onClick={handleSentenceTap}
+                  onTouchStart={(e) => { e.preventDefault(); handleSentenceTap(); }}
                   className={isActive ? "cursor-pointer hover:bg-primary/20 transition-colors select-none" : ""}
                   style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
                 >
