@@ -4,7 +4,7 @@ import {
   Tooltip, CartesianGrid, ReferenceLine, ReferenceArea,
 } from "recharts";
 
-import { ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { ZoomOut, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { useChartZoom } from "@/hooks/useChartZoom";
 import { EVENT_CATEGORIES } from "@/components/session-form/EventTimelineSection";
 
@@ -73,6 +73,7 @@ function getAllUsedCategories(events) {
 export default function HREventOverlayChart({ timelineRows, events = [], session }) {
   const [isolatedEvent, setIsolatedEvent] = useState(null);
   const [focusedFilteredIdx, setFocusedFilteredIdx] = useState(0);
+  const [eventsCollapsed, setEventsCollapsed] = useState(false);
 
   // Active category filters — null means "all"
   const usedCategories = useMemo(() => getAllUsedCategories(events), [events]);
@@ -325,11 +326,17 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
             </div>
           )}
 
-          <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
-            Events {isolatedEvent !== null ? "— tap again to reset · drag chart to zoom" : "— tap to isolate · drag chart to zoom"}
-          </p>
+          <button
+            className="w-full flex items-center justify-between"
+            onClick={() => setEventsCollapsed((v) => !v)}
+          >
+            <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
+              Events {isolatedEvent !== null ? "— tap again to reset · drag chart to zoom" : "— tap to isolate · drag chart to zoom"}
+            </p>
+            {eventsCollapsed ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />}
+          </button>
 
-          {events.map((ev, i) => {
+          {!eventsCollapsed && events.map((ev, i) => {
             const color = EVENT_COLORS[i % EVENT_COLORS.length];
             const isIsolated = isolatedEvent === i;
             const isFiltered = filteredEventIndices.includes(i);

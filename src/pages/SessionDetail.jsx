@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PageHeader from "../components/PageHeader";
-import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil } from "lucide-react";
 import SessionExportButton from "../components/SessionExportButton";
 import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
@@ -67,7 +67,6 @@ export default function SessionDetail() {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedNearClimaxIdx, setSelectedNearClimaxIdx] = useState(null);
-  const [eventTimelineCollapsed, setEventTimelineCollapsed] = useState(false);
 
   const nearClimaxEvents = useMemo(
     () => session ? detectNearClimaxEvents(timelineRows, session.climax_offset_s, session.pre_climax_offset_s) : [],
@@ -364,52 +363,6 @@ export default function SessionDetail() {
               <a href={s.video_link} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">
                 Video Link →
               </a>
-            )}
-          </div>
-        )}
-
-        {/* Event Timeline */}
-        {(s.event_timeline || []).length > 0 && (
-          <div className="bg-card rounded-xl border border-border p-4 space-y-2">
-            <button
-              className="w-full flex items-center justify-between"
-              onClick={() => setEventTimelineCollapsed((v) => !v)}
-            >
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">
-                Event Timeline <span className="text-muted-foreground font-normal normal-case">({s.event_timeline.length})</span>
-              </h3>
-              {eventTimelineCollapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
-            </button>
-            {!eventTimelineCollapsed && (
-              <div className="space-y-1.5 pt-1">
-                {[...(s.event_timeline)].sort((a, b) => a.time_s - b.time_s).map((ev, i) => {
-                  const cats = Array.isArray(ev.category) ? ev.category : [ev.category].filter(Boolean);
-                  const { EVENT_CATEGORIES: EC } = { EVENT_CATEGORIES };
-                  const primaryColor = (() => {
-                    const found = EVENT_CATEGORIES.find((c) => c.value === cats[0]);
-                    return found ? found.color : "#94a3b8";
-                  })();
-                  return (
-                    <div key={i} className="flex items-start gap-2 rounded-lg px-3 py-2" style={{ background: primaryColor + "0f", borderLeft: `3px solid ${primaryColor}44` }}>
-                      <span className="font-mono text-xs text-primary shrink-0 mt-0.5 w-10">{fmtMmSs(ev.time_s)}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap gap-1 mb-0.5">
-                          {cats.map((c) => {
-                            const meta = getCategoryMeta(c);
-                            return (
-                              <span key={c} className="text-[9px] px-1.5 rounded-full font-medium"
-                                style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
-                                {meta.label}
-                              </span>
-                            );
-                          })}
-                        </div>
-                        <p className="text-sm text-foreground leading-snug">{ev.note}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             )}
           </div>
         )}
