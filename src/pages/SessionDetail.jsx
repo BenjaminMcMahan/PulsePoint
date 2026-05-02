@@ -103,8 +103,73 @@ export default function SessionDetail() {
       const rows = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
       setTimelineRows(rows);
 
-      // Auto-compute phase HR metrics for existing sessions that have markers but no computed values
-      if (rows.length > 0 && s && (!s.hr_avg_pre_to_climax || !s.hr_avg_at_climax_window)) {
+      // Auto-detect phase markers if not already set
+      if (rows.length > 10 && s && !s.climax_offset_s) {
+        // Climax: peak HR in last 60% of session
+        const startIdx = Math.floor(rows.length * 0.25);
+        let peakIdx = startIdx;
+        for (let i = startIdx; i < rows.length; i++) {
+          if (Number(rows[i].hr) > Number(rows[peakIdx].hr)) peakIdx = i;
+        }
+        const climaxOffset = Number(rows[peakIdx].time_offset_s);
+
+        // Pre-climax: lowest HR point within 5 min before climax
+        const windowStart = climaxOffset - 300;
+        const windowEnd = climaxOffset - 15;
+        let valleyIdx = peakIdx;
+        let foundInWindow = false;
+        for (let i = 0; i < rows.length; i++) {
+          const t = Number(rows[i].time_offset_s);
+          if (t < windowStart) continue;
+          if (t > windowEnd) break;
+          if (!foundInWindow || Number(rows[i].hr) < Number(rows[valleyIdx].hr)) {
+            valleyIdx = i;
+            foundInWindow = true;
+          }
+        }
+        const preClimaxOffset = Number(rows[valleyIdx].time_offset_s);
+
+        // Recovery: first point after 15s where HR is falling for 4 consecutive samples and dropped 2%
+        const peakHr = Number(rows[peakIdx].hr);
+        let searchStart = peakIdx + 1;
+        for (let i = peakIdx + 1; i < rows.length; i++) {
+          if (Number(rows[i].time_offset_s) >= Number(rows[peakIdx].time_offset_s) + 15) { searchStart = i; break; }
+        }
+        let recoveryIdx = Math.min(searchStart, rows.length - 1);
+        for (let i = searchStart; i <= rows.length - 4; i++) {
+          const hr = Number(rows[i].hr);
+          if (
+            hr < Number(rows[i - 1].hr) &&
+            Number(rows[i + 1].hr) < hr &&
+            Number(rows[i + 2].hr) < Number(rows[i + 1].hr) &&
+            Number(rows[i + 3].hr) < Number(rows[i + 2].hr) &&
+            hr <= peakHr * 0.98
+          ) {
+            recoveryIdx = i;
+            break;
+          }
+        }
+        const recoveryOffset = Number(rows[recoveryIdx].time_offset_s);
+
+        const updates = {
+          pre_climax_offset_s: preClimaxOffset,
+          climax_offset_s: climaxOffset,
+          recovery_offset_s: recoveryOffset,
+        };
+
+        // Compute HR metrics
+        const lo = Math.min(preClimaxOffset, climaxOffset);
+        const hi = Math.max(preClimaxOffset, climaxOffset);
+        const seg = rows.filter((r) => Number(r.time_offset_s) >= lo && Number(r.time_offset_s) <= hi);
+        if (seg.length > 0) updates.hr_avg_pre_to_climax = Math.round(seg.reduce((a, r) => a + Number(r.hr), 0) / seg.length);
+
+        const win = rows.filter((r) => Math.abs(Number(r.time_offset_s) - climaxOffset) <= 30);
+        if (win.length > 0) updates.hr_avg_at_climax_window = Math.round(win.reduce((a, r) => a + Number(r.hr), 0) / win.length);
+
+        await base44.entities.Session.update(id, updates);
+        setSession((prev) => ({ ...prev, ...updates }));
+      } else if (rows.length > 0 && s && (!s.hr_avg_pre_to_climax || !s.hr_avg_at_climax_window)) {
+        // Auto-compute phase HR metrics for existing sessions with markers but no computed values
         const updates = {};
         if (s.pre_climax_offset_s != null && s.climax_offset_s != null && !s.hr_avg_pre_to_climax) {
           const lo = Math.min(s.pre_climax_offset_s, s.climax_offset_s);
