@@ -368,31 +368,7 @@ export default function SessionDetail() {
               )}
             </div>
 
-            {/* Most Recent Events - 1/3 width sidebar */}
-            {(s.event_timeline || []).length > 0 && (() => {
-              const past = (s.event_timeline || [])
-                .map((ev, i) => ({ ev, i, diff: s.climax_offset_s ? s.climax_offset_s - ev.time_s : 0 }))
-                .filter(({ diff }) => diff >= 0)
-                .sort((a, b) => a.diff - b.diff)
-                .slice(0, 3);
-              if (!past.length) return null;
-              return (
-                <div className="col-span-1 space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Most Recent</p>
-                  {past.map(({ ev, i }) => {
-                    const meta = getCategoryMeta((ev.category && (Array.isArray(ev.category) ? ev.category[0] : ev.category)) || "other");
-                    return (
-                      <div key={i} className="rounded-lg px-3 py-1.5" style={{ background: meta.color + "15", borderLeft: `3px solid ${meta.color}` }}>
-                        <div className="flex flex-col gap-1">
-                          <span className="font-mono text-[10px] font-bold" style={{ color: meta.color }}>{fmtMmSs(ev.time_s)}</span>
-                          <span className="text-xs text-foreground leading-tight">{ev.note}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+
           </div>
         </div>
         </div>
