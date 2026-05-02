@@ -196,6 +196,24 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
     };
   }, [handleTimeUpdate, videoSrc]);
 
+  // Keyboard: spacebar to play/pause (skip in text inputs)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === "Space") {
+        const active = document.activeElement;
+        if (active?.tagName === "INPUT" || active?.tagName === "TEXTAREA" || active?.tagName === "SELECT") {
+          return;
+        }
+        e.preventDefault();
+        if (videoRef.current) {
+          videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Click on chart → seek video
   const handleChartClick = useCallback((data) => {
     if (!data?.activeLabel) return;
@@ -281,8 +299,9 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
             <video
               ref={videoRef}
               src={videoSrc}
-              className="w-full rounded-lg bg-black max-h-[70vh] object-contain"
+              className="w-full rounded-lg bg-black max-h-[70vh] object-contain cursor-pointer"
               playsInline
+              onClick={() => videoRef.current && (videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause())}
             />
             {/* Video timeline scrubber */}
             {videoDuration > 0 && (
