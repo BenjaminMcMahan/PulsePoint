@@ -1,0 +1,382 @@
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { Play, Pause, Video, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  ReferenceLine, CartesianGrid,
+} from "recharts";
+import { EVENT_CATEGORIES, normalizeCategoryArray } from "./session-form/EventTimelineSection";
+
+function getCategoryMeta(value) {
+  return EVENT_CATEGORIES.find((c) => c.value === value) || EVENT_CATEGORIES[EVENT_CATEGORIES.length - 1];
+}
+
+function fmtMmSs(totalSeconds) {
+  const v = Math.round(Number(totalSeconds));
+  const m = Math.floor(v / 60);
+  const s = v % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+const PHASE_LINES = [
+  { key: "pre_climax_offset_s", label: "Pre", color: "#a855f7" },
+  { key: "climax_offset_s",     label: "Climax", color: "#ef4444" },
+  { key: "recovery_offset_s",   label: "Recovery", color: "#3b82f6" },
+];
+
+const EVENT_COLORS = [
+  "#f59e0b", "#a855f7", "#10b981", "#f43f5e", "#0ea5e9",
+  "#fb923c", "#84cc16", "#e879f9", "#34d399", "#f87171",
+];
+
+// Nearest HR from sorted chart data
+function nearestHR(chartData, time_s) {
+  if (!chartData.length) return null;
+  let best = chartData[0];
+  let bestDist = Math.abs(chartData[0].t - time_s);
+  for (const pt of chartData) {
+    const d = Math.abs(pt.t - time_s);
+    if (d < bestDist) { bestDist = d; best = pt; }
+  }
+  return Math.round(best.hr);
+}
+
+// Events within ±windowSec of a playhead position
+function nearbyEvents(events, currentSec, windowSec = 30) {
+  return events
+    .map((ev, i) => ({ ev, i, dist: Math.abs(ev.time_s - currentSec) }))
+    .filter(({ dist }) => dist <= windowSec)
+    .sort((a, b) => a.dist - b.dist);
+}
+
+export default function VideoSyncPlayer({ session, timelineRows }) {
+  const videoRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [videoSrc, setVideoSrc] = useState(null);
+  const [videoOffset, setVideoOffset] = useState(0); // seconds: video t=0 corresponds to session t=videoOffset
+  const [playheadS, setPlayheadS] = useState(0); // session time in seconds
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [zoomWindow, setZoomWindow] = useState(60); // seconds visible in chart window
+  const [activeEventIdx, setActiveEventIdx] = useState(null);
+
+  const events = session.event_timeline || [];
+
+  const chartData = useMemo(() =>
+    timelineRows.map((r) => ({
+      t: Number(r.time_offset_s),
+      hr: Math.round(Number(r.hr_smoothed || r.hr)),
+    })),
+    [timelineRows]
+  );
+
+  const maxT = chartData.length ? chartData[chartData.length - 1].t : (session.duration_minutes || 60) * 60;
+
+  // Visible x-domain centered on playhead
+  const xDomain = useMemo(() => {
+    const half = zoomWindow / 2;
+    const lo = Math.max(0, playheadS - half);
+    const hi = Math.min(maxT, lo + zoomWindow);
+    return [lo, hi];
+  }, [playheadS, zoomWindow, maxT]);
+
+  // Load local video file
+  const handleFileLoad = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setVideoSrc(url);
+  };
+
+  // Sync video → playhead
+  const handleTimeUpdate = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const sessionTime = v.currentTime + videoOffset;
+    setPlayheadS(sessionTime);
+  }, [videoOffset]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.addEventListener("timeupdate", handleTimeUpdate);
+    v.addEventListener("play", () => setIsPlaying(true));
+    v.addEventListener("pause", () => setIsPlaying(false));
+    v.addEventListener("loadedmetadata", () => setVideoDuration(v.duration));
+    return () => {
+      v.removeEventListener("timeupdate", handleTimeUpdate);
+    };
+  }, [handleTimeUpdate, videoSrc]);
+
+  // Click on chart → seek video
+  const handleChartClick = useCallback((data) => {
+    if (!data?.activeLabel) return;
+    const sessionT = Number(data.activeLabel);
+    setPlayheadS(sessionT);
+    const videoT = Math.max(0, sessionT - videoOffset);
+    if (videoRef.current) {
+      videoRef.current.currentTime = videoT;
+    }
+  }, [videoOffset]);
+
+  // Click event note → seek to it
+  const seekToEvent = (ev, idx) => {
+    setActiveEventIdx(idx);
+    setPlayheadS(ev.time_s);
+    const videoT = Math.max(0, ev.time_s - videoOffset);
+    if (videoRef.current) {
+      videoRef.current.currentTime = videoT;
+    }
+  };
+
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) v.play(); else v.pause();
+  };
+
+  const stepFrames = (seconds) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = Math.max(0, v.currentTime + seconds);
+  };
+
+  // Nearby events relative to playhead
+  const nearby = useMemo(() => nearbyEvents(events, playheadS, 30), [events, playheadS]);
+  const currentHR = useMemo(() => nearestHR(chartData, playheadS), [chartData, playheadS]);
+
+  // Chart: only show data in visible window
+  const visibleChartData = useMemo(() => {
+    const [lo, hi] = xDomain;
+    return chartData.filter(d => d.t >= lo - 5 && d.t <= hi + 5);
+  }, [chartData, xDomain]);
+
+  if (!timelineRows.length && !events.length) return null;
+
+  return (
+    <div className="bg-card rounded-xl border border-border overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+          <Video className="w-4 h-4" /> Video Sync Player
+        </h3>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="text-xs px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors"
+        >
+          {videoSrc ? "Change Video" : "Load Local Video"}
+        </button>
+        <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileLoad} />
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Video player */}
+        {videoSrc ? (
+          <div className="space-y-2">
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              className="w-full rounded-lg bg-black max-h-64 object-contain"
+              playsInline
+            />
+            {/* Playback controls */}
+            <div className="flex items-center gap-2">
+              <button onClick={() => stepFrames(-5)} className="p-1.5 rounded-lg bg-muted hover:bg-muted/70 transition-colors">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button onClick={togglePlay} className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-primary text-primary-foreground font-medium text-sm transition-colors hover:bg-primary/90">
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {isPlaying ? "Pause" : "Play"}
+              </button>
+              <button onClick={() => stepFrames(5)} className="p-1.5 rounded-lg bg-muted hover:bg-muted/70 transition-colors">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Video offset alignment */}
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+              <span className="text-xs text-muted-foreground shrink-0">Video offset (session start align):</span>
+              <input
+                type="number"
+                value={videoOffset}
+                onChange={(e) => setVideoOffset(Number(e.target.value) || 0)}
+                className="w-20 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1 h-7"
+                step="1"
+              />
+              <span className="text-xs text-muted-foreground">s</span>
+              <span className="text-xs text-muted-foreground ml-auto">Video 0:00 = Session {fmtMmSs(videoOffset)}</span>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full h-32 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+          >
+            <Video className="w-8 h-8" />
+            <span className="text-sm font-medium">Load local video file</span>
+            <span className="text-xs">Syncs playhead with HR and events</span>
+          </button>
+        )}
+
+        {/* Playhead status bar */}
+        <div className="flex items-center gap-3 bg-muted/40 rounded-lg px-3 py-2">
+          <span className="font-mono text-sm font-bold text-primary">{fmtMmSs(playheadS)}</span>
+          <span className="text-xs text-muted-foreground">session time</span>
+          {currentHR != null && (
+            <>
+              <div className="w-px h-4 bg-border" />
+              <span className="font-mono text-sm font-bold text-chart-3">{currentHR} bpm</span>
+            </>
+          )}
+          <div className="ml-auto flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Zoom:</span>
+            {[30, 60, 120, 300].map((w) => (
+              <button
+                key={w}
+                onClick={() => setZoomWindow(w)}
+                className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${zoomWindow === w ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
+              >
+                {w < 60 ? `${w}s` : `${w / 60}m`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* HR Timeline chart with playhead */}
+        {chartData.length > 0 && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">HR Timeline — click to seek</p>
+            <div className="h-48 cursor-pointer">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={visibleChartData}
+                  margin={{ top: 8, right: 4, bottom: 0, left: -20 }}
+                  onClick={handleChartClick}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                  <XAxis
+                    dataKey="t"
+                    type="number"
+                    domain={xDomain}
+                    tick={{ fontSize: 9 }}
+                    tickFormatter={fmtMmSs}
+                    tickCount={8}
+                    allowDataOverflow
+                  />
+                  <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
+                  <Tooltip
+                    formatter={(val) => [`${val} bpm`, "HR"]}
+                    labelFormatter={(v) => fmtMmSs(Math.round(Number(v)))}
+                    contentStyle={{ fontSize: 11 }}
+                  />
+
+                  {/* Phase markers */}
+                  {PHASE_LINES.map(({ key, label, color }) =>
+                    session[key] != null ? (
+                      <ReferenceLine key={key} x={session[key]} stroke={color} strokeWidth={1.5}
+                        strokeDasharray="4 2"
+                        label={{ value: label, fontSize: 7, fill: color, position: "top" }}
+                      />
+                    ) : null
+                  )}
+
+                  {/* Event markers */}
+                  {events.map((ev, i) => {
+                    const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                    return (
+                      <ReferenceLine key={i} x={ev.time_s} stroke={color} strokeWidth={1.5}
+                        strokeDasharray="2 3"
+                        label={{ value: `E${i + 1}`, fontSize: 7, fill: color, position: "insideTopLeft" }}
+                      />
+                    );
+                  })}
+
+                  {/* Live playhead */}
+                  <ReferenceLine
+                    x={playheadS}
+                    stroke="hsl(var(--foreground))"
+                    strokeWidth={2}
+                    label={{ value: "▶", fontSize: 10, fill: "hsl(var(--foreground))", position: "top" }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="hr"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Nearby event notes */}
+        {events.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Event Notes — nearby ({fmtMmSs(playheadS)} ±30s)
+            </p>
+            {nearby.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic px-1">No events within 30s of current position</p>
+            ) : (
+              nearby.map(({ ev, i, dist }) => {
+                const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                const cats = normalizeCategoryArray(ev.category);
+                const isActive = activeEventIdx === i;
+                const isCurrent = dist < 5;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => seekToEvent(ev, i)}
+                    className={`w-full text-left flex items-start gap-2 rounded-lg px-3 py-2 transition-all ${isCurrent ? "ring-1" : ""}`}
+                    style={{
+                      background: isActive ? color + "28" : color + "12",
+                      borderLeft: `3px solid ${color}`,
+                      outline: isCurrent ? `1px solid ${color}66` : "none",
+                    }}
+                  >
+                    <span className="font-mono text-[11px] font-bold shrink-0 mt-0.5" style={{ color }}>
+                      {fmtMmSs(ev.time_s)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap gap-1 mb-0.5">
+                        {cats.map((c) => {
+                          const meta = getCategoryMeta(c);
+                          return (
+                            <span key={c} className="text-[9px] px-1.5 rounded-full font-medium"
+                              style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
+                              {meta.label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <span className="text-xs text-foreground leading-snug">{ev.note}</span>
+                    </div>
+                    <div className="shrink-0 flex flex-col items-end gap-0.5">
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        {dist < 1 ? "now" : `${Math.round(dist)}s ${ev.time_s < playheadS ? "ago" : "ahead"}`}
+                      </span>
+                      {nearestHR(chartData, ev.time_s) != null && (
+                        <span className="text-[10px] font-mono font-bold text-primary">{nearestHR(chartData, ev.time_s)} bpm</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+
+            {/* All events summary (collapsed) */}
+            {events.length > nearby.length && (
+              <p className="text-[10px] text-muted-foreground px-1">
+                + {events.length - nearby.length} more events outside ±30s window — seek to them on the chart above
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
