@@ -208,6 +208,7 @@ ${JSON.stringify({
 
         return (
           <TTSReader
+            sessionId={session.id}
             paragraphs={paras}
             renderParagraph={(text, idx, isActive) => {
               const meta = paraMeta[idx];

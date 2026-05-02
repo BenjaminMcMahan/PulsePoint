@@ -212,6 +212,7 @@ Provide an insightful, experience-centered analysis. Be specific, reference actu
 
         return (
           <TTSReader
+            sessionId={session.id}
             paragraphs={paras}
             renderParagraph={(text, paraIdx, isActive) => {
               // Find which section this paragraph belongs to

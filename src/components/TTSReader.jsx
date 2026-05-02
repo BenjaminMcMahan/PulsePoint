@@ -10,14 +10,16 @@ import { getBestVoice, getEnglishVoices, resetVoiceCache } from "@/lib/ttsVoice"
  * Props:
  *   paragraphs: string[]  — array of paragraphs to read (displayed + spoken)
  *   renderParagraph?: (text, index, isActive) => ReactNode  — optional custom renderer
+ *   sessionId?: string — session ID for localStorage persistence of reading progress
  * 
  * Features:
  *   - Highlights the currently-speaking paragraph
  *   - Tap any paragraph while playing to jump to it
  *   - Continues playing in background when app loses focus
+ *   - Saves and restores last read paragraph to localStorage
  *   - Uses HTML audio element with speech synthesis fallback
  */
-export default function TTSReader({ paragraphs, renderParagraph }) {
+export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const [state, setState] = useState("idle"); // idle | playing | paused
   const [currentPara, setCurrentPara] = useState(-1);
   const [selectedVoice, setSelectedVoice] = useState(null);
@@ -60,6 +62,13 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
       window.speechSynthesis?.removeEventListener("voiceschanged", loadVoices);
     };
   }, []);
+
+  // Save current paragraph index to localStorage when it changes
+  useEffect(() => {
+    if (sessionId && currentPara >= 0) {
+      localStorage.setItem(`tts_progress_${sessionId}`, String(currentPara));
+    }
+  }, [currentPara, sessionId]);
 
   // Keep selectedVoiceRef in sync
   useEffect(() => { selectedVoiceRef.current = selectedVoice; }, [selectedVoice]);
@@ -141,6 +150,12 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
       }
     }
     chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(chunkText));
+    
+    // Save progress to localStorage
+    if (sessionId) {
+      localStorage.setItem(`tts_progress_${sessionId}`, String(paraIdx));
+    }
+    
     setTimeout(() => speakNext(), 80);
   };
 
@@ -240,6 +255,23 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
         )}
       </div>
 
+      {/* Resume button if progress saved */}
+      {sessionId && currentPara === -1 && state === "idle" && (() => {
+        const savedIdx = localStorage.getItem(`tts_progress_${sessionId}`);
+        const savedParaIdx = savedIdx ? parseInt(savedIdx, 10) : null;
+        if (savedParaIdx != null && savedParaIdx >= 0 && savedParaIdx < paragraphs.length) {
+          return (
+            <button
+              onClick={() => startFrom(savedParaIdx)}
+              className="mb-2 text-xs px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 font-medium transition-colors"
+            >
+              Resume from paragraph {savedParaIdx + 1}
+            </button>
+          );
+        }
+        return null;
+      })()}
+
       {/* Paragraphs */}
       {paragraphs.map((text, paraIdx) => {
         const displayText = fmtSecondsInText(text);
@@ -251,7 +283,6 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
               key={paraIdx}
               className={isActive ? "cursor-pointer" : ""}
               onClick={() => isActive && startFrom(paraIdx, 0)}
-              onTouchStart={(e) => { if (isActive) { e.preventDefault(); startFrom(paraIdx, 0); } }}
             >
               {renderParagraph(displayText, paraIdx, active)}
             </div>
