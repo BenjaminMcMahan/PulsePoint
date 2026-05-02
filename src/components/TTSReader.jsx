@@ -117,18 +117,28 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
     speakNext();
   };
 
-  const startFrom = (idx) => {
+  const startFrom = (paraIdx, wordIdx = 0) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     if (audioRef.current) audioRef.current.pause();
     chunkQueueRef.current = [];
     currentChunkRef.current = null;
-    remainingIdxRef.current = paragraphs.map((_, i) => i).filter(i => i > idx);
-    setCP(idx);
+    
+    // Set remaining paragraphs from paraIdx onwards
+    remainingIdxRef.current = paragraphs.map((_, i) => i).filter(i => i >= paraIdx);
+    setCP(paraIdx);
     setS("playing");
-    // Speak the tapped paragraph immediately
-    const text = paragraphs[idx] || "";
-    chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(text));
+    
+    // If starting from a word in the current paragraph, skip to that word
+    const text = paragraphs[paraIdx] || "";
+    let chunkText = text;
+    if (wordIdx > 0) {
+      const words = text.split(/\s+/);
+      if (wordIdx < words.length) {
+        chunkText = words.slice(wordIdx).join(" ");
+      }
+    }
+    chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(chunkText));
     setTimeout(() => speakNext(), 80);
   };
 
@@ -191,7 +201,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
         )}
         {isActive && (
           <span className="text-[10px] text-muted-foreground ml-1">
-            Tap any paragraph to jump
+            Tap any word to jump
           </span>
         )}
         {/* Voice picker — always show if any voices loaded */}
@@ -229,33 +239,45 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
       </div>
 
       {/* Paragraphs */}
-      {paragraphs.map((text, idx) => {
+      {paragraphs.map((text, paraIdx) => {
         const displayText = fmtSecondsInText(text);
-        const active = currentPara === idx && state === "playing";
+        const active = currentPara === paraIdx && state === "playing";
+        const words = displayText.split(/(\s+)/);
+
         if (renderParagraph) {
           return (
             <div
-              key={idx}
-              onClick={() => isActive && startFrom(idx)}
+              key={paraIdx}
               className={isActive ? "cursor-pointer" : ""}
             >
-              {renderParagraph(displayText, idx, active)}
+              {renderParagraph(displayText, paraIdx, active)}
             </div>
           );
         }
+
         return (
           <p
-            key={idx}
-            onClick={() => isActive && startFrom(idx)}
+            key={paraIdx}
             className={[
               "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200",
               active
                 ? "border-primary bg-primary/8 text-foreground font-medium rounded-r-md"
                 : "border-primary/30 text-foreground/80",
-              isActive ? "cursor-pointer hover:border-primary/60 hover:bg-muted/40" : "",
             ].join(" ")}
           >
-            {displayText}
+            {words.map((word, wordIdx) => {
+              const isWhitespace = /^\s+$/.test(word);
+              if (isWhitespace) return word;
+              return (
+                <span
+                  key={wordIdx}
+                  onClick={() => isActive && startFrom(paraIdx, words.slice(0, wordIdx).join("").trim().split(/\s+/).filter(w => w).length)}
+                  className={isActive ? "cursor-pointer hover:bg-primary/20 rounded px-0.5 transition-colors" : ""}
+                >
+                  {word}
+                </span>
+              );
+            })}
           </p>
         );
       })}
