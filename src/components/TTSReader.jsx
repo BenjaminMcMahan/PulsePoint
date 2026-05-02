@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Play, Pause, Square } from "lucide-react";
+import { Play, Pause, Square, ChevronDown } from "lucide-react";
 import { cleanTextForSpeech, splitIntoChunks } from "./TTSButton";
 import { fmtSecondsInText } from "@/utils/formatSeconds";
+import { getBestVoice, getEnglishVoices, resetVoiceCache } from "@/lib/ttsVoice";
 
 /**
  * TTSReader — paragraph-aware TTS component.
@@ -19,6 +20,9 @@ import { fmtSecondsInText } from "@/utils/formatSeconds";
 export default function TTSReader({ paragraphs, renderParagraph }) {
   const [state, setState] = useState("idle"); // idle | playing | paused
   const [currentPara, setCurrentPara] = useState(-1);
+  const [selectedVoice, setSelectedVoice] = useState(null); // null = auto
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [showVoicePicker, setShowVoicePicker] = useState(false);
 
   const stateRef = useRef("idle");
   const currentParaRef = useRef(-1);
@@ -26,9 +30,25 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   const remainingIdxRef = useRef([]);    // paragraph indices yet to speak
   const keepAliveRef = useRef(null);
   const currentChunkRef = useRef(null);  // chunk currently being spoken
+  const selectedVoiceRef = useRef(null);
 
   const setS = (s) => { stateRef.current = s; setState(s); };
   const setCP = (i) => { currentParaRef.current = i; setCurrentPara(i); };
+
+  // Load voices (they may load async)
+  useEffect(() => {
+    const loadVoices = () => {
+      resetVoiceCache();
+      const voices = getEnglishVoices();
+      setAvailableVoices(voices);
+    };
+    loadVoices();
+    window.speechSynthesis?.addEventListener("voiceschanged", loadVoices);
+    return () => window.speechSynthesis?.removeEventListener("voiceschanged", loadVoices);
+  }, []);
+
+  // Keep selectedVoiceRef in sync
+  useEffect(() => { selectedVoiceRef.current = selectedVoice; }, [selectedVoice]);
 
   useEffect(() => () => {
     clearInterval(keepAliveRef.current);
@@ -71,8 +91,11 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
       const chunk = chunkQueueRef.current.shift();
       currentChunkRef.current = chunk;
       const utt = new SpeechSynthesisUtterance(chunk);
-      utt.lang = "en-US";
-      utt.rate = 0.95;
+      const voice = selectedVoiceRef.current || getBestVoice();
+      if (voice) utt.voice = voice;
+      utt.lang = voice?.lang || "en-US";
+      utt.rate = 0.92;
+      utt.pitch = 1.0;
       utt.volume = 1;
       utt.onend = () => speakNext();
       utt.onerror = (e) => { if (e.error !== "interrupted" && e.error !== "canceled") speakNext(); };
@@ -148,7 +171,7 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
   return (
     <div className="space-y-1">
       {/* Controls */}
-      <div className="flex items-center gap-1 mb-2">
+      <div className="flex items-center gap-1 mb-2 flex-wrap">
         <button
           onClick={handlePlayPause}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:opacity-70 transition-colors text-xs font-medium select-none"
@@ -170,6 +193,38 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
           <span className="text-[10px] text-muted-foreground ml-1">
             Tap any paragraph to jump
           </span>
+        )}
+        {/* Voice picker */}
+        {availableVoices.length > 1 && (
+          <div className="relative ml-auto">
+            <button
+              onClick={() => setShowVoicePicker(v => !v)}
+              className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-[10px] select-none transition-colors"
+              style={{ WebkitTapHighlightColor: "transparent" }}
+            >
+              {selectedVoice ? selectedVoice.name.slice(0, 18) : "Auto voice"}
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {showVoicePicker && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[200px] max-h-48 overflow-y-auto">
+                <button
+                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors text-muted-foreground"
+                  onClick={() => { setSelectedVoice(null); setShowVoicePicker(false); }}
+                >
+                  Auto (best available)
+                </button>
+                {availableVoices.map((v) => (
+                  <button
+                    key={v.name}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors ${selectedVoice?.name === v.name ? "text-primary font-medium" : "text-foreground"}`}
+                    onClick={() => { setSelectedVoice(v); setShowVoicePicker(false); }}
+                  >
+                    {v.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
