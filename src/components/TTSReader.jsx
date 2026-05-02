@@ -124,12 +124,12 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
     chunkQueueRef.current = [];
     currentChunkRef.current = null;
     
-    // Set remaining paragraphs from paraIdx onwards
-    remainingIdxRef.current = paragraphs.map((_, i) => i).filter(i => i >= paraIdx);
+    // Set remaining paragraphs *after* the current one
+    remainingIdxRef.current = paragraphs.map((_, i) => i).filter(i => i > paraIdx);
     setCP(paraIdx);
     setS("playing");
     
-    // If starting from a word in the current paragraph, skip to that word
+    // For current paragraph, skip to the specified word
     const text = paragraphs[paraIdx] || "";
     let chunkText = text;
     if (wordIdx > 0) {
