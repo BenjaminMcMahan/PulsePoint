@@ -313,67 +313,59 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
           </div>
         )}
 
-        {/* Nearby event notes */}
+        {/* All event notes — nearby ones highlighted */}
         {events.length > 0 && (
           <div className="space-y-1.5">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-              Event Notes — nearby ({fmtMmSs(playheadS)} ±30s)
+              All Event Notes ({events.length}) — nearby highlighted
             </p>
-            {nearby.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic px-1">No events within 30s of current position</p>
-            ) : (
-              nearby.map(({ ev, i, dist }) => {
-                const color = EVENT_COLORS[i % EVENT_COLORS.length];
-                const cats = normalizeCategoryArray(ev.category);
-                const isActive = activeEventIdx === i;
-                const isCurrent = dist < 5;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => seekToEvent(ev, i)}
-                    className={`w-full text-left flex items-start gap-2 rounded-lg px-3 py-2 transition-all ${isCurrent ? "ring-1" : ""}`}
-                    style={{
-                      background: isActive ? color + "28" : color + "12",
-                      borderLeft: `3px solid ${color}`,
-                      outline: isCurrent ? `1px solid ${color}66` : "none",
-                    }}
-                  >
-                    <span className="font-mono text-[11px] font-bold shrink-0 mt-0.5" style={{ color }}>
-                      {fmtMmSs(ev.time_s)}
+            {events.map((ev, i) => {
+              const color = EVENT_COLORS[i % EVENT_COLORS.length];
+              const cats = normalizeCategoryArray(ev.category);
+              const dist = Math.abs(ev.time_s - playheadS);
+              const isNearby = dist <= 30;
+              const isCurrent = dist < 5;
+              const isActive = activeEventIdx === i;
+              return (
+                <button
+                  key={i}
+                  onClick={() => seekToEvent(ev, i)}
+                  className="w-full text-left flex items-start gap-2 rounded-lg px-3 py-2 transition-all"
+                  style={{
+                    background: isActive || isCurrent ? color + "28" : isNearby ? color + "18" : color + "08",
+                    borderLeft: `3px solid ${isNearby ? color : color + "55"}`,
+                    outline: isCurrent ? `1px solid ${color}66` : "none",
+                    opacity: isNearby ? 1 : 0.55,
+                  }}
+                >
+                  <span className="font-mono text-[11px] font-bold shrink-0 mt-0.5" style={{ color: isNearby ? color : color + "99" }}>
+                    {fmtMmSs(ev.time_s)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap gap-1 mb-0.5">
+                      {cats.map((c) => {
+                        const meta = getCategoryMeta(c);
+                        return (
+                          <span key={c} className="text-[9px] px-1.5 rounded-full font-medium"
+                            style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
+                            {meta.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <span className="text-xs text-foreground leading-snug">{ev.note}</span>
+                  </div>
+                  <div className="shrink-0 flex flex-col items-end gap-0.5">
+                    <span className="text-[10px] font-mono text-muted-foreground">
+                      {dist < 1 ? "now" : isNearby ? `${Math.round(dist)}s ${ev.time_s < playheadS ? "ago" : "ahead"}` : fmtMmSs(ev.time_s)}
                     </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap gap-1 mb-0.5">
-                        {cats.map((c) => {
-                          const meta = getCategoryMeta(c);
-                          return (
-                            <span key={c} className="text-[9px] px-1.5 rounded-full font-medium"
-                              style={{ background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44` }}>
-                              {meta.label}
-                            </span>
-                          );
-                        })}
-                      </div>
-                      <span className="text-xs text-foreground leading-snug">{ev.note}</span>
-                    </div>
-                    <div className="shrink-0 flex flex-col items-end gap-0.5">
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {dist < 1 ? "now" : `${Math.round(dist)}s ${ev.time_s < playheadS ? "ago" : "ahead"}`}
-                      </span>
-                      {nearestHR(chartData, ev.time_s) != null && (
-                        <span className="text-[10px] font-mono font-bold text-primary">{nearestHR(chartData, ev.time_s)} bpm</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-
-            {/* All events summary (collapsed) */}
-            {events.length > nearby.length && (
-              <p className="text-[10px] text-muted-foreground px-1">
-                + {events.length - nearby.length} more events outside ±30s window — seek to them on the chart above
-              </p>
-            )}
+                    {nearestHR(chartData, ev.time_s) != null && (
+                      <span className="text-[10px] font-mono font-bold text-primary/70">{nearestHR(chartData, ev.time_s)} bpm</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
