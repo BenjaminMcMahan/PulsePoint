@@ -95,21 +95,12 @@ ${JSON.stringify({
 
 Use this arousal profile to personalize analysis: compare the observed build arc and climax pattern against the user's known response style. Note deviations (e.g. faster/slower than typical, more/less sensitive). Reference preferred methods when interpreting session effectiveness.` : "";
 
-    const profileContext = userProfile && (userProfile.age || userProfile.resting_hr || userProfile.max_hr || userProfile.medications) ? `
-
-USER PHYSIOLOGICAL PROFILE (for context only):
-${JSON.stringify({
-  age: userProfile.age,
-  fitness_level: userProfile.fitness_level,
-  resting_hr: userProfile.resting_hr,
-  max_hr_true: userProfile.max_hr,
-  medications_conditions: userProfile.medications,
-}, null, 2)}` : "";
+    const profileContext = "";
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
-      prompt: `You are an expert analyst of sexual arousal physiology. Analyze this session with a primary focus on the arousal arc, event timeline, stimulation dynamics, and subjective experience. Heart rate data is available as supporting context — reference it where it reinforces arousal state, but do NOT make it the centerpiece of your analysis.${profileContext}${arousalProfile}${estimScreenshots.length > 0 ? `
+      prompt: `You are an expert analyst of sexual arousal physiology. Analyze this session with a primary focus on the arousal arc, event timeline, stimulation dynamics, and subjective experience. Heart rate data is available as supporting context — reference it where it reinforces arousal state, but do NOT make it the centerpiece of your analysis.${arousalProfile}${estimScreenshots.length > 0 ? `
 
 E-STIM SCREENSHOTS ATTACHED (${estimScreenshots.length}): Analyze the waveform types, frequencies, pulse widths, and channel configurations visible. Interpret how these settings shaped the arousal experience and stimulation progression throughout the session.` : ""}${eventTimeline.length > 0 ? `
 
