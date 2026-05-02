@@ -278,8 +278,9 @@ export default function SessionDetail() {
           )}
         </div>
 
-        {/* Heart Rate */}
-        <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+        {/* Heart Rate + Most Recent Side-by-Side */}
+        <div className="bg-card rounded-xl border border-border p-4">
+        <div className="space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
             <Heart className="w-3.5 h-3.5" /> Heart Rate
           </h3>
@@ -313,51 +314,83 @@ export default function SessionDetail() {
               <span className="text-sm font-mono font-bold text-chart-3">{Math.round(elevatedTime)}s</span>
             </div>
           )}
-          {timelineRows.length > 0 && (
-            <HRTimelineChart
-              rows={timelineRows}
-              savedMarkers={{
-                pre_climax_offset_s: s.pre_climax_offset_s,
-                climax_offset_s: s.climax_offset_s,
-                recovery_offset_s: s.recovery_offset_s,
-              }}
-              onMarkersChange={async (markers) => {
-                await base44.entities.Session.update(id, markers);
-                setSession((prev) => ({ ...prev, ...markers }));
-              }}
-              highlightRange={highlightRange}
-            />
-          )}
-          {timelineRows.length > 0 && !s.no_climax && (
-            <NearClimaxEvents
-              timelineRows={timelineRows}
-              session={s}
-              selectedIndex={selectedNearClimaxIdx}
-              onSelectIndex={setSelectedNearClimaxIdx}
-            />
-          )}
-          {timelineRows.length > 0 && (
-            <HRZoneAnalysis rows={timelineRows} sessionMaxHR={s.max_hr} userProfile={userProfile} />
-          )}
-          {timelineRows.length > 0 && (s.event_timeline || []).length > 0 && (
-            <HREventOverlayChart
-              timelineRows={timelineRows}
-              events={s.event_timeline}
-              session={s}
-            />
-          )}
-          {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
-            <div className="h-32">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={s.hr_timeline}>
-                  <XAxis dataKey="minute" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} domain={["auto", "auto"]} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="hr" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+          <div className="grid grid-cols-3 gap-4">
+            {/* HR Chart - 2/3 width */}
+            <div className="col-span-2 space-y-3">
+              {timelineRows.length > 0 && (
+                <HRTimelineChart
+                  rows={timelineRows}
+                  savedMarkers={{
+                    pre_climax_offset_s: s.pre_climax_offset_s,
+                    climax_offset_s: s.climax_offset_s,
+                    recovery_offset_s: s.recovery_offset_s,
+                  }}
+                  onMarkersChange={async (markers) => {
+                    await base44.entities.Session.update(id, markers);
+                    setSession((prev) => ({ ...prev, ...markers }));
+                  }}
+                  highlightRange={highlightRange}
+                />
+              )}
+              {timelineRows.length > 0 && !s.no_climax && (
+                <NearClimaxEvents
+                  timelineRows={timelineRows}
+                  session={s}
+                  selectedIndex={selectedNearClimaxIdx}
+                  onSelectIndex={setSelectedNearClimaxIdx}
+                />
+              )}
+              {timelineRows.length > 0 && (
+                <HRZoneAnalysis rows={timelineRows} sessionMaxHR={s.max_hr} userProfile={userProfile} />
+              )}
+              {timelineRows.length > 0 && (s.event_timeline || []).length > 0 && (
+                <HREventOverlayChart
+                  timelineRows={timelineRows}
+                  events={s.event_timeline}
+                  session={s}
+                />
+              )}
+              {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (
+                <div className="h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={s.hr_timeline}>
+                      <XAxis dataKey="minute" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} domain={["auto", "auto"]} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="hr" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Most Recent Events - 1/3 width sidebar */}
+            {events.length > 0 && (() => {
+              const past = events
+                .map((ev, i) => ({ ev, i, diff: s.climax_offset_s ? s.climax_offset_s - ev.time_s : 0 }))
+                .filter(({ diff }) => diff >= 0)
+                .sort((a, b) => a.diff - b.diff)
+                .slice(0, 3);
+              if (!past.length) return null;
+              return (
+                <div className="col-span-1 space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Most Recent</p>
+                  {past.map(({ ev, i }) => {
+                    const meta = getCategoryMeta((ev.category && (Array.isArray(ev.category) ? ev.category[0] : ev.category)) || "other");
+                    return (
+                      <div key={i} className="rounded-lg px-3 py-1.5" style={{ background: meta.color + "15", borderLeft: `3px solid ${meta.color}` }}>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-mono text-[10px] font-bold" style={{ color: meta.color }}>{fmtMmSs(ev.time_s)}</span>
+                          <span className="text-xs text-foreground leading-tight">{ev.note}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
         </div>
 
         {/* Methods */}
