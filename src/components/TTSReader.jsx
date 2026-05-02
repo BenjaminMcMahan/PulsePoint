@@ -256,41 +256,18 @@ export default function TTSReader({ paragraphs, renderParagraph }) {
           );
         }
 
-        // Split into sentences for tappable regions
-        const sentences = displayText.match(/[^.!?]+[.!?]+/g) || [displayText];
-        const allWords = displayText.split(/\s+/).filter(w => w);
-        let wordOffset = 0;
-
         return (
           <p
             key={paraIdx}
+            onClick={() => isActive && startFrom(paraIdx, 0)}
+            onTouchStart={(e) => { if (isActive) { e.preventDefault(); startFrom(paraIdx, 0); } }}
             className={[
               "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200",
-              active
-                ? "border-primary bg-primary/8 text-foreground font-medium rounded-r-md"
-                : "border-primary/30 text-foreground/80",
+              isActive ? "cursor-pointer border-primary bg-primary/8 text-foreground font-medium rounded-r-md select-none" : "border-primary/30 text-foreground/80",
             ].join(" ")}
+            style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
           >
-            {sentences.map((sentence, sentIdx) => {
-              const sentenceStart = wordOffset;
-              const sentenceWords = sentence.split(/\s+/).filter(w => w).length;
-              const handleSentenceTap = () => {
-                if (isActive) startFrom(paraIdx, sentenceStart);
-              };
-              wordOffset += sentenceWords;
-
-              return (
-                <span
-                  key={sentIdx}
-                  onClick={handleSentenceTap}
-                  onTouchStart={(e) => { e.preventDefault(); handleSentenceTap(); }}
-                  className={isActive ? "cursor-pointer hover:bg-primary/20 transition-colors select-none" : ""}
-                  style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
-                >
-                  {sentence}
-                </span>
-              );
-            })}
+            {displayText}
           </p>
         );
       })}
