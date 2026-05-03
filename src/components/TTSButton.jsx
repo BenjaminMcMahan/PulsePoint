@@ -81,8 +81,18 @@ export default function TTSButton({ getText }) {
 
   const setS = (s) => { stateRef.current = s; setState(s); };
 
+  const audioCtxRef = useRef(null);
+  const sourceRef = useRef(null);
+
+  const getAudioCtx = () => {
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtxRef.current;
+  };
+
   const stop = () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
+    if (sourceRef.current) { try { sourceRef.current.stop(); } catch (_) {} sourceRef.current = null; }
     queueRef.current = [];
     setS("idle");
   };
@@ -99,14 +109,18 @@ export default function TTSButton({ getText }) {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: "audio/mpeg" });
-    const url = URL.createObjectURL(blob);
 
-    if (!audioRef.current) audioRef.current = new Audio();
-    audioRef.current.src = url;
-    audioRef.current.onended = () => { URL.revokeObjectURL(url); playNextChunk(); };
-    audioRef.current.onerror = () => { URL.revokeObjectURL(url); playNextChunk(); };
-    audioRef.current.play();
+    const ctx = getAudioCtx();
+    if (ctx.state === "suspended") await ctx.resume();
+    const decoded = await ctx.decodeAudioData(bytes.buffer);
+    if (stateRef.current !== "playing") return;
+
+    const source = ctx.createBufferSource();
+    source.buffer = decoded;
+    source.connect(ctx.destination);
+    source.onended = () => { sourceRef.current = null; playNextChunk(); };
+    sourceRef.current = source;
+    source.start(0);
   };
 
   const handlePress = async () => {
@@ -117,11 +131,9 @@ export default function TTSButton({ getText }) {
     }
     if (state === "paused") {
       setS("playing");
-      if (audioRef.current?.src) {
-        audioRef.current.play();
-      } else {
-        playNextChunk();
-      }
+      const ctx = getAudioCtx();
+      if (ctx.state === "suspended") ctx.resume();
+      playNextChunk();
       return;
     }
     // idle → start

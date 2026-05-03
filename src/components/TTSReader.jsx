@@ -19,16 +19,24 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
   const stateRef = useRef("idle");
   const currentParaRef = useRef(-1);
-  const audioRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const sourceRef = useRef(null);
   const remainingParasRef = useRef([]); // paragraph indices yet to speak
   const chunkQueueRef = useRef([]);     // text chunks for current paragraph
   const voiceRef = useRef(voice);
+
+  const getAudioCtx = () => {
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtxRef.current;
+  };
 
   const setS = (s) => { stateRef.current = s; setState(s); };
   const setCP = (i) => { currentParaRef.current = i; setCurrentPara(i); if (sessionId && i >= 0) localStorage.setItem(`tts_progress_${sessionId}`, String(i)); };
 
   const stop = () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
+    if (sourceRef.current) { try { sourceRef.current.stop(); } catch (_) {} sourceRef.current = null; }
     remainingParasRef.current = [];
     chunkQueueRef.current = [];
     setS("idle");
@@ -68,18 +76,22 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: "audio/mpeg" });
-    const url = URL.createObjectURL(blob);
 
-    if (!audioRef.current) audioRef.current = new Audio();
-    audioRef.current.src = url;
-    audioRef.current.onended = () => { URL.revokeObjectURL(url); playNextChunk(); };
-    audioRef.current.onerror = () => { URL.revokeObjectURL(url); playNextChunk(); };
-    await audioRef.current.play();
+    const ctx = getAudioCtx();
+    if (ctx.state === "suspended") await ctx.resume();
+    const decoded = await ctx.decodeAudioData(bytes.buffer);
+    if (stateRef.current !== "playing") return;
+
+    const source = ctx.createBufferSource();
+    source.buffer = decoded;
+    source.connect(ctx.destination);
+    source.onended = () => { sourceRef.current = null; playNextChunk(); };
+    sourceRef.current = source;
+    source.start(0);
   };
 
   const startFrom = async (paraIdx) => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
+    if (sourceRef.current) { try { sourceRef.current.stop(); } catch (_) {} sourceRef.current = null; }
     chunkQueueRef.current = [];
     remainingParasRef.current = paragraphs.map((_, i) => i).filter(i => i > paraIdx);
     setCP(paraIdx);
@@ -91,17 +103,15 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
   const handlePlayPause = async () => {
     if (state === "playing") {
-      if (audioRef.current) audioRef.current.pause();
+      if (sourceRef.current) { try { sourceRef.current.stop(); } catch (_) {} sourceRef.current = null; }
       setS("paused");
       return;
     }
     if (state === "paused") {
       setS("playing");
-      if (audioRef.current?.src && audioRef.current.paused) {
-        audioRef.current.play();
-      } else {
-        playNextChunk();
-      }
+      const ctx = getAudioCtx();
+      if (ctx.state === "suspended") ctx.resume();
+      playNextChunk();
       return;
     }
     // idle → start
