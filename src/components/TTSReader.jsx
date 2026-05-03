@@ -23,6 +23,9 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const voiceRef = useRef(voice);
   // Generation counter: increment on every startFrom to cancel stale async chains
   const genRef = useRef(0);
+  // Prefetch cache: chunk text → decoded AudioBuffer (keyed by gen+chunk for staleness)
+  const prefetchCacheRef = useRef(new Map()); // key: `${gen}:${chunk}` → Promise<AudioBuffer>
+
 
   const getAudioCtx = () => {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
@@ -48,6 +51,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     remainingParasRef.current = [];
     chunkQueueRef.current = [];
     currentChunkRef.current = null;
+    prefetchCacheRef.current.clear();
     setBufferingPara(-1);
     setS("idle");
     setCP(-1);
@@ -79,40 +83,73 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     playNextChunk(gen);
   };
 
+  // Fetch a chunk and decode it, using the prefetch cache when available.
+  // Returns a decoded AudioBuffer or throws.
+  const fetchDecoded = async (chunk, gen) => {
+    const cacheKey = `${gen}:${chunk}`;
+    if (prefetchCacheRef.current.has(cacheKey)) {
+      return prefetchCacheRef.current.get(cacheKey);
+    }
+    // Start (or reuse) a pending promise so concurrent callers share the same fetch
+    const promise = (async () => {
+      const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+      const base64 = response.data.audio;
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const ctx = getAudioCtx();
+      return ctx.decodeAudioData(bytes.buffer.slice(0));
+    })();
+    prefetchCacheRef.current.set(cacheKey, promise);
+    return promise;
+  };
+
+  // Fire-and-forget: prefetch the next chunk into the cache without blocking playback.
+  const prefetchNext = (gen) => {
+    // Peek at the next chunk in the queue (without shifting)
+    let nextChunk = chunkQueueRef.current[0] ?? null;
+    if (!nextChunk) {
+      // Next will come from the next paragraph
+      const nextParaIdx = remainingParasRef.current[0];
+      if (nextParaIdx == null) return;
+      const nextText = paragraphs[nextParaIdx] || "";
+      const nextChunks = splitIntoChunks(cleanTextForSpeech(nextText));
+      nextChunk = nextChunks[0] ?? null;
+    }
+    if (!nextChunk) return;
+    const cacheKey = `${gen}:${nextChunk}`;
+    if (!prefetchCacheRef.current.has(cacheKey)) {
+      // Kick off background fetch; ignore errors (will retry on actual playback)
+      fetchDecoded(nextChunk, gen).catch(() => {
+        prefetchCacheRef.current.delete(cacheKey);
+      });
+    }
+  };
+
   const fetchAndPlay = async (chunk, gen) => {
     if (gen !== genRef.current) return;
     if (stateRef.current !== "playing") return;
 
     setBufferingPara(currentParaRef.current);
 
-    let response;
+    let decoded;
     try {
-      response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+      decoded = await fetchDecoded(chunk, gen);
     } catch (err) {
       console.error("TTS fetch failed:", err);
       stop();
       return;
     }
 
-    if (gen !== genRef.current) return; // jumped to new paragraph while fetching
+    if (gen !== genRef.current) return;
     if (stateRef.current !== "playing") return;
 
     setBufferingPara(-1);
-
-    const base64 = response.data.audio;
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
     const ctx = getAudioCtx();
     if (ctx.state === "suspended") await ctx.resume();
 
     if (gen !== genRef.current) return;
-
-    const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
-
-    if (gen !== genRef.current) return;
-    if (stateRef.current !== "playing") return;
 
     const source = ctx.createBufferSource();
     source.buffer = decoded;
@@ -120,6 +157,9 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     source.onended = () => { sourceRef.current = null; playNextChunk(gen); };
     sourceRef.current = source;
     source.start(0);
+
+    // Kick off background prefetch of the next chunk as soon as this one starts
+    prefetchNext(gen);
   };
 
   const startFrom = async (paraIdx) => {
@@ -127,6 +167,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     const gen = genRef.current;
 
     stopSource();
+    prefetchCacheRef.current.clear();
     // Ensure AudioContext is running (may be suspended from a pause)
     const ctx = getAudioCtx();
     if (ctx.state === "suspended") await ctx.resume();
