@@ -177,9 +177,9 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     source.buffer = decoded;
     source.connect(ctx.destination);
     
-    // Store chunk start time and duration
+    // Store chunk duration
     const chunkDuration = decoded.duration;
-    const chunkStartTime = ctx.currentTime;
+    let audioStartTime = null; // Will be set when audio actually starts
     
     source.onended = () => { 
       sourceRef.current = null;
@@ -192,6 +192,10 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     if (updateIntervalRef.current) clearInterval(updateIntervalRef.current);
     
     // Track playback time during this chunk
+    // Wait for audio to actually start playing before syncing to AudioContext time
+    let hasStarted = false;
+    let lastCtxTime = ctx.currentTime;
+    
     updateIntervalRef.current = setInterval(() => {
       if (gen !== genRef.current || stateRef.current !== "playing") {
         clearInterval(updateIntervalRef.current);
@@ -199,13 +203,23 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
         return;
       }
       
-      // Calculate elapsed time from chunk start
-      const elapsed = ctx.currentTime - chunkStartTime;
-      if (elapsed < 0) return; // Not started yet
+      const currentCtxTime = ctx.currentTime;
       
-      playbackTimeRef.current = Math.max(0, Math.min(elapsed, chunkDuration));
-      updateWordHighlight();
-    }, 50); // More frequent updates for better tracking
+      // Detect when audio actually starts (ctx.currentTime advances)
+      if (!hasStarted && currentCtxTime > lastCtxTime) {
+        hasStarted = true;
+        audioStartTime = currentCtxTime;
+      }
+      
+      lastCtxTime = currentCtxTime;
+      
+      // Only update highlighting after audio has started
+      if (hasStarted && audioStartTime !== null) {
+        const elapsed = currentCtxTime - audioStartTime;
+        playbackTimeRef.current = Math.max(0, Math.min(elapsed, chunkDuration));
+        updateWordHighlight();
+      }
+    }, 50);
     
     source.start(0);
 

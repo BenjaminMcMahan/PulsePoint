@@ -13,6 +13,29 @@ function secondsToSpeech(n) {
     : `${m} minute${m !== 1 ? 's' : ''} and ${s} seconds`;
 }
 
+// Convert time string (HH:MM:SS or MM:SS) or seconds to spoken words
+export function formatTimeAsWords(time) {
+  if (typeof time === "number") {
+    const m = Math.floor(time / 60);
+    const s = Math.round(time % 60);
+    return s === 0
+      ? `${m} minute${m !== 1 ? 's' : ''}`
+      : `${m} minute${m !== 1 ? 's' : ''} and ${s} seconds`;
+  }
+  
+  const parts = String(time).split(":").map(Number);
+  let totalSeconds = 0;
+  if (parts.length === 3) totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  else if (parts.length === 2) totalSeconds = parts[0] * 60 + parts[1];
+  else return time;
+  
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return s === 0
+    ? `${m} minute${m !== 1 ? 's' : ''}`
+    : `${m} minute${m !== 1 ? 's' : ''} and ${s} seconds`;
+}
+
 // Clean text for natural speech
 export function cleanTextForSpeech(text) {
   return text
