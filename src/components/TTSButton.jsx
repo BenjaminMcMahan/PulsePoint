@@ -95,8 +95,11 @@ export default function TTSButton({ getText }) {
     const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
     if (stateRef.current !== "playing") return;
 
-    // response.data is an ArrayBuffer from axios
-    const blob = new Blob([response.data], { type: "audio/mpeg" });
+    const base64 = response.data.audio;
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: "audio/mpeg" });
     const url = URL.createObjectURL(blob);
 
     if (!audioRef.current) audioRef.current = new Audio();

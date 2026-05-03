@@ -29,13 +29,8 @@ Deno.serve(async (req) => {
     }
 
     const audioBuffer = await response.arrayBuffer();
-    return new Response(audioBuffer, {
-      status: 200,
-      headers: {
-        "Content-Type": "audio/mpeg",
-        "Cache-Control": "public, max-age=3600",
-      },
-    });
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+    return Response.json({ audio: base64 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
