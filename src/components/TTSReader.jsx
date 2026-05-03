@@ -30,8 +30,10 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const genRef = useRef(0);
   // Prefetch cache: chunk text → decoded AudioBuffer (keyed by gen+chunk for staleness)
   const prefetchCacheRef = useRef(new Map()); // key: `${gen}:${chunk}` → Promise<AudioBuffer>
-  const playbackTimeRef = useRef(0); // track approximate playback time in seconds
+  const playbackTimeRef = useRef(0); // track playback time in seconds
+  const chunkStartTimeRef = useRef(0); // AudioContext time when current chunk started
   const wordRefs = useRef(new Map()); // map of word element refs for auto-scroll
+  const updateIntervalRef = useRef(null); // track update interval to clear it
 
 
   const getAudioCtx = () => {
@@ -68,6 +70,10 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     chunkQueueRef.current = [];
     currentChunkRef.current = null;
     prefetchCacheRef.current.clear();
+    if (updateIntervalRef.current) {
+      clearInterval(updateIntervalRef.current);
+      updateIntervalRef.current = null;
+    }
     setBufferingPara(-1);
     setS("idle");
     setCP(-1);
@@ -170,20 +176,36 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     const source = ctx.createBufferSource();
     source.buffer = decoded;
     source.connect(ctx.destination);
-    source.onended = () => { sourceRef.current = null; playNextChunk(gen); };
+    
+    // Store chunk start time and duration
+    const chunkDuration = decoded.duration;
+    const chunkStartTime = ctx.currentTime;
+    
+    source.onended = () => { 
+      sourceRef.current = null;
+      // Move to next chunk after this one finishes
+      playNextChunk(gen);
+    };
     sourceRef.current = source;
     
-    // Track actual playback time from AudioContext and update word highlighting
-    const startTime = ctx.currentTime;
-    const updateInterval = setInterval(() => {
+    // Clear previous interval if it exists
+    if (updateIntervalRef.current) clearInterval(updateIntervalRef.current);
+    
+    // Track playback time during this chunk
+    updateIntervalRef.current = setInterval(() => {
       if (gen !== genRef.current || stateRef.current !== "playing") {
-        clearInterval(updateInterval);
+        clearInterval(updateIntervalRef.current);
+        updateIntervalRef.current = null;
         return;
       }
-      // Get actual elapsed time from AudioContext
-      playbackTimeRef.current = ctx.currentTime - startTime;
+      
+      // Calculate elapsed time from chunk start
+      const elapsed = ctx.currentTime - chunkStartTime;
+      if (elapsed < 0) return; // Not started yet
+      
+      playbackTimeRef.current = Math.max(0, Math.min(elapsed, chunkDuration));
       updateWordHighlight();
-    }, 100);
+    }, 50); // More frequent updates for better tracking
     
     source.start(0);
 
@@ -197,20 +219,24 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     
     const text = paragraphs[paraIdx];
     const words = text.split(/\s+/).filter(Boolean);
+    if (!words.length) return;
     
     // Estimate word index based on playback time (~120 WPM = 2 words/sec)
     const estimatedWordIdx = Math.floor(playbackTimeRef.current * 2);
+    const boundedIdx = Math.max(0, Math.min(estimatedWordIdx, words.length - 1));
     
-    if (estimatedWordIdx < words.length) {
-      if (estimatedWordIdx !== currentWordIdx) {
-        setCurrentWordIdx(estimatedWordIdx);
-      }
-      
-      // Auto-scroll to current word
-      const wordKey = `word-${paraIdx}-${estimatedWordIdx}`;
-      const wordEl = wordRefs.current.get(wordKey);
-      if (wordEl) {
+    if (boundedIdx !== currentWordIdx) {
+      setCurrentWordIdx(boundedIdx);
+    }
+    
+    // Auto-scroll to current word with slight delay to ensure DOM is ready
+    const wordKey = `word-${paraIdx}-${boundedIdx}`;
+    const wordEl = wordRefs.current.get(wordKey);
+    if (wordEl) {
+      try {
         wordEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch (e) {
+        // Silently handle scroll errors on mobile
       }
     }
   };
