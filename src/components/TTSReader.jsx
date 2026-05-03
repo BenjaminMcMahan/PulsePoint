@@ -173,14 +173,15 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     source.onended = () => { sourceRef.current = null; playNextChunk(gen); };
     sourceRef.current = source;
     
-    // Track playback time and update word highlighting
+    // Track actual playback time from AudioContext and update word highlighting
     const startTime = ctx.currentTime;
     const updateInterval = setInterval(() => {
       if (gen !== genRef.current || stateRef.current !== "playing") {
         clearInterval(updateInterval);
         return;
       }
-      playbackTimeRef.current += 0.1;
+      // Get actual elapsed time from AudioContext
+      playbackTimeRef.current = ctx.currentTime - startTime;
       updateWordHighlight();
     }, 100);
     
@@ -197,11 +198,13 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     const text = paragraphs[paraIdx];
     const words = text.split(/\s+/).filter(Boolean);
     
-    // Estimate word index based on playback time (~120 WPM average)
-    const estimatedWordIdx = Math.floor((playbackTimeRef.current * 2));
+    // Estimate word index based on playback time (~120 WPM = 2 words/sec)
+    const estimatedWordIdx = Math.floor(playbackTimeRef.current * 2);
     
-    if (estimatedWordIdx !== currentWordIdx && estimatedWordIdx < words.length) {
-      setCurrentWordIdx(Math.max(-1, estimatedWordIdx));
+    if (estimatedWordIdx < words.length) {
+      if (estimatedWordIdx !== currentWordIdx) {
+        setCurrentWordIdx(estimatedWordIdx);
+      }
       
       // Auto-scroll to current word
       const wordKey = `word-${paraIdx}-${estimatedWordIdx}`;
