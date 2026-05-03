@@ -179,28 +179,28 @@ Arousal notes: ${userProfile.arousal_notes || "none"}
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are an expert physiological and sexual response analyst. Based on ${sessions.length} recorded sessions and the user's profile notes, generate a comprehensive, deeply personal physiological and arousal profile for this individual.
+      prompt: `You are an expert physiological and sexual response analyst. Based on ${sessions.length} recorded sessions and profile notes, generate a comprehensive, deeply personal physiological and arousal profile. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
 ${profileContext}
 SESSION DATA (${sessions.length} sessions):
 ${JSON.stringify(sessionSummaries, null, 2)}
 
 Generate a rich, holistic profile that covers:
 
-1. AROUSAL PHYSIOLOGY: Their characteristic arousal curve shape, HR response patterns, build dynamics, and how their physiology behaves under different conditions. Reference actual HR data and phase timing where available.
+1. AROUSAL PHYSIOLOGY: Your characteristic arousal curve shape, HR response patterns, build dynamics, and how your physiology behaves under different conditions. Reference actual HR data and phase timing where available.
 
-2. STIMULATION PROFILE: Which methods, combinations, and configurations produce the best outcomes. What their event timelines reveal about their response to stimulation changes. Identify what consistently works vs. what produces inconsistent results.
+2. STIMULATION PROFILE: Which methods, combinations, and configurations produce your best outcomes. What your event timelines reveal about your response to stimulation changes. Identify what consistently works vs. what produces inconsistent results for you.
 
-3. CLIMAX & RECOVERY PATTERNS: Climax quality, duration patterns, ejaculate patterns, refractory observations. How their physiology winds down and what the recovery data reveals.
+3. CLIMAX & RECOVERY PATTERNS: Your climax quality, duration patterns, ejaculate patterns, refractory observations. How your physiology winds down and what your recovery data reveals.
 
-4. CONTEXTUAL SENSITIVITIES: How mood, hydration, time of day, substances, environment, and other contextual factors influence their response. Identify what amplifies or suppresses arousal.
+4. CONTEXTUAL SENSITIVITIES: How mood, hydration, time of day, substances, environment, and other contextual factors influence your response. Identify what amplifies or suppresses your arousal.
 
-5. DISCOMFORT & PHYSIOLOGICAL EDGE CASES: Recurring discomfort patterns, unusual sensations, and what they suggest anatomically or physiologically.
+5. DISCOMFORT & PHYSIOLOGICAL EDGE CASES: Recurring discomfort patterns, unusual sensations, and what they suggest about your anatomy or physiology.
 
-6. BEHAVIORAL & AROUSAL TENDENCIES: Patterns in how they build (gradual vs. erratic, plateau-heavy vs. continuous), event timeline patterns, stimulation pause/resume habits, and what that reveals about their control and sensitivity.
+6. BEHAVIORAL & AROUSAL TENDENCIES: Patterns in how you build (gradual vs. erratic, plateau-heavy vs. continuous), your event timeline patterns, stimulation pause/resume habits, and what that reveals about your control and sensitivity.
 
-7. PERSONAL OPTIMIZATION RECOMMENDATIONS: Specific, actionable recommendations tailored to their unique profile — not generic advice. Reference their actual data, methods, and notes.
+7. PERSONAL OPTIMIZATION RECOMMENDATIONS: Specific, actionable recommendations tailored to your unique profile — not generic advice. Reference your actual data, methods, and notes.
 
-Write as a cohesive, intelligent clinical profile — personal, insightful, and grounded in the data. Use the profile notes to add context and validate or contrast observed patterns.`,
+Write as a cohesive, intelligent personal profile — speak directly to the person, be insightful, and ground everything in their data.`,
       response_json_schema: {
         type: "object",
         properties: {
@@ -375,7 +375,7 @@ function NearClimaxPanel({ sessions, allTimelines }) {
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant analyzing near-climax events detected in heart rate data from sexual response sessions.
+      prompt: `You are a physiological research assistant analyzing near-climax events detected in heart rate data from sexual response sessions. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
 
 A "near-climax event" is defined as: an erratic yet somewhat sustained climb in heart rate (>=8 bpm rise within 45 seconds), followed by a notable drop — similar in shape to the climax cascade (ever-increasing HR with an apex and fall) but not as sustained. These events occur OUTSIDE of the actual climax window.
 
@@ -383,13 +383,13 @@ Detected event data across ${sessionEvents.length} sessions (out of ${sessions.l
 ${JSON.stringify(sessionEvents, null, 2)}
 
 Provide a rich, interpretive narrative analysis. Focus on:
-1. What these events physiologically represent — are they arousal plateaus, mini-edging responses, parasympathetic interruptions, or something else?
-2. How frequently they occur and what that suggests about the user's physiological response pattern.
-3. Which session contexts (methods, duration, time-in-session) seem to precipitate more of these events.
-4. What role they likely play in the overall arousal arc — do they precede stronger or weaker climax events?
-5. Recommendations for leveraging or managing these events to optimize session outcomes.
+1. What these events physiologically represent for you — are they arousal plateaus, mini-edging responses, parasympathetic interruptions, or something else?
+2. How frequently they occur and what that suggests about your physiological response pattern.
+3. Which session contexts (methods, duration, time-in-session) seem to trigger more of these events for you.
+4. What role they likely play in your overall arousal arc — do they precede stronger or weaker climax events for you?
+5. Recommendations for how you can leverage or manage these events to optimize your session outcomes.
 
-Be interpretive, insightful, and research-oriented. Reference specific sessions where notable.`,
+Be interpretive, insightful, and speak directly to the person. Reference specific sessions where notable.`,
       response_json_schema: {
         type: "object",
         properties: {
