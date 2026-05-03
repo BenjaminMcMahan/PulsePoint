@@ -271,7 +271,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
     chunkQueueRef.current = [];
     currentChunkRef.current = null;
-    remainingParasRef.current = paragraphs.map((_, i) => i).filter(i => i > paraIdx);
+    remainingParasRef.current = paragraphs.map((_, i) => i).filter(i => i >= paraIdx);
     setCP(paraIdx);
     setS("playing");
     setBufferingPara(paraIdx);
