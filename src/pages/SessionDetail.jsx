@@ -17,6 +17,7 @@ import SessionAIPanel from "../components/SessionAIPanel";
 import SessionExecutiveSummary from "../components/SessionExecutiveSummary";
 import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import ArousalEventChart from "../components/ArousalEventChart";
+import UnifiedSessionTimeline from "../components/UnifiedSessionTimeline";
 import NoClimaxAIPanel from "../components/NoClimaxAIPanel";
 import { EVENT_CATEGORIES } from "../components/session-form/EventTimelineSection";
 
@@ -484,6 +485,11 @@ export default function SessionDetail() {
             </div>
           );
         })()}
+
+        {/* Unified Interactive Timeline */}
+        {timelineRows.length > 0 && (
+          <UnifiedSessionTimeline session={s} timelineRows={timelineRows} />
+        )}
 
         {/* Arousal Arc + Event Correlation */}
         {((session.event_timeline || []).length > 0 || timelineRows.length > 0) && (
