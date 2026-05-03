@@ -17,6 +17,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
   const stateRef = useRef("idle");
   const currentParaRef = useRef(-1);
+  const userPausedRef = useRef(false); // true only when the user explicitly paused
   const audioCtxRef = useRef(null);
   const sourceRef = useRef(null);
   const remainingParasRef = useRef([]);
@@ -32,9 +33,9 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const getAudioCtx = () => {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      // Auto-resume if browser suspends context while we intend to be playing
+      // Auto-resume if browser suspends context while we intend to be playing (not user-paused)
       ctx.addEventListener("statechange", () => {
-        if (ctx.state === "suspended" && stateRef.current === "playing") {
+        if (ctx.state === "suspended" && stateRef.current === "playing" && !userPausedRef.current) {
           ctx.resume().catch(() => {});
         }
       });
@@ -174,6 +175,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const startFrom = async (paraIdx) => {
     genRef.current++; // cancel any in-flight chain immediately
     const gen = genRef.current;
+    userPausedRef.current = false;
 
     stopSource();
     prefetchCacheRef.current.clear();
@@ -198,6 +200,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const handlePlayPause = async () => {
     if (state === "playing") {
       // Suspend the AudioContext to freeze playback at exact position
+      userPausedRef.current = true;
       const ctx = getAudioCtx();
       await ctx.suspend();
       setS("paused");
@@ -205,12 +208,14 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     }
     if (state === "buffering") {
       // Still fetching — cancel and mark paused; resume will re-fetch the same chunk
+      userPausedRef.current = true;
       genRef.current++;
       setBufferingPara(-1);
       setS("paused");
       return;
     }
     if (state === "paused") {
+      userPausedRef.current = false;
       const ctx = getAudioCtx();
       if (ctx.state === "suspended" && sourceRef.current) {
         // Audio is suspended mid-playback — just resume it
