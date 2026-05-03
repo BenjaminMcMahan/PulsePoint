@@ -235,8 +235,12 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     speedRef.current = v;
     setSpeed(v);
     localStorage.setItem("tts_speed", String(v));
-    // Clear prefetch cache since speed changed
     prefetchCacheRef.current.clear();
+    // If currently playing, restart from the current paragraph at new speed
+    if (stateRef.current === "playing" || stateRef.current === "paused") {
+      const para = currentParaRef.current >= 0 ? currentParaRef.current : 0;
+      startFrom(para);
+    }
   };
 
   const isActive = state === "playing" || state === "paused" || state === "buffering";
