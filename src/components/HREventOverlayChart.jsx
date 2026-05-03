@@ -71,6 +71,7 @@ function getAllUsedCategories(events) {
 }
 
 export default function HREventOverlayChart({ timelineRows, events = [], session }) {
+  const [collapsed, setCollapsed] = useState(true);
   const [isolatedEvent, setIsolatedEvent] = useState(null);
   const [focusedFilteredIdx, setFocusedFilteredIdx] = useState(0);
   const [eventsCollapsed, setEventsCollapsed] = useState(false);
@@ -187,20 +188,26 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h3>
-        {isZoomed ? (
+        <button className="flex items-center gap-1.5 flex-1 text-left" onClick={() => setCollapsed((v) => !v)}>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h3>
+          {collapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
+        </button>
+        {!collapsed && isZoomed && (
           <button
             onClick={() => { resetZoom(); setIsolatedEvent(null); }}
             className="flex items-center gap-1 text-[10px] text-primary border border-primary rounded px-2 py-0.5"
           >
             <ZoomOut className="w-3 h-3" /> Reset Zoom
           </button>
-        ) : (
+        )}
+        {!collapsed && !isZoomed && (
           <span className="text-[10px] text-muted-foreground">Drag to zoom</span>
         )}
       </div>
 
-      <div className="h-64 cursor-crosshair" {...wrapperProps}>
+      {collapsed && null}
+
+      {!collapsed && <div className="h-64 cursor-crosshair" {...wrapperProps}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={displayData} margin={{ top: 8, right: 4, bottom: 0, left: -20 }} {...chartProps}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -266,10 +273,10 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
             />
           </ComposedChart>
         </ResponsiveContainer>
-      </div>
+      </div>}
 
       {/* Event navigator bar */}
-      {navEv && (
+      {!collapsed && navEv && (
         <div className="rounded-lg px-3 py-3" style={{ background: navColor + "18", borderLeft: `3px solid ${navColor}` }}>
           <div className="flex items-center gap-2 mb-2">
             <button onClick={handlePrev} className="p-0.5 rounded hover:bg-black/10 shrink-0">
@@ -293,7 +300,7 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
       )}
 
       {/* Category filter chips + legend */}
-      {events.length > 0 && (
+      {!collapsed && events.length > 0 && (
         <div className="space-y-2 pt-1">
           {/* Filter chips */}
           {usedCategories.length > 1 && (

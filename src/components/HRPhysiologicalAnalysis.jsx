@@ -20,7 +20,7 @@ function MetricCard({ label, value, unit, color = "primary" }) {
 }
 
 export default function HRPhysiologicalAnalysis({ timelineRows, session }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const metrics = useMemo(() => {
     if (!timelineRows || timelineRows.length === 0) return null;

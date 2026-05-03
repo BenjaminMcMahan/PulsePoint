@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie, Legend,
@@ -33,6 +34,7 @@ function getZoneIndex(hr, restingHR, mhr) {
 }
 
 export default function HRZoneAnalysis({ rows, sessionMaxHR, userProfile }) {
+  const [collapsed, setCollapsed] = useState(true);
   const analysis = useMemo(() => {
     if (!rows || rows.length < 2) return null;
 
@@ -93,8 +95,12 @@ export default function HRZoneAnalysis({ rows, sessionMaxHR, userProfile }) {
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR Zone Analysis</h3>
+      <button className="w-full flex items-center justify-between" onClick={() => setCollapsed((v) => !v)}>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">HR Zone Analysis</h3>
+        {collapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
+      </button>
 
+      {!collapsed && <>
       {/* Key stats row */}
       <div className="grid grid-cols-3 gap-2">
         <div className="text-center bg-muted rounded-lg py-2">
@@ -202,6 +208,7 @@ export default function HRZoneAnalysis({ rows, sessionMaxHR, userProfile }) {
           </div>
         );
       })()}
+      </>}
     </div>
   );
 }

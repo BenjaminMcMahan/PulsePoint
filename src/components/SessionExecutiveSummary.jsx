@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 // ── Scoring helpers ────────────────────────────────────────────────────────────
@@ -140,6 +141,7 @@ function fmtSec(s) {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function SessionExecutiveSummary({ session, timelineRows }) {
+  const [collapsed, setCollapsed] = useState(true);
   const result = useMemo(() => computeScore(session, timelineRows), [session, timelineRows]);
 
   if (!result) return null;
@@ -194,13 +196,14 @@ export default function SessionExecutiveSummary({ session, timelineRows }) {
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <button className="w-full flex items-center justify-between" onClick={() => setCollapsed((v) => !v)}>
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
           Executive Summary
         </h3>
-        <span className="text-[10px] text-muted-foreground">{factors.length} factors</span>
-      </div>
+        {collapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
+      </button>
 
+      {!collapsed && <>
       {/* Score ring + grade */}
       <div className="flex items-center gap-5">
         {/* Circular score */}
@@ -272,6 +275,7 @@ export default function SessionExecutiveSummary({ session, timelineRows }) {
           );
         })}
       </div>
+      </>}
     </div>
   );
 }

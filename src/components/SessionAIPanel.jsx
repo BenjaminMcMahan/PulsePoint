@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Brain, AlertCircle, Activity, Lightbulb, TrendingUp, Zap } from "lucide-react";
+import { Brain, AlertCircle, Activity, Lightbulb, TrendingUp, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import TTSReader from "./TTSReader";
 import { Button } from "@/components/ui/button";
 import { EVENT_CATEGORIES } from "./session-form/EventTimelineSection";
@@ -38,6 +38,7 @@ function Item({ text }) {
 }
 
 export default function SessionAIPanel({ session, timelineRows, userProfile }) {
+  const [collapsed, setCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(session.ai_analysis ?? null);
 
@@ -172,9 +173,12 @@ Provide an insightful, experience-centered analysis. Be specific, reference actu
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
-          <Brain className="w-4 h-4" /> AI Session Analysis
-        </h3>
+        <button className="flex items-center gap-1.5 flex-1 text-left" onClick={() => setCollapsed((v) => !v)}>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+            <Brain className="w-4 h-4" /> AI Session Analysis
+          </h3>
+          {collapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" /> : <ChevronUp className="w-4 h-4 text-muted-foreground ml-1" />}
+        </button>
         <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5">
           {loading
             ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
@@ -182,13 +186,13 @@ Provide an insightful, experience-centered analysis. Be specific, reference actu
         </Button>
       </div>
 
-      {!result && !loading && (
+      {!collapsed && !result && !loading && (
         <p className="text-xs text-muted-foreground">
           Click Analyze to generate a detailed AI physiological breakdown of this session. Uses Claude Sonnet.
         </p>
       )}
 
-      {result && (() => {
+      {!collapsed && result && (() => {
         // Support both old schema (hr_analysis/phase_analysis) and new schema (arousal_arc/event_analysis)
         const arousalItems = result.arousal_arc || result.phase_analysis || [];
         const eventItems = result.event_analysis || result.hr_analysis || [];

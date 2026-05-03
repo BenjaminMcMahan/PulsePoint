@@ -118,7 +118,7 @@ const PHASE_MARKERS = [
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function UnifiedSessionTimeline({ timelineRows, session }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [showIntensity, setShowIntensity] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
   const [eventsListCollapsed, setEventsListCollapsed] = useState(false);

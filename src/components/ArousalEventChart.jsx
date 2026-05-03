@@ -116,7 +116,7 @@ const PHASE_LINES = [
 
 export default function ArousalEventChart({ session, timelineRows }) {
   const [hiddenCats, setHiddenCats] = useState(new Set());
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [listCollapsed, setListCollapsed] = useState(false);
   const [activeIdx, setActiveIdx] = useState(null); // original event index
   const [focusedFilteredIdx, setFocusedFilteredIdx] = useState(0);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Zap, Activity, Flag, Brain } from "lucide-react";
+import { TrendingUp, Zap, Activity, Flag, Brain, ChevronDown, ChevronUp } from "lucide-react";
 import TTSReader from "./TTSReader";
 import { EVENT_CATEGORIES } from "./session-form/EventTimelineSection";
 
@@ -38,6 +38,7 @@ function PhaseBlock({ color, icon, title, items }) {
 }
 
 export default function CascadeOverviewPanel({ session, timelineRows, userProfile }) {
+  const [collapsed, setCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(session.ai_cascade ?? null);
 
@@ -167,9 +168,12 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
-          <TrendingUp className="w-4 h-4" /> Cascade Overview
-        </h3>
+        <button className="flex items-center gap-1.5 flex-1 text-left" onClick={() => setCollapsed((v) => !v)}>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+            <TrendingUp className="w-4 h-4" /> Cascade Overview
+          </h3>
+          {collapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" /> : <ChevronUp className="w-4 h-4 text-muted-foreground ml-1" />}
+        </button>
         <div className="flex items-center gap-2">
           <Button
             size="sm"
@@ -184,20 +188,20 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
         </div>
       </div>
 
-      {!hasMarkers &&
+      {!collapsed && !hasMarkers &&
       <p className="text-xs text-muted-foreground">
           Set Pre-Climax, Climax, and Recovery markers on the HR timeline above to enable cascade analysis.
         </p>
       }
 
-      {hasMarkers && !result && !loading &&
+      {!collapsed && hasMarkers && !result && !loading &&
       <p className="text-xs text-muted-foreground">
           Analyze the full cascade arc — build, pre-climax, climax, and recovery — with event correlations. Uses Claude Sonnet.
         </p>
       }
 
       {/* Phase timing mini-summary */}
-      {hasMarkers &&
+      {!collapsed && hasMarkers &&
       <div className="grid grid-cols-2 gap-2">
           {session.pre_climax_offset_s != null && session.climax_offset_s != null &&
         <div className="bg-muted/50 rounded-lg px-3 py-2 flex flex-col items-center">
@@ -218,7 +222,7 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
         </div>
       }
 
-      {result && (() => {
+      {!collapsed && result && (() => {
         const PHASES = [
           { key: "build_phase", color: "#6366f1", title: "Build Phase", icon: <Activity className="w-3.5 h-3.5" /> },
           { key: "pre_climax_phase", color: "#a855f7", title: "Pre-Climax", icon: <Zap className="w-3.5 h-3.5" /> },
