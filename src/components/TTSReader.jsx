@@ -79,7 +79,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
     const ctx = getAudioCtx();
     if (ctx.state === "suspended") await ctx.resume();
-    const decoded = await ctx.decodeAudioData(bytes.buffer);
+    const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
     if (stateRef.current !== "playing") return;
 
     const source = ctx.createBufferSource();

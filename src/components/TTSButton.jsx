@@ -67,38 +67,38 @@ export function splitIntoChunks(text, maxLen = 1000) {
   return chunks.length ? chunks : [text];
 }
 
-const VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
-
 /**
  * TTSButton — simple play/pause/stop button using OpenAI TTS.
  */
 export default function TTSButton({ getText }) {
   const [state, setState] = useState("idle"); // idle | loading | playing | paused
   const stateRef = useRef("idle");
-  const audioRef = useRef(null);
-  const queueRef = useRef([]); // remaining text chunks
+  const audioCtxRef = useRef(null);
+  const sourceRef = useRef(null);
+  const queueRef = useRef([]);
   const voiceRef = useRef(localStorage.getItem("tts_oai_voice") || "alloy");
 
   const setS = (s) => { stateRef.current = s; setState(s); };
 
-  const audioCtxRef = useRef(null);
-  const sourceRef = useRef(null);
-
-  const getAudioCtx = () => {
+  const getCtx = () => {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
       audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
     }
     return audioCtxRef.current;
   };
 
-  const stop = () => {
+  const stopSource = () => {
     if (sourceRef.current) { try { sourceRef.current.stop(); } catch (_) {} sourceRef.current = null; }
+  };
+
+  const stop = () => {
+    stopSource();
     queueRef.current = [];
     setS("idle");
   };
 
   const playNextChunk = async () => {
-    if (stateRef.current === "paused") return;
+    if (stateRef.current !== "playing") return;
     const chunk = queueRef.current.shift();
     if (!chunk) { setS("idle"); return; }
 
@@ -109,10 +109,12 @@ export default function TTSButton({ getText }) {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    // slice() to get a fresh, non-detachable ArrayBuffer
+    const buffer = bytes.buffer.slice(0);
 
-    const ctx = getAudioCtx();
+    const ctx = getCtx();
     if (ctx.state === "suspended") await ctx.resume();
-    const decoded = await ctx.decodeAudioData(bytes.buffer);
+    const decoded = await ctx.decodeAudioData(buffer);
     if (stateRef.current !== "playing") return;
 
     const source = ctx.createBufferSource();
@@ -125,14 +127,14 @@ export default function TTSButton({ getText }) {
 
   const handlePress = async () => {
     if (state === "playing") {
-      if (audioRef.current) audioRef.current.pause();
+      stopSource();
       setS("paused");
       return;
     }
     if (state === "paused") {
       setS("playing");
-      const ctx = getAudioCtx();
-      if (ctx.state === "suspended") ctx.resume();
+      const ctx = getCtx();
+      if (ctx.state === "suspended") await ctx.resume();
       playNextChunk();
       return;
     }
