@@ -14,6 +14,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const [showVoicePicker, setShowVoicePicker] = useState(false);
   const [speed, setSpeed] = useState(() => parseFloat(localStorage.getItem("tts_speed") || "1.0"));
   const [downloading, setDownloading] = useState(false);
+  const [currentWordIdx, setCurrentWordIdx] = useState(-1); // index of highlighted word in current para
   const speedRef = useRef(parseFloat(localStorage.getItem("tts_speed") || "1.0"));
 
   const stateRef = useRef("idle");
@@ -29,6 +30,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const genRef = useRef(0);
   // Prefetch cache: chunk text → decoded AudioBuffer (keyed by gen+chunk for staleness)
   const prefetchCacheRef = useRef(new Map()); // key: `${gen}:${chunk}` → Promise<AudioBuffer>
+  const playbackTimeRef = useRef(0); // track approximate playback time in seconds
+  const wordRefs = useRef(new Map()); // map of word element refs for auto-scroll
 
 
   const getAudioCtx = () => {
@@ -49,6 +52,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const setCP = (i) => {
     currentParaRef.current = i;
     setCurrentPara(i);
+    setCurrentWordIdx(-1);
+    playbackTimeRef.current = 0;
     if (sessionId && i >= 0) localStorage.setItem(`tts_progress_${sessionId}`, String(i));
   };
 
@@ -167,10 +172,44 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     source.connect(ctx.destination);
     source.onended = () => { sourceRef.current = null; playNextChunk(gen); };
     sourceRef.current = source;
+    
+    // Track playback time and update word highlighting
+    const startTime = ctx.currentTime;
+    const updateInterval = setInterval(() => {
+      if (gen !== genRef.current || stateRef.current !== "playing") {
+        clearInterval(updateInterval);
+        return;
+      }
+      playbackTimeRef.current += 0.1;
+      updateWordHighlight();
+    }, 100);
+    
     source.start(0);
 
     // Kick off background prefetch of the next chunk as soon as this one starts
     prefetchNext(gen);
+  };
+
+  const updateWordHighlight = () => {
+    const paraIdx = currentParaRef.current;
+    if (paraIdx < 0 || paraIdx >= paragraphs.length) return;
+    
+    const text = paragraphs[paraIdx];
+    const words = text.split(/\s+/).filter(Boolean);
+    
+    // Estimate word index based on playback time (~120 WPM average)
+    const estimatedWordIdx = Math.floor((playbackTimeRef.current * 2));
+    
+    if (estimatedWordIdx !== currentWordIdx && estimatedWordIdx < words.length) {
+      setCurrentWordIdx(Math.max(-1, estimatedWordIdx));
+      
+      // Auto-scroll to current word
+      const wordKey = `word-${paraIdx}-${estimatedWordIdx}`;
+      const wordEl = wordRefs.current.get(wordKey);
+      if (wordEl) {
+        wordEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
   };
 
   const startFrom = async (paraIdx) => {
@@ -471,6 +510,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
         const displayText = fmtSecondsInText(text);
         const isPlaying = currentPara === paraIdx && state === "playing";
         const isBuffering = bufferingPara === paraIdx && state !== "idle" && state !== "paused";
+        const words = displayText.split(/\s+/).filter(Boolean);
 
         if (renderParagraph) {
           return (
@@ -489,7 +529,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
             key={paraIdx}
             onClick={() => isActive && startFrom(paraIdx)}
             className={[
-              "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 flex items-center gap-2",
+              "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 flex items-center gap-2 flex-wrap",
               isActive ? "cursor-pointer" : "",
               isPlaying ? "border-primary bg-primary/8 text-foreground font-medium rounded-r-md"
                 : isBuffering ? "border-primary/60 bg-primary/5 text-foreground rounded-r-md"
@@ -499,7 +539,25 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
             {isBuffering && (
               <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             )}
-            {displayText}
+            {isPlaying ? (
+              words.map((word, wordIdx) => {
+                const key = `word-${paraIdx}-${wordIdx}`;
+                const isHighlighted = wordIdx === currentWordIdx;
+                return (
+                  <span
+                    key={wordIdx}
+                    ref={(el) => {
+                      if (el) wordRefs.current.set(key, el);
+                    }}
+                    className={`transition-colors ${isHighlighted ? "bg-primary text-primary-foreground font-bold px-1 rounded" : ""}`}
+                  >
+                    {word}
+                  </span>
+                );
+              })
+            ) : (
+              displayText
+            )}
           </p>
         );
       })}
