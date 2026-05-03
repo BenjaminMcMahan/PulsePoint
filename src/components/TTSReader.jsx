@@ -13,6 +13,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const [voice, setVoice] = useState(() => localStorage.getItem("tts_oai_voice") || "alloy");
   const [showVoicePicker, setShowVoicePicker] = useState(false);
   const [speed, setSpeed] = useState(() => parseFloat(localStorage.getItem("tts_speed") || "1.0"));
+  const [downloading, setDownloading] = useState(false);
   const speedRef = useRef(parseFloat(localStorage.getItem("tts_speed") || "1.0"));
 
   const stateRef = useRef("idle");
@@ -261,6 +262,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const savedIdx = sessionId ? parseInt(localStorage.getItem(`tts_progress_${sessionId}`) || "-1", 10) : -1;
 
   const downloadAudio = async () => {
+    setDownloading(true);
     try {
       // Fetch all chunks for all paragraphs
       const allChunks = [];
@@ -269,6 +271,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
         const chunks = splitIntoChunks(cleaned);
         allChunks.push(...chunks);
       }
+
+      console.log(`Starting download: ${allChunks.length} chunks`);
 
       // Fetch all audio buffers in parallel
       const buffers = await Promise.all(
@@ -284,6 +288,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
         )
       );
 
+      console.log(`Fetched ${buffers.length} audio buffers, combining...`);
+
       // Combine all buffers into one
       const totalLength = buffers.reduce((sum, buf) => sum + buf.length, 0);
       const ctx = getAudioCtx();
@@ -295,6 +301,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
         offset += buf.length;
       }
 
+      console.log(`Combined buffer created, encoding to WAV...`);
+
       // Encode to WAV
       const samples = combined.getChannelData(0);
       const header = createWavHeader(samples, ctx.sampleRate);
@@ -305,8 +313,12 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       a.download = `tts-section-${Date.now()}.wav`;
       a.click();
       URL.revokeObjectURL(url);
+
+      console.log("Download complete");
+      setDownloading(false);
     } catch (err) {
       console.error("Download failed:", err);
+      setDownloading(false);
     }
   };
 
@@ -381,11 +393,21 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
         <button
           onClick={downloadAudio}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground active:opacity-70 transition-colors text-xs font-medium select-none ml-auto"
+          disabled={downloading}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50 active:opacity-70 transition-colors text-xs font-medium select-none ml-auto"
           style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
           title="Download full section as WAV"
         >
-          <Download className="w-3.5 h-3.5" /> Download
+          {downloading ? (
+            <>
+              <span className="w-3 h-3 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+              Downloading…
+            </>
+          ) : (
+            <>
+              <Download className="w-3.5 h-3.5" /> Download
+            </>
+          )}
         </button>
 
         {/* Speed slider */}
