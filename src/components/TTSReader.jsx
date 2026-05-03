@@ -170,9 +170,11 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
     stopSource();
     prefetchCacheRef.current.clear();
-    // Ensure AudioContext is running (may be suspended from a pause)
+    // Suspend then resume to immediately silence any audio still playing
     const ctx = getAudioCtx();
-    if (ctx.state === "suspended") await ctx.resume();
+    if (ctx.state === "running") await ctx.suspend();
+    if (gen !== genRef.current) return; // another startFrom raced us
+    await ctx.resume();
 
     chunkQueueRef.current = [];
     currentChunkRef.current = null;
