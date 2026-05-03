@@ -12,6 +12,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const [bufferingPara, setBufferingPara] = useState(-1); // which paragraph is currently fetching
   const [voice, setVoice] = useState(() => localStorage.getItem("tts_oai_voice") || "alloy");
   const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const [speed, setSpeed] = useState(() => parseFloat(localStorage.getItem("tts_speed") || "1.0"));
+  const speedRef = useRef(parseFloat(localStorage.getItem("tts_speed") || "1.0"));
 
   const stateRef = useRef("idle");
   const currentParaRef = useRef(-1);
@@ -92,7 +94,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     }
     // Start (or reuse) a pending promise so concurrent callers share the same fetch
     const promise = (async () => {
-      const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+      const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
       const base64 = response.data.audio;
       const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);
@@ -229,6 +231,14 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     setShowVoicePicker(false);
   };
 
+  const changeSpeed = (v) => {
+    speedRef.current = v;
+    setSpeed(v);
+    localStorage.setItem("tts_speed", String(v));
+    // Clear prefetch cache since speed changed
+    prefetchCacheRef.current.clear();
+  };
+
   const isActive = state === "playing" || state === "paused" || state === "buffering";
   const savedIdx = sessionId ? parseInt(localStorage.getItem(`tts_progress_${sessionId}`) || "-1", 10) : -1;
 
@@ -261,6 +271,21 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
         {isActive && (
           <span className="text-[10px] text-muted-foreground ml-1">Tap paragraph to jump</span>
         )}
+
+        {/* Speed slider */}
+        <div className="flex items-center gap-1.5 ml-1">
+          <span className="text-[10px] text-muted-foreground w-6 text-right">{speed.toFixed(1)}x</span>
+          <input
+            type="range"
+            min="0.5"
+            max="2.0"
+            step="0.25"
+            value={speed}
+            onChange={(e) => changeSpeed(parseFloat(e.target.value))}
+            className="w-20 h-1 accent-primary cursor-pointer"
+            style={{ accentColor: "hsl(var(--primary))" }}
+          />
+        </div>
 
         {/* Voice picker */}
         <div className="relative ml-auto">
