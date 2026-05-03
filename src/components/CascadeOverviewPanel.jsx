@@ -60,15 +60,22 @@ export default function CascadeOverviewPanel({ session, timelineRows, userProfil
     setLoading(true);
     setResult(null);
 
+    const formatTimeWords = (seconds) => {
+      const m = Math.floor(seconds / 60);
+      const s = Math.round(seconds % 60);
+      if (m === 0) return `${s} second${s !== 1 ? 's' : ''}`;
+      if (s === 0) return `${m} minute${m !== 1 ? 's' : ''}`;
+      return `${m} minute${m !== 1 ? 's' : ''} and ${s} second${s !== 1 ? 's' : ''}`;
+    };
+
     // Annotate events with HR and phase context
     const annotatedEvents = (session.event_timeline || []).map((ev) => {
-      const m = Math.floor(ev.time_s / 60);
-      const sec = (ev.time_s % 60).toString().padStart(2, "0");
+      const timeWords = formatTimeWords(ev.time_s);
       const hr = nearestHR(ev.time_s);
       const catMeta = getCategoryMeta(ev.category);
       const relToClimax = session.climax_offset_s != null ? Math.round(ev.time_s - session.climax_offset_s) : null;
-      const relStr = relToClimax != null ? ` (${relToClimax >= 0 ? "+" : ""}${relToClimax}s vs climax)` : "";
-      return `[${catMeta.label}] ${m}:${sec}${relStr} — ${ev.note}${hr != null ? ` [HR: ${hr} bpm]` : ""}`;
+      const relStr = relToClimax != null ? ` (${formatTimeWords(Math.abs(relToClimax))} ${relToClimax >= 0 ? 'after' : 'before'} climax)` : "";
+      return `[${catMeta.label}] at ${timeWords}${relStr} — ${ev.note}${hr != null ? ` (heart rate: ${hr} beats per minute)` : ""}`;
     });
 
     // Build HR at key phase markers
@@ -102,7 +109,16 @@ Use this arousal profile to contextualize the cascade — compare the observed b
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant. Analyze the climax cascade arc of this single sexual response session in depth. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.${arousalProfile}
+      prompt: `You are a physiological research assistant. Analyze the climax cascade arc of this single sexual response session in depth. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
+
+CRITICAL FOR TEXT-TO-SPEECH QUALITY:
+- Write all times as words: "ten minutes and thirty seconds" not "10:30"
+- Spell out all numbers as words (e.g., "ten beats per minute" not "10 bpm")
+- Write in conversational, sentence-based prose with natural pauses
+- Use short sentences and simple grammar optimized for audio readability
+- Avoid jargon—explain concepts clearly as if speaking aloud
+- Use commas and periods to create natural speech cadence
+${arousalProfile}
 
 Focus exclusively on the four phases:
 1. BUILD (start of session → pre-climax marker): how arousal built, HR trajectory, event patterns, pacing

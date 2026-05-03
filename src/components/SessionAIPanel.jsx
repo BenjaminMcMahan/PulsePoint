@@ -72,14 +72,21 @@ export default function SessionAIPanel({ session, timelineRows, userProfile }) {
       return Math.round(Number(best.hr));
     };
 
+    const formatTimeWords = (seconds) => {
+      const m = Math.floor(seconds / 60);
+      const s = Math.round(seconds % 60);
+      if (m === 0) return `${s} second${s !== 1 ? 's' : ''}`;
+      if (s === 0) return `${m} minute${m !== 1 ? 's' : ''}`;
+      return `${m} minute${m !== 1 ? 's' : ''} and ${s} second${s !== 1 ? 's' : ''}`;
+    };
+
     const eventTimeline = (session.event_timeline || []).map(e => {
-      const m = Math.floor(e.time_s / 60);
-      const s = (e.time_s % 60).toString().padStart(2, '0');
+      const timeWords = formatTimeWords(e.time_s);
       const hr = nearestHR(e.time_s);
       const catMeta = getCategoryMeta(e.category);
       const relToClimax = session.climax_offset_s != null ? Math.round(e.time_s - session.climax_offset_s) : null;
-      const relStr = relToClimax != null ? ` (${relToClimax >= 0 ? "+" : ""}${relToClimax}s vs climax)` : "";
-      return `[${catMeta.label}] ${m}:${s}${relStr} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ''}`;
+      const relStr = relToClimax != null ? ` (${formatTimeWords(Math.abs(relToClimax))} ${relToClimax >= 0 ? 'after' : 'before'} climax)` : "";
+      return `[${catMeta.label}] at ${timeWords}${relStr} — ${e.note}${hr != null ? ` (heart rate: ${hr} beats per minute)` : ''}`;
     });
 
     const arousalProfile = userProfile && (userProfile.arousal_response_style || userProfile.arousal_notes || userProfile.climax_sensitivity) ? `
@@ -101,7 +108,16 @@ Use this arousal profile to personalize analysis: compare the observed build arc
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
-      prompt: `You are an expert analyst of sexual arousal physiology. Analyze this session with a primary focus on the arousal arc, event timeline, stimulation dynamics, and subjective experience. Heart rate data is available as supporting context — reference it where it reinforces arousal state, but do NOT make it the centerpiece of your analysis. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.${arousalProfile}${estimScreenshots.length > 0 ? `
+      prompt: `You are an expert analyst of sexual arousal physiology. Analyze this session with a primary focus on the arousal arc, event timeline, stimulation dynamics, and subjective experience. Heart rate data is available as supporting context — reference it where it reinforces arousal state, but do NOT make it the centerpiece of your analysis. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
+
+CRITICAL FOR TEXT-TO-SPEECH QUALITY:
+- Write all times as words: "ten minutes and thirty seconds" not "10:30"
+- Spell out all numbers as words (e.g., "ten beats per minute" not "10 bpm")
+- Write in conversational, sentence-based prose with natural pauses
+- Use short sentences and simple grammar optimized for audio readability
+- Avoid jargon—explain concepts clearly as if speaking aloud
+- Use commas and periods to create natural speech cadence
+${arousalProfile}${estimScreenshots.length > 0 ? `
 
 E-STIM SCREENSHOTS ATTACHED (${estimScreenshots.length}): Analyze the waveform types, frequencies, pulse widths, and channel configurations visible. Interpret how these settings shaped the arousal experience and stimulation progression throughout the session.` : ""}${eventTimeline.length > 0 ? `
 

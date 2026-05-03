@@ -231,6 +231,14 @@ Arousal notes: ${userProfile.arousal_notes || "none"}
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       prompt: `You are an expert physiological and sexual response analyst. Based on ${sessions.length} recorded sessions and profile notes, generate a comprehensive, deeply personal physiological and arousal profile. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
+
+CRITICAL FOR TEXT-TO-SPEECH QUALITY:
+- Write all times as words: "ten minutes and thirty seconds" not "10:30"
+- Spell out all numbers as words (e.g., "ten beats per minute" not "10 bpm")
+- Write in conversational, sentence-based prose with natural pauses
+- Use short sentences and simple grammar optimized for audio readability
+- Avoid jargon—explain concepts clearly as if speaking aloud
+- Use commas and periods to create natural speech cadence
 ${profileContext}
 SESSION DATA (${sessions.length} sessions):
 ${JSON.stringify(sessionSummaries, null, 2)}
@@ -428,7 +436,13 @@ function NearClimaxPanel({ sessions, allTimelines }) {
       model: "claude_sonnet_4_6",
       prompt: `You are a physiological research assistant analyzing near-climax events detected in heart rate data from sexual response sessions. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
 
-A "near-climax event" is defined as: an erratic yet somewhat sustained climb in heart rate (>=8 bpm rise within 45 seconds), followed by a notable drop — similar in shape to the climax cascade (ever-increasing HR with an apex and fall) but not as sustained. These events occur OUTSIDE of the actual climax window.
+CRITICAL FOR TEXT-TO-SPEECH QUALITY:
+- Write all times as words: "ten minutes and thirty seconds" not "10:30"
+- Spell out all numbers as words (e.g., "ten beats per minute" not "10 bpm")
+- Write in conversational, sentence-based prose with natural pauses
+- Use short sentences and simple grammar optimized for audio readability
+
+A "near-climax event" is defined as: an erratic yet somewhat sustained climb in heart rate (eight or more beats per minute rise within forty-five seconds), followed by a notable drop — similar in shape to the climax cascade (ever-increasing HR with an apex and fall) but not as sustained. These events occur outside of the actual climax window.
 
 Detected event data across ${sessionEvents.length} sessions (out of ${sessions.length} total):
 ${JSON.stringify(sessionEvents, null, 2)}
