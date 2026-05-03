@@ -19,6 +19,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const sourceRef = useRef(null);
   const remainingParasRef = useRef([]);
   const chunkQueueRef = useRef([]);
+  const currentChunkRef = useRef(null); // the chunk currently playing/buffering
   const voiceRef = useRef(voice);
   // Generation counter: increment on every startFrom to cancel stale async chains
   const genRef = useRef(0);
@@ -46,6 +47,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     stopSource();
     remainingParasRef.current = [];
     chunkQueueRef.current = [];
+    currentChunkRef.current = null;
     setBufferingPara(-1);
     setS("idle");
     setCP(-1);
@@ -57,6 +59,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
     if (chunkQueueRef.current.length > 0) {
       const chunk = chunkQueueRef.current.shift();
+      currentChunkRef.current = chunk;
       await fetchAndPlay(chunk, gen);
       return;
     }
@@ -72,6 +75,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     setCP(idx);
     const text = paragraphs[idx] || "";
     chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(text));
+    currentChunkRef.current = null;
     playNextChunk(gen);
   };
 
@@ -123,7 +127,12 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     const gen = genRef.current;
 
     stopSource();
+    // Ensure AudioContext is running (may be suspended from a pause)
+    const ctx = getAudioCtx();
+    if (ctx.state === "suspended") await ctx.resume();
+
     chunkQueueRef.current = [];
+    currentChunkRef.current = null;
     remainingParasRef.current = paragraphs.map((_, i) => i).filter(i => i > paraIdx);
     setCP(paraIdx);
     setS("playing");
@@ -135,19 +144,37 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   };
 
   const handlePlayPause = async () => {
-    if (state === "playing" || state === "buffering") {
-      stopSource();
-      genRef.current++; // cancel in-flight fetch
+    if (state === "playing") {
+      // Suspend the AudioContext to freeze playback at exact position
+      const ctx = getAudioCtx();
+      await ctx.suspend();
+      setS("paused");
+      return;
+    }
+    if (state === "buffering") {
+      // Still fetching — cancel and mark paused; resume will re-fetch the same chunk
+      genRef.current++;
       setBufferingPara(-1);
       setS("paused");
       return;
     }
     if (state === "paused") {
-      const gen = genRef.current;
-      setS("playing");
       const ctx = getAudioCtx();
-      if (ctx.state === "suspended") ctx.resume();
-      playNextChunk(gen);
+      if (ctx.state === "suspended" && sourceRef.current) {
+        // Audio is suspended mid-playback — just resume it
+        await ctx.resume();
+        setS("playing");
+      } else {
+        // Was paused during buffering — re-fetch the current chunk
+        const gen = genRef.current;
+        setS("playing");
+        if (currentChunkRef.current) {
+          await fetchAndPlay(currentChunkRef.current, gen);
+        } else {
+          await ctx.resume();
+          playNextChunk(gen);
+        }
+      }
       return;
     }
     // idle → start
