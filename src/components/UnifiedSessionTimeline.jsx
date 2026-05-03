@@ -3,7 +3,7 @@ import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   ReferenceLine, ReferenceArea, ResponsiveContainer,
 } from "recharts";
-import { ZoomOut, ChevronDown, ChevronUp, X } from "lucide-react";
+import { ZoomOut, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { EVENT_CATEGORIES, normalizeCategoryArray } from "./session-form/EventTimelineSection";
 import { useChartZoom } from "@/hooks/useChartZoom";
 
@@ -78,14 +78,6 @@ function buildIntensityCurve(chartData, session) {
   });
 }
 
-// Find events within ±EVENT_SNAP_S of a given time
-const EVENT_SNAP_S = 15;
-function eventsNear(t, sessionEvents) {
-  return (sessionEvents || [])
-    .map((ev, i) => ({ ...ev, _idx: i }))
-    .filter((ev) => Math.abs(ev.time_s - t) <= EVENT_SNAP_S);
-}
-
 // ── Custom Tooltip — HR + intensity only ──────────────────────────────────────
 
 function CustomTooltip({ active, payload, label }) {
@@ -123,51 +115,6 @@ const PHASE_MARKERS = [
   { key: "recovery_offset_s",   label: "Recovery",   color: "#3b82f6" },
 ];
 
-// ── Clicked-point event panel ──────────────────────────────────────────────────
-
-function ClickedEventPanel({ events, intensityAtT, clickedT, onDismiss }) {
-  if (!events.length) return null;
-  return (
-    <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Events near <span className="font-mono text-foreground">{fmtMmSs(clickedT)}</span>
-          {intensityAtT != null && (
-            <span className="ml-2 font-mono font-bold" style={{ color: intensityColor(intensityAtT) }}>
-              · Intensity {intensityAtT}/10
-            </span>
-          )}
-        </p>
-        <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground transition-colors">
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
-      {events.map((ev, i) => {
-        const cats = getCategories(ev);
-        return (
-          <div key={i} className="flex items-start gap-2 text-xs">
-            <span className="font-mono text-primary shrink-0 mt-0.5 w-8">{fmtMmSs(ev.time_s)}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap gap-1 mb-0.5">
-                {cats.map((c) => {
-                  const m = getCategoryMeta(c);
-                  return (
-                    <span key={c} className="text-[9px] px-1.5 rounded-full font-semibold"
-                      style={{ background: m.color + "22", color: m.color }}>
-                      {m.label}
-                    </span>
-                  );
-                })}
-              </div>
-              <p className="text-foreground/90 leading-snug">{ev.note}</p>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function UnifiedSessionTimeline({ timelineRows, session }) {
@@ -176,10 +123,8 @@ export default function UnifiedSessionTimeline({ timelineRows, session }) {
   const [showEvents, setShowEvents] = useState(true);
   const [eventsListCollapsed, setEventsListCollapsed] = useState(false);
 
-  // Clicked point state
-  const [clickedT, setClickedT] = useState(null);
-  const [clickedIntensity, setClickedIntensity] = useState(null);
-  const [nearbyEvents, setNearbyEvents] = useState([]);
+  // Active event navigator state
+  const [activeEventIdx, setActiveEventIdx] = useState(null); // index into sessionEvents
 
   const sessionEvents = session?.event_timeline || [];
 
@@ -219,21 +164,28 @@ export default function UnifiedSessionTimeline({ timelineRows, session }) {
   const xDomain = zoomDomain ? [zoomDomain.x1, zoomDomain.x2] : ["dataMin", "dataMax"];
   const isZoomed = zoomDomain != null;
 
-  // Handle chart click — find nearby events + intensity at clicked point
+  // Handle chart click — jump to nearest event
   const handleChartClick = useCallback((chartState) => {
     if (!chartState?.activePayload?.length) return;
     const t = Number(chartState.activeLabel);
-    const intVal = chartState.activePayload.find((p) => p.dataKey === "intensity")?.value ?? null;
-    const nearby = eventsNear(t, sessionEvents);
-    setClickedT(t);
-    setClickedIntensity(intVal);
-    setNearbyEvents(nearby);
+    if (!sessionEvents.length) return;
+    // Find the nearest event to the clicked time
+    let nearestIdx = 0;
+    let nearestDist = Math.abs(sessionEvents[0].time_s - t);
+    sessionEvents.forEach((ev, i) => {
+      const d = Math.abs(ev.time_s - t);
+      if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+    });
+    setActiveEventIdx((prev) => prev === nearestIdx ? null : nearestIdx);
   }, [sessionEvents]);
 
-  const dismissClickPanel = useCallback(() => {
-    setClickedT(null);
-    setNearbyEvents([]);
-    setClickedIntensity(null);
+  const navigateTo = useCallback((i) => {
+    const bounded = ((i % sessionEvents.length) + sessionEvents.length) % sessionEvents.length;
+    setActiveEventIdx(bounded);
+  }, [sessionEvents]);
+
+  const handleEventClick = useCallback((i) => {
+    setActiveEventIdx((prev) => prev === i ? null : i);
   }, []);
 
   if (!timelineRows.length) return null;
@@ -343,15 +295,15 @@ export default function UnifiedSessionTimeline({ timelineRows, session }) {
                   ) : null
                 )}
 
-                {/* Clicked-time marker */}
-                {clickedT != null && (
+                {/* Active event marker */}
+                {activeEventIdx != null && sessionEvents[activeEventIdx] && (
                   <ReferenceLine
                     yAxisId="hr"
-                    x={clickedT}
-                    stroke="hsl(var(--foreground))"
-                    strokeWidth={1.5}
+                    x={sessionEvents[activeEventIdx].time_s}
+                    stroke={intensityColor(eventIntensities[activeEventIdx] ?? 5)}
+                    strokeWidth={2}
                     strokeDasharray="3 2"
-                    strokeOpacity={0.5}
+                    strokeOpacity={0.9}
                   />
                 )}
 
@@ -359,16 +311,17 @@ export default function UnifiedSessionTimeline({ timelineRows, session }) {
                 {showEvents && sessionEvents.map((ev, i) => {
                   const intensity = eventIntensities[i];
                   const color = intensity != null ? intensityColor(intensity) : "#888";
-                  const isNearby = nearbyEvents.some((n) => n._idx === i);
+                  const isActive = activeEventIdx === i;
+                  const isDimmed = activeEventIdx != null && !isActive;
                   return (
                     <ReferenceLine
                       key={i}
                       yAxisId="hr"
                       x={ev.time_s}
                       stroke={color}
-                      strokeWidth={isNearby ? 2.5 : 1.2}
+                      strokeWidth={isActive ? 2.5 : 1.2}
                       strokeDasharray="2 3"
-                      strokeOpacity={nearbyEvents.length > 0 && !isNearby ? 0.3 : 0.85}
+                      strokeOpacity={isDimmed ? 0.2 : 0.85}
                       label={{ value: `E${i + 1}`, fontSize: 7, fill: color, position: "insideTopRight", offset: 2 }}
                     />
                   );
@@ -438,15 +391,39 @@ export default function UnifiedSessionTimeline({ timelineRows, session }) {
             )}
           </div>
 
-          {/* Clicked-point nearby events panel */}
-          {clickedT != null && (
-            <ClickedEventPanel
-              events={nearbyEvents}
-              intensityAtT={clickedIntensity}
-              clickedT={clickedT}
-              onDismiss={dismissClickPanel}
-            />
-          )}
+          {/* Navigator card — shown when an event is active */}
+          {activeEventIdx != null && sessionEvents[activeEventIdx] && (() => {
+            const ev = sessionEvents[activeEventIdx];
+            const intensity = eventIntensities[activeEventIdx];
+            const color = intensity != null ? intensityColor(intensity) : "#888";
+            const cats = getCategories(ev);
+            return (
+              <div className="rounded-lg px-3 py-3 space-y-1.5" style={{ background: color + "18", borderLeft: `3px solid ${color}` }}>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => navigateTo(activeEventIdx - 1)} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+                    <ChevronLeft className="w-4 h-4" style={{ color }} />
+                  </button>
+                  <div className="flex-1 flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[11px] font-bold" style={{ color }}>
+                      E{activeEventIdx + 1} / {sessionEvents.length}
+                    </span>
+                    <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(ev.time_s)}</span>
+                    {cats.map((c) => {
+                      const m = getCategoryMeta(c);
+                      return <span key={c} className="text-[9px] px-1.5 rounded-full font-semibold" style={{ background: m.color + "22", color: m.color }}>{m.label}</span>;
+                    })}
+                    {intensity != null && (
+                      <span className="font-mono text-[11px] font-bold" style={{ color }}>{intensity}/10</span>
+                    )}
+                  </div>
+                  <button onClick={() => navigateTo(activeEventIdx + 1)} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+                    <ChevronRight className="w-4 h-4" style={{ color }} />
+                  </button>
+                </div>
+                <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">{ev.note}</p>
+              </div>
+            );
+          })()}
 
           {/* Collapsible event list */}
           {showEvents && sessionEvents.length > 0 && (
@@ -456,7 +433,7 @@ export default function UnifiedSessionTimeline({ timelineRows, session }) {
                 onClick={() => setEventsListCollapsed((v) => !v)}
               >
                 <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  All Events ({sessionEvents.length})
+                  All Events ({sessionEvents.length}) — tap to highlight
                 </p>
                 {eventsListCollapsed
                   ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
@@ -469,16 +446,18 @@ export default function UnifiedSessionTimeline({ timelineRows, session }) {
                     const cats = getCategories(ev);
                     const intensity = eventIntensities[i];
                     const color = intensity != null ? intensityColor(intensity) : "#888";
-                    const isNearby = nearbyEvents.some((n) => n._idx === i);
+                    const isActive = activeEventIdx === i;
+                    const isDimmed = activeEventIdx != null && !isActive;
                     return (
-                      <div
+                      <button
                         key={i}
-                        className="flex items-start gap-2 rounded-lg px-2.5 py-1.5 transition-all"
+                        onClick={() => handleEventClick(i)}
+                        className="w-full flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-all"
                         style={{
-                          background: isNearby ? color + "28" : color + "0f",
-                          borderLeft: `3px solid ${isNearby ? color : color + "55"}`,
-                          outline: isNearby ? `1px solid ${color}44` : "none",
-                          opacity: nearbyEvents.length > 0 && !isNearby ? 0.45 : 1,
+                          background: isActive ? color + "28" : color + "0f",
+                          borderLeft: `3px solid ${isActive ? color : color + "55"}`,
+                          outline: isActive ? `1px solid ${color}44` : "none",
+                          opacity: isDimmed ? 0.35 : 1,
                         }}
                       >
                         <span className="font-mono text-[10px] font-bold shrink-0 mt-0.5" style={{ color }}>
@@ -499,14 +478,12 @@ export default function UnifiedSessionTimeline({ timelineRows, session }) {
                           <span className="text-xs text-foreground/90 leading-snug">{ev.note}</span>
                         </div>
                         {intensity != null && (
-                          <span
-                            className="font-mono text-[10px] font-bold shrink-0 mt-0.5 px-1.5 py-0.5 rounded-md"
-                            style={{ background: color + "22", color }}
-                          >
+                          <span className="font-mono text-[10px] font-bold shrink-0 mt-0.5 px-1.5 py-0.5 rounded-md"
+                            style={{ background: color + "22", color }}>
                             {intensity}/10
                           </span>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
