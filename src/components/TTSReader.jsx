@@ -305,14 +305,14 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
       // Encode to WAV
       const samples = combined.getChannelData(0);
-      const header = createWavHeader(samples, ctx.sampleRate);
-      const wavBlob = new Blob([header, samples], { type: "audio/wav" });
+      const wavData = createWavHeader(samples, ctx.sampleRate);
+      const wavBlob = new Blob([wavData], { type: "audio/wav" });
       const url = URL.createObjectURL(wavBlob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `tts-section-${Date.now()}.wav`;
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
 
       console.log("Download complete");
       setDownloading(false);
@@ -327,10 +327,11 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     const bytesPerSample = 2;
     const frameLength = samples.length;
     const dataLength = frameLength * channels * bytesPerSample;
-    const buffer = new ArrayBuffer(44);
-    const view = new DataView(buffer);
+    
+    // Create header
+    const header = new ArrayBuffer(44);
+    const view = new DataView(header);
 
-    // WAV header
     const writeString = (offset, string) => {
       for (let i = 0; i < string.length; i++) {
         view.setUint8(offset + i, string.charCodeAt(i));
@@ -342,7 +343,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     writeString(8, "WAVE");
     writeString(12, "fmt ");
     view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true); // PCM
+    view.setUint16(20, 1, true);
     view.setUint16(22, channels, true);
     view.setUint32(24, sampleRate, true);
     view.setUint32(28, sampleRate * channels * bytesPerSample, true);
@@ -357,7 +358,12 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       pcmData[i] = samples[i] < 0 ? samples[i] * 0x8000 : samples[i] * 0x7FFF;
     }
 
-    return new Uint8Array([...new Uint8Array(buffer), ...new Uint8Array(pcmData.buffer)]);
+    // Combine header + PCM data
+    const wavFile = new Uint8Array(44 + dataLength);
+    wavFile.set(new Uint8Array(header), 0);
+    wavFile.set(new Uint8Array(pcmData.buffer), 44);
+    
+    return wavFile;
   };
 
   return (
