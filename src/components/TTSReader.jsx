@@ -261,6 +261,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const savedIdx = sessionId ? parseInt(localStorage.getItem(`tts_progress_${sessionId}`) || "-1", 10) : -1;
 
   return (
+    <>
     <div className="space-y-1">
       {/* Controls */}
       <div className="flex items-center gap-1 mb-2 flex-wrap">
@@ -378,5 +379,20 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
         );
       })}
     </div>
+
+    {/* Floating play/pause button (bottom right) */}
+    {isActive && (
+      <button
+        onClick={handlePlayPause}
+        className="fixed bottom-6 right-6 flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:opacity-70 transition-all z-40"
+        style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
+        title={state === "playing" ? "Pause" : "Resume"}
+      >
+        {state === "playing" || state === "buffering"
+          ? <Pause className="w-5 h-5" />
+          : <Play className="w-5 h-5" />}
+      </button>
+    )}
+    </>
   );
 }
