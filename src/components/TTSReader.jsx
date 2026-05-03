@@ -346,14 +346,27 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       const samples = combined.getChannelData(0);
       const wavData = createWavHeader(samples, ctx.sampleRate);
       const wavBlob = new Blob([wavData], { type: "audio/wav" });
+      const fileName = `tts-section-${Date.now()}.wav`;
       const url = URL.createObjectURL(wavBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `tts-section-${Date.now()}.wav`;
+      a.download = fileName;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 100);
 
-      console.log("Download complete");
+      // Save to library
+      const file = new File([wavBlob], fileName, { type: "audio/wav" });
+      const uploadRes = await base44.integrations.Core.UploadFile({ file });
+      
+      await base44.entities.AudioExport.create({
+        title: fileName.replace(".wav", ""),
+        file_url: uploadRes.file_url,
+        duration_seconds: combined.duration,
+        voice: voiceRef.current,
+        speed: speedRef.current,
+      });
+
+      console.log("Download complete and saved to library");
       setDownloading(false);
     } catch (err) {
       console.error("Download failed:", err);

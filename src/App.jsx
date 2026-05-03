@@ -22,6 +22,7 @@ import Profile from './pages/Profile';
 import CorrelationMatrix from './pages/CorrelationMatrix';
 import EventCorrelations from './pages/EventCorrelations';
 import VideoPlayer from './pages/VideoPlayer';
+import Library from './pages/Library';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -66,6 +67,7 @@ const AuthenticatedApp = () => {
         <Route path="/correlations" element={<CorrelationMatrix />} />
         <Route path="/event-correlations" element={<EventCorrelations />} />
         <Route path="/video" element={<VideoPlayer />} />
+        <Route path="/library" element={<Library />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>
