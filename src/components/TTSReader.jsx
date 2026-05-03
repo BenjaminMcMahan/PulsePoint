@@ -69,7 +69,14 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
   const fetchAndPlay = async (chunk) => {
     if (stateRef.current !== "playing") return;
-    const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+    let response;
+    try {
+      response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+    } catch (err) {
+      console.error("TTS fetch failed:", err);
+      stop();
+      return;
+    }
     if (stateRef.current !== "playing") return;
 
     const base64 = response.data.audio;

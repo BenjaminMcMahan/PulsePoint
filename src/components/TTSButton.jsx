@@ -102,7 +102,14 @@ export default function TTSButton({ getText }) {
     const chunk = queueRef.current.shift();
     if (!chunk) { setS("idle"); return; }
 
-    const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+    let response;
+    try {
+      response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+    } catch (err) {
+      console.error("TTS fetch failed:", err);
+      stop();
+      return;
+    }
     if (stateRef.current !== "playing") return;
 
     const base64 = response.data.audio;
