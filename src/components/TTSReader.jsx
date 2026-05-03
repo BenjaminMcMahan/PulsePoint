@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Play, Pause, Square, ChevronDown } from "lucide-react";
+import { Play, Pause, Square, ChevronDown, Download } from "lucide-react";
 import { cleanTextForSpeech, splitIntoChunks } from "./TTSButton";
 import { fmtSecondsInText } from "@/utils/formatSeconds";
 import { base44 } from "@/api/base44Client";
@@ -260,6 +260,94 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const isActive = state === "playing" || state === "paused" || state === "buffering";
   const savedIdx = sessionId ? parseInt(localStorage.getItem(`tts_progress_${sessionId}`) || "-1", 10) : -1;
 
+  const downloadAudio = async () => {
+    try {
+      // Fetch all chunks for all paragraphs
+      const allChunks = [];
+      for (const para of paragraphs) {
+        const cleaned = cleanTextForSpeech(para);
+        const chunks = splitIntoChunks(cleaned);
+        allChunks.push(...chunks);
+      }
+
+      // Fetch all audio buffers in parallel
+      const buffers = await Promise.all(
+        allChunks.map(chunk =>
+          base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current })
+            .then(res => {
+              const binary = atob(res.data.audio);
+              const bytes = new Uint8Array(binary.length);
+              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+              const ctx = getAudioCtx();
+              return ctx.decodeAudioData(bytes.buffer.slice(0));
+            })
+        )
+      );
+
+      // Combine all buffers into one
+      const totalLength = buffers.reduce((sum, buf) => sum + buf.length, 0);
+      const ctx = getAudioCtx();
+      const combined = ctx.createBuffer(1, totalLength, ctx.sampleRate);
+      const data = combined.getChannelData(0);
+      let offset = 0;
+      for (const buf of buffers) {
+        data.set(buf.getChannelData(0), offset);
+        offset += buf.length;
+      }
+
+      // Encode to WAV
+      const samples = combined.getChannelData(0);
+      const header = createWavHeader(samples, ctx.sampleRate);
+      const wavBlob = new Blob([header, samples], { type: "audio/wav" });
+      const url = URL.createObjectURL(wavBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `tts-section-${Date.now()}.wav`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
+    }
+  };
+
+  const createWavHeader = (samples, sampleRate) => {
+    const channels = 1;
+    const bytesPerSample = 2;
+    const frameLength = samples.length;
+    const dataLength = frameLength * channels * bytesPerSample;
+    const buffer = new ArrayBuffer(44);
+    const view = new DataView(buffer);
+
+    // WAV header
+    const writeString = (offset, string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(0, "RIFF");
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, channels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * channels * bytesPerSample, true);
+    view.setUint16(32, channels * bytesPerSample, true);
+    view.setUint16(34, 16, true);
+    writeString(36, "data");
+    view.setUint32(40, dataLength, true);
+
+    // Convert float samples to 16-bit PCM
+    const pcmData = new Int16Array(frameLength);
+    for (let i = 0; i < frameLength; i++) {
+      pcmData[i] = samples[i] < 0 ? samples[i] * 0x8000 : samples[i] * 0x7FFF;
+    }
+
+    return new Uint8Array([...new Uint8Array(buffer), ...new Uint8Array(pcmData.buffer)]);
+  };
+
   return (
     <>
     <div className="space-y-1">
@@ -290,6 +378,15 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
         {isActive && (
           <span className="text-[10px] text-muted-foreground ml-1">Tap paragraph to jump</span>
         )}
+
+        <button
+          onClick={downloadAudio}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground active:opacity-70 transition-colors text-xs font-medium select-none ml-auto"
+          style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
+          title="Download full section as WAV"
+        >
+          <Download className="w-3.5 h-3.5" /> Download
+        </button>
 
         {/* Speed slider */}
         <div className="flex items-center gap-1.5 ml-1">
