@@ -225,20 +225,21 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     const estimatedWordIdx = Math.floor(playbackTimeRef.current * 2);
     const boundedIdx = Math.max(0, Math.min(estimatedWordIdx, words.length - 1));
     
-    if (boundedIdx !== currentWordIdx) {
-      setCurrentWordIdx(boundedIdx);
-    }
+    // Update state with new index
+    setCurrentWordIdx(boundedIdx);
     
-    // Auto-scroll to current word with slight delay to ensure DOM is ready
-    const wordKey = `word-${paraIdx}-${boundedIdx}`;
-    const wordEl = wordRefs.current.get(wordKey);
-    if (wordEl) {
-      try {
-        wordEl.scrollIntoView({ behavior: "smooth", block: "center" });
-      } catch (e) {
-        // Silently handle scroll errors on mobile
+    // Auto-scroll using requestAnimationFrame for better mobile performance
+    requestAnimationFrame(() => {
+      const wordKey = `word-${paraIdx}-${boundedIdx}`;
+      const wordEl = wordRefs.current.get(wordKey);
+      if (wordEl) {
+        try {
+          wordEl.scrollIntoView({ behavior: "auto", block: "center" });
+        } catch (e) {
+          // Silently handle scroll errors
+        }
       }
-    }
+    });
   };
 
   const startFrom = async (paraIdx) => {
@@ -587,11 +588,15 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
                 const isHighlighted = wordIdx === currentWordIdx;
                 return (
                   <span
-                    key={wordIdx}
+                    key={key}
                     ref={(el) => {
-                      if (el) wordRefs.current.set(key, el);
+                      if (el) {
+                        wordRefs.current.set(key, el);
+                      } else {
+                        wordRefs.current.delete(key);
+                      }
                     }}
-                    className={`transition-colors ${isHighlighted ? "bg-primary text-primary-foreground font-bold px-1 rounded" : ""}`}
+                    className={isHighlighted ? "bg-primary text-primary-foreground font-bold px-1 rounded inline-block transition-all" : "inline-block"}
                   >
                     {word}
                   </span>
