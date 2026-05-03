@@ -107,7 +107,7 @@ export default function NoClimaxAIPanel({ session, timelineRows, userProfile }) 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
-      prompt: `You are an expert sexual arousal physiologist. Analyze this INCOMPLETE session — it did NOT result in climax. Provide a full-depth analysis as if this were a complete session, replacing climax metrics with arousal arc and near-threshold assessments. Do NOT treat this as a failed session — it is a rich physiological dataset.
+      prompt: `You are an expert sexual arousal physiologist. Analyze this INCOMPLETE session — it did NOT result in climax. Provide a full-depth analysis as if this were a complete session, replacing climax metrics with arousal arc and near-threshold assessments. Do NOT treat this as a failed session — it is a rich physiological dataset. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
 ${arousalProfile}
 ${estimScreenshots.length > 0 ? `\nE-STIM SCREENSHOTS ATTACHED (${estimScreenshots.length}): Analyze waveform types, frequencies, pulse widths, and channel configurations. Interpret how these settings shaped the arousal experience and whether they were approaching climax-sufficient intensity.` : ""}
 ${hrPeaks.length > 0 ? `\nDETECTED HR PEAK EVENTS (potential near-threshold moments):\n${hrPeaks.map(p => `- ${Math.floor(p.time_s/60)}:${String(Math.round(p.time_s%60)).padStart(2,'0')} — HR spike to ${p.hr} bpm`).join('\n')}` : ""}

@@ -100,7 +100,7 @@ Use this arousal profile to personalize analysis: compare the observed build arc
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
-      prompt: `You are an expert analyst of sexual arousal physiology. Analyze this session with a primary focus on the arousal arc, event timeline, stimulation dynamics, and subjective experience. Heart rate data is available as supporting context — reference it where it reinforces arousal state, but do NOT make it the centerpiece of your analysis.${arousalProfile}${estimScreenshots.length > 0 ? `
+      prompt: `You are an expert analyst of sexual arousal physiology. Analyze this session with a primary focus on the arousal arc, event timeline, stimulation dynamics, and subjective experience. Heart rate data is available as supporting context — reference it where it reinforces arousal state, but do NOT make it the centerpiece of your analysis. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.${arousalProfile}${estimScreenshots.length > 0 ? `
 
 E-STIM SCREENSHOTS ATTACHED (${estimScreenshots.length}): Analyze the waveform types, frequencies, pulse widths, and channel configurations visible. Interpret how these settings shaped the arousal experience and stimulation progression throughout the session.` : ""}${eventTimeline.length > 0 ? `
 

@@ -101,7 +101,7 @@ Use this arousal profile to contextualize the cascade — compare the observed b
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant. Analyze the climax cascade arc of this single sexual response session in depth.${arousalProfile}
+      prompt: `You are a physiological research assistant. Analyze the climax cascade arc of this single sexual response session in depth. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.${arousalProfile}
 
 Focus exclusively on the four phases:
 1. BUILD (start of session → pre-climax marker): how arousal built, HR trajectory, event patterns, pacing
