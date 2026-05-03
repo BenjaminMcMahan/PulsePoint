@@ -213,7 +213,16 @@ export default function ArousalEventChart({ session, timelineRows }) {
 
           <div className="w-full" style={{ height: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+              <ComposedChart
+                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                onClick={(chartData) => {
+                  if (!chartData?.activePayload?.length) return;
+                  const clicked = chartData.activePayload.find((p) => p.payload?.category !== undefined);
+                  if (clicked) {
+                    handleEventClick(clicked.payload._idx);
+                  }
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
                 <XAxis
                   dataKey="time_s"
