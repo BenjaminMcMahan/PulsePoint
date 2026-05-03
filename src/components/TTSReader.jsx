@@ -302,9 +302,9 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       userPausedRef.current = false;
       const ctx = getAudioCtx();
       if (ctx.state === "suspended" && sourceRef.current) {
-        // Audio is suspended mid-playback — just resume it
-        await ctx.resume();
-        setS("playing");
+        // Audio is suspended mid-playback — resume the context first
+        setS("playing"); // update state immediately
+        await ctx.resume().catch(() => {}); // ensure context resumes even if it fails
       } else {
         // Was paused during buffering — re-fetch the current chunk
         const gen = genRef.current;
