@@ -244,18 +244,20 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
           <TTSReader
             sessionId={session.id}
             paragraphs={paras.map(p => p.text)}
-            renderParagraph={(text, idx, isActive) => {
+            renderParagraph={(text, idx, isActive, isBuffering) => {
               const meta = paras[idx];
               if (meta.type === "summary") {
                 return (
-                  <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md ${isActive ? "border-primary bg-primary/8 text-foreground" : "border-primary/50 text-foreground"}`}>
+                  <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${isActive ? "border-primary bg-primary/8 text-foreground" : isBuffering ? "border-primary/60 bg-primary/5 text-foreground" : "border-primary/50 text-foreground"}`}>
+                    {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
                     {text}
                   </p>
                 );
               }
               if (meta.type === "quality") {
                 return (
-                  <div className={`rounded-lg px-3 py-2.5 transition-all duration-200 ${isActive ? "bg-primary/20" : "bg-primary/10"}`}>
+                  <div className={`rounded-lg px-3 py-2.5 transition-all duration-200 ${isActive ? "bg-primary/20" : isBuffering ? "bg-primary/10" : "bg-primary/10"}`}>
+                    {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mb-1 block" />}
                     <p className="text-xs font-semibold text-primary mb-1">Cascade Quality Assessment</p>
                     <p className="text-foreground text-sm leading-relaxed">{text}</p>
                   </div>
@@ -264,13 +266,14 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
               // phase item
               return (
                 <li
-                  className={`text-sm pl-3 border-l-2 py-1 leading-relaxed list-none transition-all duration-200 rounded-r-md`}
+                  className={`text-sm pl-3 border-l-2 py-1 leading-relaxed list-none transition-all duration-200 rounded-r-md flex items-center gap-2`}
                   style={{
-                    borderColor: isActive ? meta.color : meta.color + "66",
-                    background: isActive ? meta.color + "18" : "transparent",
+                    borderColor: isActive ? meta.color : isBuffering ? meta.color + "99" : meta.color + "66",
+                    background: isActive ? meta.color + "18" : isBuffering ? meta.color + "0f" : "transparent",
                     color: isActive ? "#fff" : "#a8b4cc",
                   }}
                 >
+                  {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: meta.color, borderTopColor: "transparent" }} />}
                   • {text}
                 </li>
               );

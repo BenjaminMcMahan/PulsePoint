@@ -218,7 +218,7 @@ Provide an insightful, experience-centered analysis. Be specific, reference actu
           <TTSReader
             sessionId={session.id}
             paragraphs={paras}
-            renderParagraph={(text, paraIdx, isActive) => {
+            renderParagraph={(text, paraIdx, isActive, isBuffering) => {
               // Find which section this paragraph belongs to
               let section = sections[0];
               for (const sec of sections) {
@@ -227,13 +227,15 @@ Provide an insightful, experience-centered analysis. Be specific, reference actu
               const isSummary = section.label === null;
               if (isSummary) {
                 return (
-                  <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md ${isActive ? "border-primary bg-primary/8 text-foreground" : "border-primary/50 text-foreground"}`}>
+                  <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${isActive ? "border-primary bg-primary/8 text-foreground" : isBuffering ? "border-primary/60 bg-primary/5 text-foreground" : "border-primary/50 text-foreground"}`}>
+                    {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
                     {text}
                   </p>
                 );
               }
               return (
-                <li className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md list-none ${isActive ? "border-primary bg-primary/8 text-foreground font-medium" : "border-primary/30 text-foreground"}`}>
+                <li className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md list-none flex items-center gap-2 ${isActive ? "border-primary bg-primary/8 text-foreground font-medium" : isBuffering ? "border-primary/60 bg-primary/5 text-foreground" : "border-primary/30 text-foreground"}`}>
+                  {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
                   {text}
                 </li>
               );

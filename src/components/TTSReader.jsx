@@ -6,14 +6,10 @@ import { base44 } from "@/api/base44Client";
 
 const OAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
 
-/**
- * TTSReader — paragraph-aware TTS using OpenAI TTS API.
- * Highlights the currently-speaking paragraph.
- * Tap any paragraph while playing to jump to it.
- */
 export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
-  const [state, setState] = useState("idle"); // idle | loading | playing | paused
+  const [state, setState] = useState("idle"); // idle | buffering | playing | paused
   const [currentPara, setCurrentPara] = useState(-1);
+  const [bufferingPara, setBufferingPara] = useState(-1); // which paragraph is currently fetching
   const [voice, setVoice] = useState(() => localStorage.getItem("tts_oai_voice") || "alloy");
   const [showVoicePicker, setShowVoicePicker] = useState(false);
 
@@ -21,9 +17,11 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   const currentParaRef = useRef(-1);
   const audioCtxRef = useRef(null);
   const sourceRef = useRef(null);
-  const remainingParasRef = useRef([]); // paragraph indices yet to speak
-  const chunkQueueRef = useRef([]);     // text chunks for current paragraph
+  const remainingParasRef = useRef([]);
+  const chunkQueueRef = useRef([]);
   const voiceRef = useRef(voice);
+  // Generation counter: increment on every startFrom to cancel stale async chains
+  const genRef = useRef(0);
 
   const getAudioCtx = () => {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
@@ -33,28 +31,38 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
   };
 
   const setS = (s) => { stateRef.current = s; setState(s); };
-  const setCP = (i) => { currentParaRef.current = i; setCurrentPara(i); if (sessionId && i >= 0) localStorage.setItem(`tts_progress_${sessionId}`, String(i)); };
+  const setCP = (i) => {
+    currentParaRef.current = i;
+    setCurrentPara(i);
+    if (sessionId && i >= 0) localStorage.setItem(`tts_progress_${sessionId}`, String(i));
+  };
+
+  const stopSource = () => {
+    if (sourceRef.current) { try { sourceRef.current.stop(); } catch (_) {} sourceRef.current = null; }
+  };
 
   const stop = () => {
-    if (sourceRef.current) { try { sourceRef.current.stop(); } catch (_) {} sourceRef.current = null; }
+    genRef.current++; // invalidate any in-flight async chain
+    stopSource();
     remainingParasRef.current = [];
     chunkQueueRef.current = [];
+    setBufferingPara(-1);
     setS("idle");
     setCP(-1);
   };
 
-  const playNextChunk = async () => {
+  const playNextChunk = async (gen) => {
+    if (gen !== genRef.current) return; // stale call — a new startFrom has taken over
     if (stateRef.current !== "playing") return;
 
-    // If there are remaining chunks for the current paragraph, play the next one
     if (chunkQueueRef.current.length > 0) {
       const chunk = chunkQueueRef.current.shift();
-      await fetchAndPlay(chunk);
+      await fetchAndPlay(chunk, gen);
       return;
     }
 
-    // Advance to next paragraph
     if (remainingParasRef.current.length === 0) {
+      setBufferingPara(-1);
       setS("idle");
       setCP(-1);
       return;
@@ -64,11 +72,15 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     setCP(idx);
     const text = paragraphs[idx] || "";
     chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(text));
-    playNextChunk();
+    playNextChunk(gen);
   };
 
-  const fetchAndPlay = async (chunk) => {
+  const fetchAndPlay = async (chunk, gen) => {
+    if (gen !== genRef.current) return;
     if (stateRef.current !== "playing") return;
+
+    setBufferingPara(currentParaRef.current);
+
     let response;
     try {
       response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
@@ -77,7 +89,11 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       stop();
       return;
     }
+
+    if (gen !== genRef.current) return; // jumped to new paragraph while fetching
     if (stateRef.current !== "playing") return;
+
+    setBufferingPara(-1);
 
     const base64 = response.data.audio;
     const binary = atob(base64);
@@ -86,39 +102,52 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
     const ctx = getAudioCtx();
     if (ctx.state === "suspended") await ctx.resume();
+
+    if (gen !== genRef.current) return;
+
     const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
+
+    if (gen !== genRef.current) return;
     if (stateRef.current !== "playing") return;
 
     const source = ctx.createBufferSource();
     source.buffer = decoded;
     source.connect(ctx.destination);
-    source.onended = () => { sourceRef.current = null; playNextChunk(); };
+    source.onended = () => { sourceRef.current = null; playNextChunk(gen); };
     sourceRef.current = source;
     source.start(0);
   };
 
   const startFrom = async (paraIdx) => {
-    if (sourceRef.current) { try { sourceRef.current.stop(); } catch (_) {} sourceRef.current = null; }
+    genRef.current++; // cancel any in-flight chain immediately
+    const gen = genRef.current;
+
+    stopSource();
     chunkQueueRef.current = [];
     remainingParasRef.current = paragraphs.map((_, i) => i).filter(i => i > paraIdx);
     setCP(paraIdx);
     setS("playing");
+    setBufferingPara(paraIdx);
+
     const text = paragraphs[paraIdx] || "";
     chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(text));
-    playNextChunk();
+    playNextChunk(gen);
   };
 
   const handlePlayPause = async () => {
-    if (state === "playing") {
-      if (sourceRef.current) { try { sourceRef.current.stop(); } catch (_) {} sourceRef.current = null; }
+    if (state === "playing" || state === "buffering") {
+      stopSource();
+      genRef.current++; // cancel in-flight fetch
+      setBufferingPara(-1);
       setS("paused");
       return;
     }
     if (state === "paused") {
+      const gen = genRef.current;
       setS("playing");
       const ctx = getAudioCtx();
       if (ctx.state === "suspended") ctx.resume();
-      playNextChunk();
+      playNextChunk(gen);
       return;
     }
     // idle → start
@@ -132,7 +161,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     setShowVoicePicker(false);
   };
 
-  const isActive = state === "playing" || state === "paused";
+  const isActive = state === "playing" || state === "paused" || state === "buffering";
   const savedIdx = sessionId ? parseInt(localStorage.getItem(`tts_progress_${sessionId}`) || "-1", 10) : -1;
 
   return (
@@ -141,13 +170,12 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       <div className="flex items-center gap-1 mb-2 flex-wrap">
         <button
           onClick={handlePlayPause}
-          disabled={state === "loading"}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:opacity-70 transition-colors text-xs font-medium select-none disabled:opacity-50"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:opacity-70 transition-colors text-xs font-medium select-none"
           style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
         >
-          {state === "loading"
-            ? <><span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />Loading…</>
-            : state === "playing"
+          {state === "playing"
+            ? <><Pause className="w-3.5 h-3.5" />Pause</>
+            : state === "buffering"
               ? <><Pause className="w-3.5 h-3.5" />Pause</>
               : <><Play className="w-3.5 h-3.5" />{state === "idle" ? "Read" : "Resume"}</>}
         </button>
@@ -204,7 +232,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       {/* Paragraphs */}
       {paragraphs.map((text, paraIdx) => {
         const displayText = fmtSecondsInText(text);
-        const active = currentPara === paraIdx && state === "playing";
+        const isPlaying = currentPara === paraIdx && state === "playing";
+        const isBuffering = bufferingPara === paraIdx && state !== "idle" && state !== "paused";
 
         if (renderParagraph) {
           return (
@@ -213,7 +242,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
               className={isActive ? "cursor-pointer" : ""}
               onClick={() => isActive && startFrom(paraIdx)}
             >
-              {renderParagraph(displayText, paraIdx, active)}
+              {renderParagraph(displayText, paraIdx, isPlaying, isBuffering)}
             </div>
           );
         }
@@ -223,11 +252,16 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
             key={paraIdx}
             onClick={() => isActive && startFrom(paraIdx)}
             className={[
-              "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200",
+              "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 flex items-center gap-2",
               isActive ? "cursor-pointer" : "",
-              active ? "border-primary bg-primary/8 text-foreground font-medium rounded-r-md" : "border-primary/30 text-foreground/80",
+              isPlaying ? "border-primary bg-primary/8 text-foreground font-medium rounded-r-md"
+                : isBuffering ? "border-primary/60 bg-primary/5 text-foreground rounded-r-md"
+                : "border-primary/30 text-foreground/80",
             ].join(" ")}
           >
+            {isBuffering && (
+              <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            )}
             {displayText}
           </p>
         );
