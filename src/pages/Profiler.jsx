@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Brain, Activity, Layers, AlertCircle, Zap, TrendingUp, Clock } from "lucide-react";
+import { Brain, Activity, AlertCircle, Zap, TrendingUp, Heart, Lightbulb, User } from "lucide-react";
+import TTSReader from "../components/TTSReader";
 import TTSButton from "../components/TTSButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -108,41 +109,219 @@ function SectionCard({ icon, title, color, children }) {
 
 }
 
-function ClusterCard({ cluster, index }) {
-  const colors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-4))", "hsl(var(--accent))", "hsl(var(--chart-3))"];
-  const color = colors[index % colors.length];
-  return (
-    <div className="rounded-xl border border-border p-4 space-y-3" style={{ borderColor: color + "44" }}>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-bold" style={{ color }}>{cluster.name}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{cluster.session_count} sessions · {cluster.typical_duration || "—"}</p>
-        </div>
-        <Badge variant="outline" className="text-[10px] shrink-0 max-w-[120px] truncate" style={{ borderColor: color, color }} title={cluster.build_type_tendency || "Mixed"}>
-          {cluster.build_type_tendency || "Mixed"}
-        </Badge>
-      </div>
-      <p className="text-[#ffffff] text-base leading-relaxed break-words">{cluster.description}</p>
-      {cluster.defining_methods?.length > 0 &&
-      <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Key Methods</p>
-          <div className="flex flex-wrap gap-1">
-            {cluster.defining_methods.map((m, i) =>
-          <Badge key={i} variant="secondary" className="text-[9px]">{m}</Badge>
-          )}
-          </div>
-        </div>
-      }
-      {cluster.physiological_signature &&
-      <p className="text-[#ffffff] pl-2 text-sm leading-relaxed border-l-2 border-border italic break-words">{cluster.physiological_signature}</p>
-      }
-      {cluster.recommendation &&
-      <div className="bg-muted/60 rounded-lg p-3">
-          <p className="text-sm text-foreground leading-relaxed break-words">{cluster.recommendation}</p>
-        </div>
-      }
-    </div>);
+function AIProfilePanel({ sessions, userProfile }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
 
+  useEffect(() => {
+    base44.entities.SessionClusterAnalysis.list("-updated_date", 1).then((rows) => {
+      if (rows[0]?.result) setResult(rows[0].result);
+    });
+  }, []);
+
+  const analyze = async () => {
+    setLoading(true);
+    setResult(null);
+
+    const sessionSummaries = sessions.map((s) => ({
+      date: s.date?.slice(0, 10),
+      duration_minutes: s.duration_minutes,
+      methods: s.methods,
+      custom_methods: s.custom_methods,
+      foley_size: s.foley_size,
+      foley_type: s.foley_type,
+      estim_notes: s.estim_notes,
+      sleeve_type: s.sleeve_type,
+      tens_placement: s.tens_placement,
+      build_type: s.build_type,
+      custom_build_type: s.custom_build_type,
+      climax_duration: s.climax_duration,
+      no_climax: s.no_climax,
+      intensity: s.intensity,
+      build_quality: s.build_quality,
+      satisfaction: s.satisfaction,
+      avg_hr: s.avg_hr,
+      max_hr: s.max_hr,
+      hr_at_climax: s.hr_at_climax,
+      hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
+      hr_avg_at_climax_window: s.hr_avg_at_climax_window,
+      pre_climax_offset_s: s.pre_climax_offset_s,
+      climax_offset_s: s.climax_offset_s,
+      recovery_offset_s: s.recovery_offset_s,
+      mood: s.mood,
+      environment: s.environment,
+      hydration: s.hydration,
+      substances: s.substances,
+      ejaculate_volume: s.ejaculate_volume,
+      discomfort: s.discomfort,
+      discomfort_entries: s.discomfort_entries?.length > 0 ? s.discomfort_entries : undefined,
+      unusual_sensations: s.unusual_sensations,
+      refractory_notes: s.refractory_notes,
+      notes: s.notes,
+      tags: s.tags,
+      is_favorite: s.is_favorite,
+      event_timeline: s.event_timeline?.length > 0 ? s.event_timeline.map(e => ({
+        time_s: e.time_s,
+        category: Array.isArray(e.category) ? e.category : [e.category].filter(Boolean),
+        note: e.note,
+      })) : undefined,
+    }));
+
+    const profileContext = userProfile ? `
+USER PROFILE & NOTES:
+Age: ${userProfile.age || "—"} | Fitness: ${userProfile.fitness_level || "—"} | Resting HR: ${userProfile.resting_hr || "—"} bpm | Max HR: ${userProfile.max_hr || "—"} bpm
+Arousal style: ${userProfile.arousal_response_style || "—"} | Build duration: ${userProfile.typical_build_duration || "—"} | Climax sensitivity: ${userProfile.climax_sensitivity || "—"}
+Preferred stimulation: ${(userProfile.preferred_stimulation || []).join(", ") || "—"}
+Refractory pattern: ${userProfile.refractory_pattern || "—"}
+Medications/conditions: ${userProfile.medications || "none noted"}
+Arousal notes: ${userProfile.arousal_notes || "none"}
+` : "";
+
+    const res = await base44.integrations.Core.InvokeLLM({
+      model: "claude_sonnet_4_6",
+      prompt: `You are an expert physiological and sexual response analyst. Based on ${sessions.length} recorded sessions and the user's profile notes, generate a comprehensive, deeply personal physiological and arousal profile for this individual.
+${profileContext}
+SESSION DATA (${sessions.length} sessions):
+${JSON.stringify(sessionSummaries, null, 2)}
+
+Generate a rich, holistic profile that covers:
+
+1. AROUSAL PHYSIOLOGY: Their characteristic arousal curve shape, HR response patterns, build dynamics, and how their physiology behaves under different conditions. Reference actual HR data and phase timing where available.
+
+2. STIMULATION PROFILE: Which methods, combinations, and configurations produce the best outcomes. What their event timelines reveal about their response to stimulation changes. Identify what consistently works vs. what produces inconsistent results.
+
+3. CLIMAX & RECOVERY PATTERNS: Climax quality, duration patterns, ejaculate patterns, refractory observations. How their physiology winds down and what the recovery data reveals.
+
+4. CONTEXTUAL SENSITIVITIES: How mood, hydration, time of day, substances, environment, and other contextual factors influence their response. Identify what amplifies or suppresses arousal.
+
+5. DISCOMFORT & PHYSIOLOGICAL EDGE CASES: Recurring discomfort patterns, unusual sensations, and what they suggest anatomically or physiologically.
+
+6. BEHAVIORAL & AROUSAL TENDENCIES: Patterns in how they build (gradual vs. erratic, plateau-heavy vs. continuous), event timeline patterns, stimulation pause/resume habits, and what that reveals about their control and sensitivity.
+
+7. PERSONAL OPTIMIZATION RECOMMENDATIONS: Specific, actionable recommendations tailored to their unique profile — not generic advice. Reference their actual data, methods, and notes.
+
+Write as a cohesive, intelligent clinical profile — personal, insightful, and grounded in the data. Use the profile notes to add context and validate or contrast observed patterns.`,
+      response_json_schema: {
+        type: "object",
+        properties: {
+          profile_overview: { type: "string" },
+          arousal_physiology: { type: "array", items: { type: "string" } },
+          stimulation_profile: { type: "array", items: { type: "string" } },
+          climax_and_recovery: { type: "array", items: { type: "string" } },
+          contextual_sensitivities: { type: "array", items: { type: "string" } },
+          discomfort_and_edge_cases: { type: "array", items: { type: "string" } },
+          behavioral_tendencies: { type: "array", items: { type: "string" } },
+          optimization_recommendations: { type: "array", items: { type: "string" } },
+        },
+        required: ["profile_overview", "arousal_physiology", "stimulation_profile", "climax_and_recovery", "contextual_sensitivities", "behavioral_tendencies", "optimization_recommendations"],
+      },
+    });
+
+    const raw = typeof res === "string" ? JSON.parse(res) : res;
+    const parsed = raw?.response ?? raw;
+    setResult(parsed);
+
+    const existing = await base44.entities.SessionClusterAnalysis.list("-updated_date", 1);
+    if (existing[0]) {
+      await base44.entities.SessionClusterAnalysis.update(existing[0].id, { result: parsed, session_count: sessions.length });
+    } else {
+      await base44.entities.SessionClusterAnalysis.create({ result: parsed, session_count: sessions.length });
+    }
+    setLoading(false);
+  };
+
+  const SECTIONS = [
+    { key: "arousal_physiology", label: "Arousal Physiology", icon: <Heart className="w-3.5 h-3.5" />, color: "hsl(var(--chart-3))" },
+    { key: "stimulation_profile", label: "Stimulation Profile", icon: <Zap className="w-3.5 h-3.5" />, color: "hsl(var(--primary))" },
+    { key: "climax_and_recovery", label: "Climax & Recovery", icon: <TrendingUp className="w-3.5 h-3.5" />, color: "hsl(var(--chart-2))" },
+    { key: "contextual_sensitivities", label: "Contextual Sensitivities", icon: <Activity className="w-3.5 h-3.5" />, color: "hsl(var(--chart-4))" },
+    { key: "discomfort_and_edge_cases", label: "Discomfort & Edge Cases", icon: <AlertCircle className="w-3.5 h-3.5" />, color: "hsl(var(--destructive))" },
+    { key: "behavioral_tendencies", label: "Behavioral Tendencies", icon: <User className="w-3.5 h-3.5" />, color: "hsl(var(--accent))" },
+    { key: "optimization_recommendations", label: "Optimization Recommendations", icon: <Lightbulb className="w-3.5 h-3.5" />, color: "hsl(var(--chart-1))" },
+  ];
+
+  // Build flat paragraph list for TTSReader
+  const paras = [];
+  const paraMeta = [];
+  if (result) {
+    if (result.profile_overview) { paras.push(result.profile_overview); paraMeta.push({ type: "overview" }); }
+    for (const sec of SECTIONS) {
+      for (const item of (result[sec.key] || [])) {
+        paras.push(item);
+        paraMeta.push({ type: "section", sec });
+      }
+    }
+  }
+
+  return (
+    <SectionCard icon={<Brain className="w-4 h-4" />} title="Comprehensive Physiological Profile" color="hsl(var(--primary))">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          AI-generated personal physiological & arousal profile based on all sessions, event timelines, and profile notes.
+        </p>
+        <Button size="sm" onClick={analyze} disabled={loading || sessions.length < 2} className="h-7 text-xs gap-1.5 shrink-0 ml-2">
+          {loading
+            ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Profiling…</>
+            : <><Brain className="w-3 h-3" />{result ? "Re-generate" : "Generate Profile"}</>}
+        </Button>
+      </div>
+
+      {sessions.length < 2 && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5" /> Need at least 2 sessions to generate a profile.
+        </p>
+      )}
+
+      {!result && !loading && sessions.length >= 2 && (
+        <p className="text-xs text-muted-foreground">
+          Click Generate Profile to create your comprehensive physiological and arousal profile. Uses Claude Sonnet.
+        </p>
+      )}
+
+      {result && (
+        <TTSReader
+          sessionId="profiler_ai_profile"
+          paragraphs={paras}
+          renderParagraph={(text, idx, isActive) => {
+            const meta = paraMeta[idx];
+            if (!meta) return null;
+
+            if (meta.type === "overview") {
+              return (
+                <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md ${isActive ? "border-primary bg-primary/10 text-foreground" : "border-primary/50 text-foreground"}`}>
+                  {text}
+                </p>
+              );
+            }
+
+            const { sec } = meta;
+            // Check if first item in section → render section header
+            const firstInSection = paras.findIndex((_, i) => paraMeta[i]?.type === "section" && paraMeta[i]?.sec?.key === sec.key) === idx;
+
+            return (
+              <div>
+                {firstInSection && (
+                  <p className="text-xs font-semibold flex items-center gap-1.5 mt-4 mb-1.5 pt-3 border-t border-border" style={{ color: sec.color }}>
+                    {sec.icon}{sec.label}
+                  </p>
+                )}
+                <li
+                  className="text-sm pl-3 border-l-2 py-1 leading-relaxed list-none transition-all duration-200 rounded-r-md"
+                  style={{
+                    borderColor: isActive ? sec.color : sec.color + "55",
+                    background: isActive ? sec.color + "18" : "transparent",
+                    color: "hsl(var(--foreground))",
+                  }}
+                >
+                  {text}
+                </li>
+              </div>
+            );
+          }}
+        />
+      )}
+    </SectionCard>
+  );
 }
 
 function NearClimaxPanel({ sessions, allTimelines }) {
@@ -348,184 +527,22 @@ Be interpretive, insightful, and research-oriented. Reference specific sessions 
 
 }
 
-function ClusterPanel({ sessions }) {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [savedId, setSavedId] = useState(null);
-
-  useEffect(() => {
-    base44.entities.SessionClusterAnalysis.list("-updated_date", 1).then((rows) => {
-      if (rows[0]?.result) {
-        setResult(rows[0].result);
-        setSavedId(rows[0].id);
-      }
-    });
-  }, []);
-
-  const analyze = async () => {
-    setLoading(true);
-    setResult(null);
-
-    const summary = sessions.map((s) => ({
-      date: s.date?.slice(0, 10),
-      duration_minutes: s.duration_minutes,
-      avg_hr: s.avg_hr,
-      max_hr: s.max_hr,
-      hr_at_climax: s.hr_at_climax,
-      hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
-      hr_avg_at_climax_window: s.hr_avg_at_climax_window,
-      pre_climax_offset_s: s.pre_climax_offset_s,
-      climax_offset_s: s.climax_offset_s,
-      recovery_offset_s: s.recovery_offset_s,
-      methods: s.methods,
-      custom_methods: s.custom_methods,
-      foley_size: s.foley_size,
-      foley_type: s.foley_type,
-      estim_notes: s.estim_notes,
-      sleeve_type: s.sleeve_type,
-      tens_placement: s.tens_placement,
-      build_type: s.build_type,
-      custom_build_type: s.custom_build_type,
-      climax_duration: s.climax_duration,
-      unusual_sensations: s.unusual_sensations,
-      refractory_notes: s.refractory_notes,
-      ejaculate_volume: s.ejaculate_volume,
-      discomfort: s.discomfort,
-      mood: s.mood,
-      environment: s.environment,
-      substances: s.substances,
-      hydration: s.hydration,
-      tags: s.tags
-    }));
-
-    const res = await base44.integrations.Core.InvokeLLM({
-      model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant performing cluster analysis on sexual response session data.
-
-Analyze ${sessions.length} sessions and identify distinct physiological/behavioral profiles or clusters. DO NOT use intensity or satisfaction scores as clustering variables.
-
-Session data:
-${JSON.stringify(summary, null, 2)}
-
-Your goal:
-1. Identify 3-5 meaningful clusters based on: HR profile, phase timing, methods used, build type, physiological context (mood, hydration, discomfort, ejaculate volume, substances), and unusual sensations.
-2. For each cluster, name it, describe its defining characteristics, note which methods consistently appear, and provide an interpretive recommendation.
-3. Identify which method combinations most reliably produce specific build types preferred by the user.
-4. Provide cross-cluster insights about what differentiates high-quality sessions physiologically.
-
-Be interpretive and insightful — not just descriptive.`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          overview: { type: "string" },
-          clusters: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                session_count: { type: "number" },
-                description: { type: "string" },
-                defining_methods: { type: "array", items: { type: "string" } },
-                build_type_tendency: { type: "string" },
-                typical_duration: { type: "string" },
-                physiological_signature: { type: "string" },
-                recommendation: { type: "string" }
-              },
-              required: ["name", "session_count", "description", "defining_methods", "recommendation"]
-            }
-          },
-          method_build_correlations: { type: "array", items: { type: "string" } },
-          cross_cluster_insights: { type: "array", items: { type: "string" } }
-        },
-        required: ["overview", "clusters", "method_build_correlations", "cross_cluster_insights"]
-      }
-    });
-
-    const raw = typeof res === "string" ? JSON.parse(res) : res;
-    const parsed = raw?.response ?? raw;
-    setResult(parsed);
-
-    const existing = await base44.entities.SessionClusterAnalysis.list("-updated_date", 1);
-    if (existing[0]) {
-      await base44.entities.SessionClusterAnalysis.update(existing[0].id, { result: parsed, session_count: sessions.length });
-      setSavedId(existing[0].id);
-    } else {
-      const created = await base44.entities.SessionClusterAnalysis.create({ result: parsed, session_count: sessions.length });
-      setSavedId(created.id);
-    }
-    setLoading(false);
-  };
-
-  return (
-    <SectionCard icon={<Layers className="w-4 h-4" />} title="Session Profile Clusters" color="hsl(var(--primary))">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">AI-identified physiological profiles across all sessions, linked to methods and build types.</p>
-        <div className="flex items-center gap-2">
-          {result && <TTSButton getText={() => {
-            const parts = [result.overview];
-            result.clusters?.forEach((c) => parts.push(c.name + ': ' + c.description + '. ' + c.recommendation));
-            result.method_build_correlations?.forEach((s) => parts.push(s));
-            result.cross_cluster_insights?.forEach((s) => parts.push(s));
-            return parts.filter(Boolean).join('. ');
-          }} />}
-        <Button size="sm" onClick={analyze} disabled={loading || sessions.length < 4} className="h-7 text-xs gap-1.5 shrink-0 ml-2">
-          {loading ?
-            <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</> :
-            <><Brain className="w-3 h-3" />{result ? "Re-run" : "Analyze"}</>}
-        </Button>
-        </div>
-      </div>
-
-      {sessions.length < 4 &&
-      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-          <AlertCircle className="w-3.5 h-3.5" /> Need at least 4 sessions for meaningful cluster detection.
-        </p>
-      }
-
-      {result &&
-      <div className="space-y-4">
-          {result.overview &&
-        <p className="text-base text-foreground leading-relaxed border-l-2 border-primary pl-3 font-medium">{result.overview}</p>
-        }
-          {result.clusters?.length > 0 &&
-        <div className="space-y-3">
-              {result.clusters.map((cluster, i) => <ClusterCard key={i} cluster={cluster} index={i} />)}
-            </div>
-        }
-          {result.method_build_correlations?.length > 0 &&
-        <div className="bg-muted/60 rounded-lg p-3 space-y-2">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1 tracking-wider"><TrendingUp className="w-3 h-3" />Method → Build Type Correlations</p>
-              {result.method_build_correlations.map((s, i) =>
-          <p key={i} className="text-[#ffffff] pl-3 text-sm leading-relaxed border-l-2 border-primary/40">• {s}</p>
-          )}
-            </div>
-        }
-          {result.cross_cluster_insights?.length > 0 &&
-        <div className="bg-muted/60 rounded-lg p-3 space-y-2">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1 tracking-wider"><Activity className="w-3 h-3" />Cross-Cluster Insights</p>
-              {result.cross_cluster_insights.map((s, i) =>
-          <p key={i} className="text-[#ffffff] pl-3 text-sm leading-relaxed border-l-2 border-primary/40">• {s}</p>
-          )}
-            </div>
-        }
-        </div>
-      }
-    </SectionCard>);
-
-}
-
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function Profiler() {
   const [sessions, setSessions] = useState([]);
   const [allTimelines, setAllTimelines] = useState({});
+  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const all = await base44.entities.Session.list("-date", 300);
+      const [all, me] = await Promise.all([
+        base44.entities.Session.list("-date", 300),
+        base44.auth.me(),
+      ]);
       setSessions(all);
+      setUserProfile(me);
 
       // Load HR timelines for sessions that have climax markers (needed for near-climax detection)
       const withData = all.filter((s) => s.climax_offset_s != null || s.avg_hr != null);
@@ -545,8 +562,8 @@ export default function Profiler() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>);
-
+      </div>
+    );
   }
 
   return (
@@ -556,8 +573,8 @@ export default function Profiler() {
         <p className="text-sm text-muted-foreground mt-0.5">{sessions.length} sessions · {Object.keys(allTimelines).length} with HR data</p>
       </div>
 
-      <ClusterPanel sessions={sessions} />
+      <AIProfilePanel sessions={sessions} userProfile={userProfile} />
       <NearClimaxPanel sessions={sessions} allTimelines={allTimelines} />
-    </div>);
-
+    </div>
+  );
 }
