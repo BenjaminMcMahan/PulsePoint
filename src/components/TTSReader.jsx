@@ -31,7 +31,14 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
 
   const getAudioCtx = () => {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // Auto-resume if browser suspends context while we intend to be playing
+      ctx.addEventListener("statechange", () => {
+        if (ctx.state === "suspended" && stateRef.current === "playing") {
+          ctx.resume().catch(() => {});
+        }
+      });
+      audioCtxRef.current = ctx;
     }
     return audioCtxRef.current;
   };
