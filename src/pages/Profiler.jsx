@@ -544,13 +544,19 @@ export default function Profiler() {
       setSessions(all);
       setUserProfile(me);
 
-      // Load HR timelines for sessions that have climax markers (needed for near-climax detection)
+      // Load HR timelines in small batches to avoid rate limits
       const withData = all.filter((s) => s.climax_offset_s != null || s.avg_hr != null);
-      const pairs = await Promise.all(
-        withData.map((s) =>
-        base44.entities.HeartRateTimeline.filter({ session: s.id }, "time_offset_s", 5000).then((rows) => [s.id, rows])
-        )
-      );
+      const BATCH = 5;
+      const pairs = [];
+      for (let i = 0; i < withData.length; i += BATCH) {
+        const chunk = withData.slice(i, i + BATCH);
+        const results = await Promise.all(
+          chunk.map((s) =>
+            base44.entities.HeartRateTimeline.filter({ session: s.id }, "time_offset_s", 5000).then((rows) => [s.id, rows])
+          )
+        );
+        pairs.push(...results);
+      }
       const map = {};
       pairs.forEach(([id, rows]) => {if (rows.length > 0) map[id] = rows;});
       setAllTimelines(map);
