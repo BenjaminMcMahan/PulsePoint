@@ -14,82 +14,133 @@ function fmtSec(s) {
   return v >= 60 ? `${Math.floor(v / 60)}m${v % 60}s` : `${v}s`;
 }
 
-// Detect near-climax events in a HR timeline:
-// Erratic rises (>=8 bpm over ≤45s) ending in a drop, not as sustained as a full climax.
-function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS) {
+// Import-equivalent: NCE keyword list for note corroboration (mirrored from NearClimaxEvents)
+const NCE_KEYWORDS = [
+  "tension", "tense", "tight", "tighten", "clench", "grip",
+  "foot", "feet", "plant", "planting", "toe", "curl",
+  "throb", "pulse", "pulsing", "twitch", "spasm",
+  "edge", "edg", "near", "almost", "close", "threshold",
+  "pressure", "build", "buildup", "surge", "wave", "rush",
+  "intense", "intensity", "strong", "overwhelming",
+  "breath", "breathing", "gasp", "hold",
+  "shiver", "shak", "tremble",
+];
+
+function scoreEventNoteCorroboration(eventStartS, eventEndS, sessionEvents) {
+  if (!sessionEvents || sessionEvents.length === 0) return 0;
+  const windowS = 45;
+  let score = 0;
+  for (const ev of sessionEvents) {
+    const t = Number(ev.time_s);
+    if (t < eventStartS - windowS || t > eventEndS + windowS) continue;
+    const dist = Math.max(0, Math.min(Math.abs(t - eventStartS), Math.abs(t - eventEndS)));
+    const proximityWeight = dist < 15 ? 2 : 1;
+    const note = (ev.note || "").toLowerCase();
+    const cats = Array.isArray(ev.category) ? ev.category : [ev.category].filter(Boolean);
+    if (cats.some(c => ["physical", "sensation"].includes(c))) score += 1 * proximityWeight;
+    for (const kw of NCE_KEYWORDS) {
+      if (note.includes(kw)) { score += 2 * proximityWeight; break; }
+    }
+  }
+  return score;
+}
+
+// Detect near-climax events: sustained HR elevations (not brief spikes) before the pre-climax marker.
+// Uses event note corroboration for confidence scoring.
+function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS, sessionEvents = []) {
   if (!rows || rows.length < 10) return [];
-  const events = [];
 
-  const RISE_THRESHOLD = 8;
+  const smoothed = rows.map((r, i) => {
+    const win = rows.slice(Math.max(0, i - 3), i + 4);
+    const avg = win.reduce((a, w) => a + Number(w.hr), 0) / win.length;
+    return { t: Number(r.time_offset_s), hr: avg };
+  });
+
+  const excludeStart = climaxOffsetS != null
+    ? (preClimaxOffsetS != null
+        ? Math.min(preClimaxOffsetS, climaxOffsetS - 60)
+        : climaxOffsetS - 90)
+    : Infinity;
+
+  const allHRs = smoothed.filter(p => p.t < excludeStart).map(p => p.hr);
+  if (allHRs.length < 10) return [];
+  const sessionMinHR = Math.min(...allHRs);
+  const sessionMaxHR = Math.max(...allHRs);
+  const sessionHRRange = sessionMaxHR - sessionMinHR;
+
+  const MIN_RISE_BPM = Math.max(7, sessionHRRange * 0.13);
+  const MAX_RISE_BPM = sessionHRRange * 0.78;
   const RISE_WINDOW_S = 120;
-  const PLATEAU_MIN_S = 6;
-  const DROP_NEEDED = 6;
+  const SUSTAINED_THRESHOLD_S = 20;
+  const SUSTAINED_TOLERANCE = 5;
+  const DROP_BPM = Math.max(5, MIN_RISE_BPM * 0.55);
+  const SEARCH_DROP_S = 150;
+  const MIN_DURATION_S = 25;
+  const MAX_DURATION_S = 300;
   const COOLDOWN_S = 30;
-  const MIN_EVENT_DURATION_S = 10;
-  const MAX_EVENT_DURATION_S = climaxOffsetS != null && preClimaxOffsetS != null ?
-  Math.max(60, Math.abs(climaxOffsetS - preClimaxOffsetS) * 0.8) :
-  180;
-  const climaxExcludeRadius = 90;
+  const MIN_CONFIDENCE = 2;
 
-  let i = 0;
+  const events = [];
   let lastEventEnd = -Infinity;
+  let i = 0;
 
-  while (i < rows.length - 5) {
-    const t0 = Number(rows[i].time_offset_s);
-    const hr0 = Number(rows[i].hr);
-
-    if (t0 < lastEventEnd + COOLDOWN_S) {i++;continue;}
-    if (climaxOffsetS != null && Math.abs(t0 - climaxOffsetS) < climaxExcludeRadius) {i++;continue;}
+  while (i < smoothed.length - 5) {
+    const { t: t0, hr: hr0 } = smoothed[i];
+    if (t0 < lastEventEnd + COOLDOWN_S) { i++; continue; }
+    if (t0 >= excludeStart) break;
 
     let peakIdx = i;
     let peakHr = hr0;
-    for (let j = i + 1; j < rows.length; j++) {
-      const tj = Number(rows[j].time_offset_s);
-      if (tj - t0 > RISE_WINDOW_S) break;
-      if (Number(rows[j].hr) > peakHr) {
-        peakHr = Number(rows[j].hr);
-        peakIdx = j;
-      }
+    for (let j = i + 1; j < smoothed.length; j++) {
+      if (smoothed[j].t - t0 > RISE_WINDOW_S) break;
+      if (smoothed[j].t >= excludeStart) break;
+      if (smoothed[j].hr > peakHr) { peakHr = smoothed[j].hr; peakIdx = j; }
     }
 
-    if (peakHr - hr0 < RISE_THRESHOLD || peakIdx === i) {i++;continue;}
+    const rise = peakHr - hr0;
+    if (rise < MIN_RISE_BPM || rise > MAX_RISE_BPM || peakIdx === i) { i++; continue; }
 
-    const peakTime = Number(rows[peakIdx].time_offset_s);
+    const peakTime = smoothed[peakIdx].t;
 
-    let plateauEnd = peakIdx;
-    for (let j = peakIdx; j < rows.length; j++) {
-      if (Number(rows[j].time_offset_s) - peakTime > PLATEAU_MIN_S) break;
-      if (Number(rows[j].hr) >= peakHr - DROP_NEEDED / 2) plateauEnd = j;
+    // Require sustained elevation — not just a momentary spike
+    let sustainedEndIdx = peakIdx;
+    for (let j = peakIdx + 1; j < smoothed.length; j++) {
+      if (smoothed[j].t - peakTime > 90) break;
+      if (smoothed[j].hr >= peakHr - SUSTAINED_TOLERANCE) sustainedEndIdx = j;
     }
-    const plateauDuration = Number(rows[plateauEnd].time_offset_s) - peakTime;
-    if (plateauDuration < PLATEAU_MIN_S * 0.5) {i = peakIdx + 1;continue;}
+    const sustainedDuration = smoothed[sustainedEndIdx].t - peakTime;
+    if (sustainedDuration < SUSTAINED_THRESHOLD_S) { i = peakIdx + 1; continue; }
 
-    let dropped = false;
-    let dropIdx = plateauEnd;
-    for (let j = plateauEnd + 1; j < rows.length && j < plateauEnd + 40; j++) {
-      if (Number(rows[j].hr) <= peakHr - DROP_NEEDED) {
-        dropped = true;
-        dropIdx = j;
-        break;
-      }
+    let dropIdx = -1;
+    for (let j = sustainedEndIdx + 1; j < smoothed.length; j++) {
+      if (smoothed[j].t - peakTime > SEARCH_DROP_S) break;
+      if (smoothed[j].hr <= peakHr - DROP_BPM) { dropIdx = j; break; }
     }
+    if (dropIdx === -1) { i = peakIdx + 1; continue; }
 
-    if (!dropped) {i = peakIdx + 1;continue;}
+    const eventDuration = smoothed[dropIdx].t - t0;
+    if (eventDuration < MIN_DURATION_S || eventDuration > MAX_DURATION_S) { i++; continue; }
+    if (peakHr >= sessionMaxHR * 0.96) { i = dropIdx + 1; continue; }
 
-    const eventDuration = Number(rows[dropIdx].time_offset_s) - t0;
-    if (eventDuration < MIN_EVENT_DURATION_S || eventDuration > MAX_EVENT_DURATION_S) {i++;continue;}
+    const noteScore = scoreEventNoteCorroboration(t0, smoothed[dropIdx].t, sessionEvents);
+    const hrConfidence = Math.min(4, Math.floor((rise / MIN_RISE_BPM - 1) * 2) + Math.floor(sustainedDuration / 20));
+    const totalConfidence = hrConfidence + noteScore;
+    if (totalConfidence < MIN_CONFIDENCE) { i++; continue; }
 
     events.push({
       start_offset_s: t0,
       peak_offset_s: peakTime,
-      end_offset_s: Number(rows[dropIdx].time_offset_s),
+      end_offset_s: smoothed[dropIdx].t,
       base_hr: Math.round(hr0),
       peak_hr: Math.round(peakHr),
-      rise_bpm: Math.round(peakHr - hr0),
-      duration_s: Math.round(eventDuration)
+      rise_bpm: Math.round(rise),
+      sustained_s: Math.round(sustainedDuration),
+      duration_s: Math.round(eventDuration),
+      confidence: Math.min(10, totalConfidence),
+      note_corroborated: noteScore > 0,
     });
 
-    lastEventEnd = Number(rows[dropIdx].time_offset_s);
+    lastEventEnd = smoothed[dropIdx].t;
     i = dropIdx + 1;
   }
 
@@ -348,7 +399,7 @@ function NearClimaxPanel({ sessions, allTimelines }) {
     for (const session of sessions) {
       const rows = allTimelines[session.id] || [];
       if (rows.length < 10) continue;
-      const events = detectNearClimaxEvents(rows, session.climax_offset_s, session.pre_climax_offset_s);
+      const events = detectNearClimaxEvents(rows, session.climax_offset_s, session.pre_climax_offset_s, session.event_timeline || []);
       if (events.length > 0) {
         sessionEvents.push({
           date: session.date?.slice(0, 10),
