@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine, Scatter, CartesianGrid,
@@ -119,6 +119,7 @@ export default function ArousalEventChart({ session, timelineRows }) {
   const [collapsed, setCollapsed] = useState(false);
   const [listCollapsed, setListCollapsed] = useState(false);
   const [activeIdx, setActiveIdx] = useState(null); // original event index
+  const [focusedFilteredIdx, setFocusedFilteredIdx] = useState(0);
 
   const arousalCurve = useMemo(() => buildArousalCurve(timelineRows, session), [timelineRows, session]);
 
@@ -149,9 +150,17 @@ export default function ArousalEventChart({ session, timelineRows }) {
     setActiveIdx(null);
   };
 
-  const handleEventClick = useCallback((idx) => {
-    setActiveIdx((prev) => prev === idx ? null : idx);
-  }, []);
+  const handleEventClick = useCallback((origIdx) => {
+    setActiveIdx((prev) => prev === origIdx ? null : origIdx);
+    const fi = eventPoints.findIndex((e) => e._idx === origIdx);
+    if (fi !== -1) setFocusedFilteredIdx(fi);
+  }, [eventPoints]);
+
+  const navigateTo = useCallback((fi) => {
+    const bounded = ((fi % eventPoints.length) + eventPoints.length) % eventPoints.length;
+    setFocusedFilteredIdx(bounded);
+    setActiveIdx(eventPoints[bounded]?._idx ?? null);
+  }, [eventPoints]);
 
   const presentCats = useMemo(() => {
     const seen = new Set();
@@ -266,6 +275,41 @@ export default function ArousalEventChart({ session, timelineRows }) {
               Upload a HR file to see the full arousal arc. Events shown at estimated positions.
             </p>
           )}
+
+          {/* Navigator card — shown when an event is active */}
+          {activeEvent && (() => {
+            const color = arousalColor(activeEvent.arousal ?? 5);
+            const cats = normalizeCategoryArray(activeEvent.category);
+            const fi = eventPoints.findIndex((e) => e._idx === activeEvent._idx);
+            return (
+              <div className="rounded-lg px-3 py-3 space-y-1.5" style={{ background: color + "18", borderLeft: `3px solid ${color}` }}>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => navigateTo(fi - 1)} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+                    <ChevronLeft className="w-4 h-4" style={{ color }} />
+                  </button>
+                  <div className="flex-1 flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[11px] font-bold" style={{ color }}>
+                      E{fi + 1} / {eventPoints.length}
+                    </span>
+                    <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(activeEvent.time_s)}</span>
+                    {cats.map((c) => {
+                      const m = getCategoryMeta(c);
+                      return <span key={c} className="text-[9px] px-1.5 rounded-full font-semibold" style={{ background: m.color + "22", color: m.color }}>{m.label}</span>;
+                    })}
+                    {activeEvent.arousal != null && (
+                      <span className="font-mono text-[11px] font-bold" style={{ color }}>
+                        {activeEvent.arousal}/10
+                      </span>
+                    )}
+                  </div>
+                  <button onClick={() => navigateTo(fi + 1)} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+                    <ChevronRight className="w-4 h-4" style={{ color }} />
+                  </button>
+                </div>
+                <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">{activeEvent.note}</p>
+              </div>
+            );
+          })()}
 
           {/* Collapsible event list */}
           {eventPoints.length > 0 && (
