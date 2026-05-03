@@ -1,199 +1,118 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Play, Pause, Square, ChevronDown } from "lucide-react";
 import { cleanTextForSpeech, splitIntoChunks } from "./TTSButton";
 import { fmtSecondsInText } from "@/utils/formatSeconds";
-import { getBestVoice, getEnglishVoices, resetVoiceCache } from "@/lib/ttsVoice";
+import { base44 } from "@/api/base44Client";
+
+const OAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
 
 /**
- * TTSReader — paragraph-aware TTS component using Web Audio (audio element).
- * 
- * Props:
- *   paragraphs: string[]  — array of paragraphs to read (displayed + spoken)
- *   renderParagraph?: (text, index, isActive) => ReactNode  — optional custom renderer
- *   sessionId?: string — session ID for localStorage persistence of reading progress
- * 
- * Features:
- *   - Highlights the currently-speaking paragraph
- *   - Tap any paragraph while playing to jump to it
- *   - Continues playing in background when app loses focus
- *   - Saves and restores last read paragraph to localStorage
- *   - Uses HTML audio element with speech synthesis fallback
+ * TTSReader — paragraph-aware TTS using OpenAI TTS API.
+ * Highlights the currently-speaking paragraph.
+ * Tap any paragraph while playing to jump to it.
  */
 export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
-  const [state, setState] = useState("idle"); // idle | playing | paused
+  const [state, setState] = useState("idle"); // idle | loading | playing | paused
   const [currentPara, setCurrentPara] = useState(-1);
-  const [selectedVoice, setSelectedVoice] = useState(null);
-  const [availableVoices, setAvailableVoices] = useState([]);
+  const [voice, setVoice] = useState(() => localStorage.getItem("tts_oai_voice") || "alloy");
   const [showVoicePicker, setShowVoicePicker] = useState(false);
 
   const stateRef = useRef("idle");
   const currentParaRef = useRef(-1);
-  const audioRef = useRef(null);  // hidden audio element for playback
-  const chunkQueueRef = useRef([]);      // chunks for current paragraph
-  const remainingIdxRef = useRef([]);    // paragraph indices yet to speak
-  const currentChunkRef = useRef(null);
-  const selectedVoiceRef = useRef(null);
-  const touchStartRef = useRef(null);
-  const touchMovedRef = useRef(false);
+  const audioRef = useRef(null);
+  const remainingParasRef = useRef([]); // paragraph indices yet to speak
+  const chunkQueueRef = useRef([]);     // text chunks for current paragraph
+  const voiceRef = useRef(voice);
 
   const setS = (s) => { stateRef.current = s; setState(s); };
-  const setCP = (i) => { currentParaRef.current = i; setCurrentPara(i); };
+  const setCP = (i) => { currentParaRef.current = i; setCurrentPara(i); if (sessionId && i >= 0) localStorage.setItem(`tts_progress_${sessionId}`, String(i)); };
 
-  // Load voices and restore saved preference from localStorage
-  useEffect(() => {
-    const loadVoices = () => {
-      resetVoiceCache();
-      const voices = getEnglishVoices();
-      if (voices.length > 0) {
-        setAvailableVoices(voices);
-        // Restore saved voice preference
-        const savedName = localStorage.getItem("tts_voice_name");
-        if (savedName) {
-          const match = voices.find(v => v.name === savedName);
-          if (match) setSelectedVoice(match);
-        }
-      }
-    };
-    loadVoices();
-    const t = setTimeout(loadVoices, 200);
-    window.speechSynthesis?.addEventListener("voiceschanged", loadVoices);
-    return () => {
-      clearTimeout(t);
-      window.speechSynthesis?.removeEventListener("voiceschanged", loadVoices);
-    };
-  }, []);
+  const stop = () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
+    remainingParasRef.current = [];
+    chunkQueueRef.current = [];
+    setS("idle");
+    setCP(-1);
+  };
 
-  // Save current paragraph index to localStorage when it changes
-  useEffect(() => {
-    if (sessionId && currentPara >= 0) {
-      localStorage.setItem(`tts_progress_${sessionId}`, String(currentPara));
-    }
-  }, [currentPara, sessionId]);
-
-  // Keep selectedVoiceRef in sync
-  useEffect(() => { selectedVoiceRef.current = selectedVoice; }, [selectedVoice]);
-
-  useEffect(() => () => {
-    if (audioRef.current) audioRef.current.pause();
-    window.speechSynthesis?.cancel();
-  }, []);
-
-  // Initialize audio element for background playback
-  useEffect(() => {
-    if (!audioRef.current) {
-      const audio = document.createElement("audio");
-      audio.style.display = "none";
-      document.body.appendChild(audio);
-      audioRef.current = audio;
-    }
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = "";
-      }
-    };
-  }, []);
-
-  const speakNext = () => {
+  const playNextChunk = async () => {
     if (stateRef.current !== "playing") return;
 
-    // Speak remaining chunks of current paragraph first
+    // If there are remaining chunks for the current paragraph, play the next one
     if (chunkQueueRef.current.length > 0) {
       const chunk = chunkQueueRef.current.shift();
-      currentChunkRef.current = chunk;
-      const utt = new SpeechSynthesisUtterance(chunk);
-      const voice = selectedVoiceRef.current || getBestVoice();
-      if (voice) utt.voice = voice;
-      utt.lang = voice?.lang || "en-US";
-      utt.rate = 0.92;
-      utt.pitch = 1.0;
-      utt.volume = 1;
-      utt.onend = () => speakNext();
-      utt.onerror = (e) => { if (e.error !== "interrupted" && e.error !== "canceled") speakNext(); };
-      window.speechSynthesis.speak(utt);
+      await fetchAndPlay(chunk);
       return;
     }
 
     // Advance to next paragraph
-    if (remainingIdxRef.current.length === 0) {
+    if (remainingParasRef.current.length === 0) {
       setS("idle");
       setCP(-1);
       return;
     }
 
-    const idx = remainingIdxRef.current.shift();
+    const idx = remainingParasRef.current.shift();
     setCP(idx);
     const text = paragraphs[idx] || "";
     chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(text));
-    speakNext();
+    playNextChunk();
   };
 
-  const startFrom = (paraIdx, wordIdx = 0) => {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    if (audioRef.current) audioRef.current.pause();
+  const fetchAndPlay = async (chunk) => {
+    if (stateRef.current !== "playing") return;
+    const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+    if (stateRef.current !== "playing") return;
+
+    const blob = new Blob([response.data], { type: "audio/mpeg" });
+    const url = URL.createObjectURL(blob);
+
+    if (!audioRef.current) audioRef.current = new Audio();
+    audioRef.current.src = url;
+    audioRef.current.onended = () => { URL.revokeObjectURL(url); playNextChunk(); };
+    audioRef.current.onerror = () => { URL.revokeObjectURL(url); playNextChunk(); };
+    await audioRef.current.play();
+  };
+
+  const startFrom = async (paraIdx) => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
     chunkQueueRef.current = [];
-    currentChunkRef.current = null;
-    
-    // Set remaining paragraphs *after* the current one
-    remainingIdxRef.current = paragraphs.map((_, i) => i).filter(i => i > paraIdx);
+    remainingParasRef.current = paragraphs.map((_, i) => i).filter(i => i > paraIdx);
     setCP(paraIdx);
     setS("playing");
-    
-    // For current paragraph, skip to the specified word
     const text = paragraphs[paraIdx] || "";
-    let chunkText = text;
-    if (wordIdx > 0) {
-      const words = text.split(/\s+/);
-      if (wordIdx < words.length) {
-        chunkText = words.slice(wordIdx).join(" ");
-      }
-    }
-    chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(chunkText));
-    
-    // Save progress to localStorage
-    if (sessionId) {
-      localStorage.setItem(`tts_progress_${sessionId}`, String(paraIdx));
-    }
-    
-    setTimeout(() => speakNext(), 80);
+    chunkQueueRef.current = splitIntoChunks(cleanTextForSpeech(text));
+    playNextChunk();
   };
 
-  const handlePlayPause = () => {
-    if (!window.speechSynthesis) return;
+  const handlePlayPause = async () => {
     if (state === "playing") {
-      // Pause: cancel speech but preserve queue
-      window.speechSynthesis.cancel();
       if (audioRef.current) audioRef.current.pause();
-      // Re-prepend the chunk that was interrupted so it replays on resume
-      if (currentChunkRef.current) {
-        chunkQueueRef.current = [currentChunkRef.current, ...chunkQueueRef.current];
-        currentChunkRef.current = null;
-      }
       setS("paused");
       return;
     }
     if (state === "paused") {
       setS("playing");
-      // Resume from the re-prepended chunk
-      setTimeout(() => speakNext(), 80);
+      if (audioRef.current?.src && audioRef.current.paused) {
+        audioRef.current.play();
+      } else {
+        playNextChunk();
+      }
       return;
     }
-    // idle → start from beginning
-    startFrom(0);
+    // idle → start
+    await startFrom(0);
   };
 
-  const stop = () => {
-    window.speechSynthesis.cancel();
-    if (audioRef.current) audioRef.current.pause();
-    chunkQueueRef.current = [];
-    remainingIdxRef.current = [];
-    currentChunkRef.current = null;
-    setS("idle");
-    setCP(-1);
+  const changeVoice = (v) => {
+    setVoice(v);
+    voiceRef.current = v;
+    localStorage.setItem("tts_oai_voice", v);
+    setShowVoicePicker(false);
   };
 
   const isActive = state === "playing" || state === "paused";
+  const savedIdx = sessionId ? parseInt(localStorage.getItem(`tts_progress_${sessionId}`) || "-1", 10) : -1;
 
   return (
     <div className="space-y-1">
@@ -201,12 +120,17 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       <div className="flex items-center gap-1 mb-2 flex-wrap">
         <button
           onClick={handlePlayPause}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:opacity-70 transition-colors text-xs font-medium select-none"
+          disabled={state === "loading"}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:opacity-70 transition-colors text-xs font-medium select-none disabled:opacity-50"
           style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
         >
-          {state === "playing" ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-          {state === "idle" ? "Read" : state === "playing" ? "Pause" : "Resume"}
+          {state === "loading"
+            ? <><span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />Loading…</>
+            : state === "playing"
+              ? <><Pause className="w-3.5 h-3.5" />Pause</>
+              : <><Play className="w-3.5 h-3.5" />{state === "idle" ? "Read" : "Resume"}</>}
         </button>
+
         {isActive && (
           <button
             onClick={stop}
@@ -216,61 +140,45 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
             <Square className="w-3.5 h-3.5" />
           </button>
         )}
+
         {isActive && (
-          <span className="text-[10px] text-muted-foreground ml-1">
-            Tap any word to jump
-          </span>
+          <span className="text-[10px] text-muted-foreground ml-1">Tap paragraph to jump</span>
         )}
-        {/* Voice picker — always show if any voices loaded */}
-        {availableVoices.length > 0 && (
-          <div className="relative ml-auto">
-            <button
-              onClick={() => setShowVoicePicker(v => !v)}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-[10px] select-none transition-colors"
-              style={{ WebkitTapHighlightColor: "transparent" }}
-            >
-              {selectedVoice ? selectedVoice.name.slice(0, 18) : "Auto voice"}
-              <ChevronDown className="w-3 h-3" />
-            </button>
-            {showVoicePicker && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[200px] max-h-48 overflow-y-auto">
+
+        {/* Voice picker */}
+        <div className="relative ml-auto">
+          <button
+            onClick={() => setShowVoicePicker(v => !v)}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-[10px] select-none transition-colors capitalize"
+            style={{ WebkitTapHighlightColor: "transparent" }}
+          >
+            {voice} <ChevronDown className="w-3 h-3" />
+          </button>
+          {showVoicePicker && (
+            <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[120px]">
+              {OAI_VOICES.map((v) => (
                 <button
-                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors text-muted-foreground"
-                  onClick={() => { setSelectedVoice(null); localStorage.removeItem("tts_voice_name"); setShowVoicePicker(false); }}
+                  key={v}
+                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors capitalize ${voice === v ? "text-primary font-medium" : "text-foreground"}`}
+                  onClick={() => changeVoice(v)}
                 >
-                  Auto (best available)
+                  {v}
                 </button>
-                {availableVoices.map((v) => (
-                  <button
-                    key={v.name}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors ${selectedVoice?.name === v.name ? "text-primary font-medium" : "text-foreground"}`}
-                    onClick={() => { setSelectedVoice(v); localStorage.setItem("tts_voice_name", v.name); setShowVoicePicker(false); }}
-                  >
-                    {v.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Resume button if progress saved */}
-      {sessionId && currentPara === -1 && state === "idle" && (() => {
-        const savedIdx = localStorage.getItem(`tts_progress_${sessionId}`);
-        const savedParaIdx = savedIdx ? parseInt(savedIdx, 10) : null;
-        if (savedParaIdx != null && savedParaIdx >= 0 && savedParaIdx < paragraphs.length) {
-          return (
-            <button
-              onClick={() => startFrom(savedParaIdx)}
-              className="mb-2 text-xs px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 font-medium transition-colors"
-            >
-              Resume from paragraph {savedParaIdx + 1}
-            </button>
-          );
-        }
-        return null;
-      })()}
+      {/* Resume from saved position */}
+      {sessionId && currentPara === -1 && state === "idle" && savedIdx >= 0 && savedIdx < paragraphs.length && (
+        <button
+          onClick={() => startFrom(savedIdx)}
+          className="mb-2 text-xs px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 font-medium transition-colors"
+        >
+          Resume from paragraph {savedIdx + 1}
+        </button>
+      )}
 
       {/* Paragraphs */}
       {paragraphs.map((text, paraIdx) => {
@@ -282,38 +190,21 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
             <div
               key={paraIdx}
               className={isActive ? "cursor-pointer" : ""}
-              onClick={() => isActive && startFrom(paraIdx, 0)}
+              onClick={() => isActive && startFrom(paraIdx)}
             >
               {renderParagraph(displayText, paraIdx, active)}
             </div>
           );
         }
 
-        const handleTouchStart = (e) => {
-          touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-          touchMovedRef.current = false;
-        };
-
-        const handleTouchMove = (e) => {
-          if (!touchStartRef.current) return;
-          const dx = Math.abs(e.touches[0].clientX - touchStartRef.current.x);
-          const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
-          if (dx > 5 || dy > 5) touchMovedRef.current = true;
-        };
-
-        const handleClick = () => {
-          if (isActive && !touchMovedRef.current) startFrom(paraIdx, 0);
-        };
-
         return (
           <p
             key={paraIdx}
-            onClick={handleClick}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
+            onClick={() => isActive && startFrom(paraIdx)}
             className={[
               "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200",
-              isActive ? "cursor-pointer border-primary bg-primary/8 text-foreground font-medium rounded-r-md" : "border-primary/30 text-foreground/80",
+              isActive ? "cursor-pointer" : "",
+              active ? "border-primary bg-primary/8 text-foreground font-medium rounded-r-md" : "border-primary/30 text-foreground/80",
             ].join(" ")}
           >
             {displayText}

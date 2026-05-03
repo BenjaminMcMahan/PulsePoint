@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Play, Pause, Square } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
 // Convert large raw-second values to spoken minutes + seconds
 function secondsToSpeech(n) {
@@ -19,7 +20,6 @@ export function cleanTextForSpeech(text) {
     .replace(/·/g, ". ")
     .replace(/–|—/g, ", ")
     .replace(/(\d+)\s*bpm/gi, "$1 beats per minute")
-    // Convert "NNNs" or "NNN seconds" where NNN >= 100 into minutes+seconds
     .replace(/\b(\d{3,})\s*seconds\b/gi, (_, n) => secondsToSpeech(n))
     .replace(/\b(\d{3,})s\b/g, (_, n) => secondsToSpeech(n))
     .replace(/(\d+)\s*m(\d+)s/g, (_, m, s) => `${m} minute${m !== '1' ? 's' : ''} ${s} seconds`)
@@ -50,8 +50,8 @@ export function cleanTextForSpeech(text) {
     .trim();
 }
 
-// Split text into chunks safe for Android (< 180 chars)
-export function splitIntoChunks(text, maxLen = 180) {
+// Split text into chunks of ~1000 chars on sentence boundaries
+export function splitIntoChunks(text, maxLen = 1000) {
   const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
   const chunks = [];
   let current = "";
@@ -67,94 +67,67 @@ export function splitIntoChunks(text, maxLen = 180) {
   return chunks.length ? chunks : [text];
 }
 
+const VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+
 /**
- * TTSButton — simple play/pause/stop button.
- * Uses cancel+re-queue instead of pause/resume for Android compatibility.
- * Includes background keepAlive to prevent Chrome from suspending speech.
+ * TTSButton — simple play/pause/stop button using OpenAI TTS.
  */
 export default function TTSButton({ getText }) {
-  const [state, setState] = useState("idle"); // idle | playing | paused
+  const [state, setState] = useState("idle"); // idle | loading | playing | paused
   const stateRef = useRef("idle");
-  const queueRef = useRef([]);
-  const keepAliveRef = useRef(null);
+  const audioRef = useRef(null);
+  const queueRef = useRef([]); // remaining text chunks
+  const voiceRef = useRef(localStorage.getItem("tts_oai_voice") || "alloy");
 
   const setS = (s) => { stateRef.current = s; setState(s); };
 
-  useEffect(() => () => {
-    clearInterval(keepAliveRef.current);
-    window.speechSynthesis?.cancel();
-  }, []);
-
   const stop = () => {
-    clearInterval(keepAliveRef.current);
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
     queueRef.current = [];
-    window.speechSynthesis.cancel();
     setS("idle");
   };
 
-  const speakNext = () => {
-    if (stateRef.current !== "playing") return;
+  const playNextChunk = async () => {
+    if (stateRef.current === "paused") return;
     const chunk = queueRef.current.shift();
     if (!chunk) { setS("idle"); return; }
 
-    const utt = new SpeechSynthesisUtterance(chunk);
-    utt.lang = "en-US";
-    utt.rate = 0.95;
-    utt.volume = 1;
-    utt.onend = () => speakNext();
-    utt.onerror = (e) => {
-      if (e.error !== "interrupted" && e.error !== "canceled") speakNext();
-    };
-    window.speechSynthesis.speak(utt);
+    const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+    if (stateRef.current !== "playing") return;
+
+    // response.data is an ArrayBuffer from axios
+    const blob = new Blob([response.data], { type: "audio/mpeg" });
+    const url = URL.createObjectURL(blob);
+
+    if (!audioRef.current) audioRef.current = new Audio();
+    audioRef.current.src = url;
+    audioRef.current.onended = () => { URL.revokeObjectURL(url); playNextChunk(); };
+    audioRef.current.onerror = () => { URL.revokeObjectURL(url); playNextChunk(); };
+    audioRef.current.play();
   };
 
-  // Background keepAlive: poll every 8s while blurred to restart stalled synthesis
-  const startKeepAlive = () => {
-    clearInterval(keepAliveRef.current);
-    keepAliveRef.current = setInterval(() => {
-      if (stateRef.current !== "playing") { clearInterval(keepAliveRef.current); return; }
-      if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending && queueRef.current.length > 0) {
-        speakNext();
-      }
-    }, 8000);
-  };
-
-  useEffect(() => {
-    const onBlur = () => { if (stateRef.current === "playing") startKeepAlive(); };
-    const onFocus = () => {
-      clearInterval(keepAliveRef.current);
-      if (stateRef.current === "playing" && !window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-        setTimeout(() => speakNext(), 150);
-      }
-    };
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, []); // eslint-disable-line
-
-  const handlePress = () => {
+  const handlePress = async () => {
     if (state === "playing") {
-      // Android-safe pause: cancel and keep remaining queue intact
-      clearInterval(keepAliveRef.current);
-      window.speechSynthesis.cancel();
+      if (audioRef.current) audioRef.current.pause();
       setS("paused");
       return;
     }
     if (state === "paused") {
       setS("playing");
-      setTimeout(() => speakNext(), 80);
+      if (audioRef.current?.src) {
+        audioRef.current.play();
+      } else {
+        playNextChunk();
+      }
       return;
     }
-    // idle → start fresh
+    // idle → start
     const raw = getText?.();
     if (!raw?.trim()) return;
-    window.speechSynthesis.cancel();
+    setS("loading");
     queueRef.current = splitIntoChunks(cleanTextForSpeech(raw));
     setS("playing");
-    setTimeout(() => speakNext(), 80);
+    playNextChunk();
   };
 
   if (state === "idle") {
@@ -165,6 +138,14 @@ export default function TTSButton({ getText }) {
         style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
       >
         <Play className="w-3.5 h-3.5" /> Read
+      </button>
+    );
+  }
+
+  if (state === "loading") {
+    return (
+      <button disabled className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-medium select-none">
+        <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Loading…
       </button>
     );
   }
