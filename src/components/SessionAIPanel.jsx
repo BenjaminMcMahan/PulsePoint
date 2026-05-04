@@ -58,6 +58,16 @@ export default function SessionAIPanel({ session, timelineRows, userProfile }) {
       hr_max: Math.round(Math.max(...timelineRows.map(r => Number(r.hr)))),
     } : null;
 
+    // Sample HR trajectory for the prompt (~1 point every 15s)
+    const hrTrajectory = (() => {
+      if (!timelineRows.length) return null;
+      const step = Math.max(1, Math.floor(timelineRows.length / 60));
+      return timelineRows
+        .filter((_, i) => i % step === 0)
+        .map(r => `${Math.round(Number(r.time_offset_s))}s:${Math.round(Number(r.hr))}`)
+        .join("  ");
+    })();
+
     // Build a sorted HR lookup from timeline rows for nearest-HR matching
     const sortedRows = [...timelineRows].sort((a, b) => Number(a.time_offset_s) - Number(b.time_offset_s));
     const nearestHR = (time_s) => {
@@ -103,28 +113,40 @@ ${JSON.stringify({
 
 Use this arousal profile to personalize analysis: compare the observed build arc and climax pattern against the user's known response style. Note deviations (e.g. faster/slower than typical, more/less sensitive). Reference preferred methods when interpreting session effectiveness.` : "";
 
-    const profileContext = "";
-
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
-      prompt: `You are an expert analyst of sexual arousal physiology. Analyze this session with a primary focus on the arousal arc, event timeline, stimulation dynamics, and subjective experience. Heart rate data is available as supporting context — reference it where it reinforces arousal state, but do NOT make it the centerpiece of your analysis. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
+      prompt: `You are an expert physiologist and anatomist specializing in sexual response. Analyze this session integrating arousal physiology, anatomy, heart rate data, event timeline, and subjective experience into a cohesive narrative. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
+
+PHYSIOLOGICAL & ANATOMICAL LENS — apply throughout:
+- Interpret HR trajectory as a real-time window into sympathetic nervous system activation, parasympathetic withdrawal, and autonomic arousal state
+- Reference relevant anatomy where appropriate: pelvic floor muscle engagement, smooth muscle tone in the bladder neck and urethra, prostatic engorgement, pudendal nerve pathways, bulbocavernosus/ischiocavernosus muscle activity
+- Where foley or urethral stimulation is involved, consider the urethral sensory nerve density, stretch receptor activation, and internal urethral sphincter dynamics
+- Where e-stim is involved, consider motor nerve recruitment, muscle contraction patterns, and how frequency/pulse-width affect sensory vs motor fibers
+- Connect subjective sensations (pressure, throb, tightness, wave) to their likely anatomical generators
+- Interpret discomfort entries through an anatomical lens — likely tissue, nerve, or positional cause
+- Note how stimulation pauses affect sympathetic tone and re-arousal dynamics based on HR recovery pattern
 
 CRITICAL FOR TEXT-TO-SPEECH QUALITY:
 - Write all times as words: "ten minutes and thirty seconds" not "10:30"
 - Spell out all numbers as words (e.g., "ten beats per minute" not "10 bpm")
 - Write in conversational, sentence-based prose with natural pauses
 - Use short sentences and simple grammar optimized for audio readability
-- Avoid jargon—explain concepts clearly as if speaking aloud
+- Avoid dense jargon — explain anatomical concepts briefly but accessibly
 - Use commas and periods to create natural speech cadence
 ${arousalProfile}${estimScreenshots.length > 0 ? `
 
-E-STIM SCREENSHOTS ATTACHED (${estimScreenshots.length}): Analyze the waveform types, frequencies, pulse widths, and channel configurations visible. Interpret how these settings shaped the arousal experience and stimulation progression throughout the session.` : ""}${eventTimeline.length > 0 ? `
+E-STIM SCREENSHOTS ATTACHED (${estimScreenshots.length}): Analyze the waveform types, frequencies, pulse widths, and channel configurations. Interpret how these settings recruited sensory vs motor fibers, shaped smooth muscle tone, and drove the arousal arc through the session.` : ""}${eventTimeline.length > 0 ? `
 
-SESSION EVENT TIMELINE:
+SESSION EVENT TIMELINE (with heart rate at each moment):
 ${eventTimeline.join('\n')}
 
-This is the most important data in the analysis. For each event, interpret: what it tells us about arousal state at that moment, how it influenced the progression of stimulation, what it reveals about sensitivity or response patterns, and how it connects to subsequent events. Identify the narrative arc across the full timeline.` : ""}
+This is the primary dataset. For each event: interpret the arousal state at that HR level, what the note reveals about the underlying physiology or anatomy, and how it connects to the session arc. Identify physiological turning points — moments where HR + event note together reveal a shift in autonomic or sensory state.` : ""}
+
+${hrTrajectory ? `HR TRAJECTORY (time_s:bpm, sampled):
+${hrTrajectory}
+
+Use this to trace sympathetic activation patterns, identify arousal plateaus, and correlate HR changes to event timing.` : ""}
 
 Session data:
 ${JSON.stringify({
@@ -155,7 +177,7 @@ ${JSON.stringify({
   unusual_sensations: session.unusual_sensations,
   refractory_notes: session.refractory_notes,
   notes: session.notes,
-  hr_supporting_data: hrSummary ? { avg: session.avg_hr, max: session.max_hr, hr_at_climax: session.hr_at_climax } : undefined,
+  hr: hrSummary ? { avg: session.avg_hr, max: session.max_hr, hr_at_climax: session.hr_at_climax, min: hrSummary.hr_min } : undefined,
   phase_markers_s: {
     pre_climax: session.pre_climax_offset_s,
     climax: session.climax_offset_s,
@@ -163,9 +185,9 @@ ${JSON.stringify({
   },
 }, null, 2)}
 
-${session.discomfort_entries?.length > 0 ? "Discomfort entries are present — analyze each for likely anatomical cause, severity context, and whether it disrupted arousal progression. Flag anything worth noting." : ""}
+${session.discomfort_entries?.length > 0 ? "Discomfort entries present — analyze each for likely anatomical cause (nerve, tissue, positional), severity context, and whether it disrupted the arousal arc." : ""}
 
-Provide an insightful, experience-centered analysis. Be specific, reference actual events and ratings, and tell the story of this session's arousal arc.`,
+Provide a rich, physiologically-grounded analysis that tells the story of this session — from the autonomic and anatomical level up to the subjective experience.`,
       response_json_schema: {
         type: "object",
         properties: {

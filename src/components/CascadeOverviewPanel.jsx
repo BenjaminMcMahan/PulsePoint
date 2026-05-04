@@ -109,25 +109,30 @@ Use this arousal profile to contextualize the cascade — compare the observed b
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant. Analyze the climax cascade arc of this single sexual response session in depth. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
+      prompt: `You are a physiological research assistant and anatomist specializing in sexual response. Analyze the climax cascade arc of this single session in depth, integrating HR data, anatomy, and event timing. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
+
+PHYSIOLOGICAL & ANATOMICAL LENS — apply per phase:
+- BUILD: Sympathetic tone ramp-up, penile/prostatic engorgement via parasympathetic vasodilation, pelvic floor baseline tone, how stimulation method (foley stretch, e-stim recruitment, manual) drives afferent nerve signaling
+- PRE-CLIMAX: Emission phase onset — seminal vesicle and vas deferens smooth muscle contractions, internal urethral sphincter closing, prostatic congestion peaking, HR acceleration reflecting sympathetic surge, pudendal nerve afferent traffic intensifying
+- CLIMAX: Expulsion reflex — rhythmic bulbocavernosus and ischiocavernosus contractions (typically every ~0.8 seconds), external urethral sphincter release, peak sympathetic output reflected in HR apex, ejaculate volume relative to congestion level
+- RECOVERY: Parasympathetic rebound, detumescence, pelvic floor relaxation, HR descent rate as a proxy for autonomic recovery speed, refractory state driven by prolactin/oxytocin release and sympathetic exhaustion
 
 CRITICAL FOR TEXT-TO-SPEECH QUALITY:
 - Write all times as words: "ten minutes and thirty seconds" not "10:30"
 - Spell out all numbers as words (e.g., "ten beats per minute" not "10 bpm")
 - Write in conversational, sentence-based prose with natural pauses
 - Use short sentences and simple grammar optimized for audio readability
-- Avoid jargon—explain concepts clearly as if speaking aloud
+- Explain anatomical terms briefly and accessibly — don't assume medical background
 - Use commas and periods to create natural speech cadence
 ${arousalProfile}
 
-Focus exclusively on the four phases:
-1. BUILD (start of session → pre-climax marker): how arousal built, HR trajectory, event patterns, pacing
-2. PRE-CLIMAX (pre-climax marker → climax marker): the final ascent, HR acceleration, sensations, events
-3. CLIMAX (the peak event itself): HR peak, intensity, duration, ejaculate, physical markers
-4. RECOVERY (climax → recovery marker and beyond): HR descent rate, refractory state, physical/emotional notes
+Focus exclusively on the four phases, grounding each in both the HR/event data and the underlying physiology:
+1. BUILD: Arousal arc, HR climb, stimulation dynamics, autonomic activation trajectory
+2. PRE-CLIMAX: Final ascent, emission phase signals, HR acceleration pattern, sensory events
+3. CLIMAX: Peak physiology, contraction pattern implied by duration/intensity, ejaculate correlates
+4. RECOVERY: Autonomic rebound rate, refractory physiology, post-climax sensations
 
-Use all available data — HR timeline, event notes with categories and timing, phase markers, subjective ratings.
-Be specific, reference actual values, note event-HR correlations.
+Be specific, reference actual values, and connect what happened physiologically to what was felt subjectively.
 
 Session cascade data:
 ${JSON.stringify({
