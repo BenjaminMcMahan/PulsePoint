@@ -446,15 +446,157 @@ function buildPDF(session, timelineRows) {
     curY += 4;
   }
 
+  // ── Discomfort Log ───────────────────────────────────────────────────────
+  if ((s.discomfort_entries || []).length > 0) {
+    checkPage(14);
+    sectionHeader(`Discomfort Log (${s.discomfort_entries.length} entries)`);
+    s.discomfort_entries.forEach((d, idx) => {
+      const noteLines = doc.splitTextToSize(d.note || "", CONTENT_W - 28);
+      const rowH = Math.max(5.5, noteLines.length * 4 + 2);
+      checkPage(rowH + 1);
+      if (idx % 2 === 0) { doc.setFillColor(255, 248, 248); doc.rect(MARGIN, curY, CONTENT_W, rowH, "F"); }
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(220, 60, 60);
+      doc.text(`Sev ${d.severity}/10`, MARGIN, curY + 4);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(50, 50, 50);
+      doc.text(noteLines, MARGIN + 24, curY + 4);
+      doc.setDrawColor(240, 220, 220);
+      doc.setLineWidth(0.2);
+      doc.line(MARGIN, curY + rowH, MARGIN + CONTENT_W, curY + rowH);
+      curY += rowH + 0.5;
+    });
+    curY += 3;
+  }
+
+  // ── Unusual sensations / refractory notes ────────────────────────────────
+  if (s.unusual_sensations || s.refractory_notes) {
+    checkPage(12);
+    sectionHeader("Additional Observations");
+    if (s.unusual_sensations) {
+      doc.setFontSize(7); doc.setTextColor(120, 120, 120); doc.setFont("helvetica", "bold");
+      doc.text("UNUSUAL SENSATIONS", MARGIN, curY); curY += 4;
+      doc.setFont("helvetica", "normal"); doc.setTextColor(50, 50, 50); doc.setFontSize(8);
+      const lines = doc.splitTextToSize(s.unusual_sensations, CONTENT_W - 4);
+      doc.text(lines, MARGIN, curY); curY += lines.length * 4.5 + 3;
+    }
+    if (s.refractory_notes) {
+      doc.setFontSize(7); doc.setTextColor(120, 120, 120); doc.setFont("helvetica", "bold");
+      doc.text("REFRACTORY NOTES", MARGIN, curY); curY += 4;
+      doc.setFont("helvetica", "normal"); doc.setTextColor(50, 50, 50); doc.setFontSize(8);
+      const lines = doc.splitTextToSize(s.refractory_notes, CONTENT_W - 4);
+      doc.text(lines, MARGIN, curY); curY += lines.length * 4.5 + 3;
+    }
+  }
+
   // ── Notes ────────────────────────────────────────────────────────────────
   if (s.notes) {
     checkPage(14);
-    sectionHeader("Notes");
+    sectionHeader("Session Notes");
     const noteLines = doc.splitTextToSize(s.notes, CONTENT_W - 4);
     doc.setFontSize(8);
     doc.setTextColor(50, 50, 50);
     doc.text(noteLines, MARGIN, curY);
     curY += noteLines.length * 4.5 + 4;
+  }
+
+  // ── Tags ─────────────────────────────────────────────────────────────────
+  if ((s.tags || []).length > 0) {
+    checkPage(10);
+    sectionHeader("Tags");
+    doc.setFontSize(8);
+    doc.setTextColor(80, 60, 140);
+    doc.text(s.tags.map(t => `#${t}`).join("   "), MARGIN, curY);
+    curY += 6;
+  }
+
+  // ── AI Session Analysis ───────────────────────────────────────────────────
+  const ai = s.ai_analysis;
+  if (ai) {
+    checkPage(14);
+    sectionHeader("AI Session Analysis");
+
+    const writeAIBlock = (label, items) => {
+      if (!items?.length) return;
+      checkPage(10);
+      doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(45, 185, 165);
+      doc.text(label.toUpperCase(), MARGIN, curY); curY += 4.5;
+      doc.setFont("helvetica", "normal");
+      for (const item of items) {
+        const lines = doc.splitTextToSize(`• ${item}`, CONTENT_W - 6);
+        checkPage(lines.length * 4.5 + 1);
+        doc.setFontSize(7.5); doc.setTextColor(40, 40, 40);
+        doc.text(lines, MARGIN + 2, curY);
+        curY += lines.length * 4.5 + 1;
+      }
+      curY += 2;
+    };
+
+    if (ai.summary) {
+      const sumLines = doc.splitTextToSize(ai.summary, CONTENT_W - 4);
+      checkPage(sumLines.length * 4.5 + 4);
+      doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 30, 30);
+      doc.text(sumLines, MARGIN, curY);
+      curY += sumLines.length * 4.5 + 5;
+      doc.setFont("helvetica", "normal");
+    }
+
+    writeAIBlock("Arousal Arc", ai.arousal_arc || ai.phase_analysis);
+    writeAIBlock("Event Analysis", ai.event_analysis || ai.hr_analysis);
+    writeAIBlock("Notable Findings", ai.notable_findings);
+    writeAIBlock("Recommendations", ai.recommendations);
+  }
+
+  // ── AI Cascade Overview ───────────────────────────────────────────────────
+  const cascade = s.ai_cascade;
+  if (cascade) {
+    checkPage(14);
+    sectionHeader("AI Cascade Overview");
+
+    const cascadeBlocks = [
+      { key: "build_phase", label: "Build Phase" },
+      { key: "pre_climax_phase", label: "Pre-Climax Phase" },
+      { key: "climax_phase", label: "Climax Phase" },
+      { key: "recovery_phase", label: "Recovery Phase" },
+    ];
+
+    if (cascade.summary) {
+      const sumLines = doc.splitTextToSize(cascade.summary, CONTENT_W - 4);
+      checkPage(sumLines.length * 4.5 + 4);
+      doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 30, 30);
+      doc.text(sumLines, MARGIN, curY);
+      curY += sumLines.length * 4.5 + 5;
+      doc.setFont("helvetica", "normal");
+    }
+
+    for (const { key, label } of cascadeBlocks) {
+      const items = cascade[key];
+      if (!items?.length) continue;
+      checkPage(10);
+      doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(139, 92, 246);
+      doc.text(label.toUpperCase(), MARGIN, curY); curY += 4.5;
+      doc.setFont("helvetica", "normal");
+      for (const item of items) {
+        const lines = doc.splitTextToSize(`• ${item}`, CONTENT_W - 6);
+        checkPage(lines.length * 4.5 + 1);
+        doc.setFontSize(7.5); doc.setTextColor(40, 40, 40);
+        doc.text(lines, MARGIN + 2, curY);
+        curY += lines.length * 4.5 + 1;
+      }
+      curY += 2;
+    }
+
+    if (cascade.cascade_quality) {
+      checkPage(12);
+      doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(45, 185, 165);
+      doc.text("CASCADE QUALITY", MARGIN, curY); curY += 4.5;
+      doc.setFont("helvetica", "normal");
+      const lines = doc.splitTextToSize(cascade.cascade_quality, CONTENT_W - 4);
+      doc.setFontSize(7.5); doc.setTextColor(40, 40, 40);
+      doc.text(lines, MARGIN, curY);
+      curY += lines.length * 4.5 + 4;
+    }
   }
 
   // ── Footer on every page ─────────────────────────────────────────────────
@@ -482,7 +624,9 @@ function downloadFile(content, filename, mimeType) {
 
 export default function SessionExportButton({ session, timelineRows = [] }) {
   const [open, setOpen] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
   const dateSlug = moment(session.date).format("YYYY-MM-DD");
+  const hasAI = !!(session.ai_analysis || session.ai_cascade);
 
   const handleCSV = () => {
     downloadFile(buildCSV(session, timelineRows), `session-${dateSlug}.csv`, "text/csv");
@@ -495,20 +639,32 @@ export default function SessionExportButton({ session, timelineRows = [] }) {
   };
 
   const handlePDF = () => {
-    const doc = buildPDF(session, timelineRows);
-    doc.save(`session-${dateSlug}.pdf`);
+    setGeneratingPDF(true);
     setOpen(false);
+    // Defer so UI can update before the synchronous PDF build
+    setTimeout(() => {
+      const doc = buildPDF(session, timelineRows);
+      doc.save(`session-${dateSlug}.pdf`);
+      setGeneratingPDF(false);
+    }, 50);
   };
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" title="Export session">
-          <Download className="w-5 h-5 text-muted-foreground" />
+        <Button variant="ghost" size="icon" title="Export / Generate Report" disabled={generatingPDF}>
+          {generatingPDF
+            ? <span className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+            : <Download className="w-5 h-5 text-muted-foreground" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={handlePDF}>Download PDF Report</DropdownMenuItem>
+        <DropdownMenuItem onClick={handlePDF}>
+          <span className="flex flex-col">
+            <span>Generate PDF Report</span>
+            {hasAI && <span className="text-[10px] text-primary">Includes AI analysis + cascade</span>}
+          </span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={handleCSV}>Export as CSV</DropdownMenuItem>
         <DropdownMenuItem onClick={handleText}>Export as Text Report</DropdownMenuItem>
       </DropdownMenuContent>
