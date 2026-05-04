@@ -283,6 +283,53 @@
     "ai_no_climax": {
       "type": "object",
       "description": "Stored AI analysis for no-climax sessions"
+    },
+    "ai_near_climax_events": {
+      "type": "array",
+      "description": "AI-refined near-climax events detected from HR data + session analysis context",
+      "items": {
+        "type": "object",
+        "properties": {
+          "start_offset_s": {
+            "type": "number"
+          },
+          "peak_offset_s": {
+            "type": "number"
+          },
+          "end_offset_s": {
+            "type": "number"
+          },
+          "base_hr": {
+            "type": "number"
+          },
+          "peak_hr": {
+            "type": "number"
+          },
+          "rise_bpm": {
+            "type": "number"
+          },
+          "sustained_s": {
+            "type": "number"
+          },
+          "duration_s": {
+            "type": "number"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "note_corroborated": {
+            "type": "boolean"
+          },
+          "ai_label": {
+            "type": "string",
+            "description": "Short AI-generated label for what this event represents"
+          },
+          "ai_interpretation": {
+            "type": "string",
+            "description": "AI narrative interpretation of this event"
+          }
+        }
+      }
     }
   },
   "required": [

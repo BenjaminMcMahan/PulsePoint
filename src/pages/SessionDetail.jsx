@@ -72,10 +72,11 @@ export default function SessionDetail() {
   const [loading, setLoading] = useState(true);
   const [selectedNearClimaxIdx, setSelectedNearClimaxIdx] = useState(null);
 
-  const nearClimaxEvents = useMemo(
-    () => session ? detectNearClimaxEvents(timelineRows, session.climax_offset_s, session.pre_climax_offset_s) : [],
-    [timelineRows, session]
-  );
+  const nearClimaxEvents = useMemo(() => {
+    if (!session) return [];
+    if (session.ai_near_climax_events?.length > 0) return session.ai_near_climax_events;
+    return detectNearClimaxEvents(timelineRows, session.climax_offset_s, session.pre_climax_offset_s);
+  }, [timelineRows, session]);
 
   const highlightRange = useMemo(() => {
     if (selectedNearClimaxIdx == null || !nearClimaxEvents[selectedNearClimaxIdx]) return null;
@@ -338,6 +339,7 @@ export default function SessionDetail() {
                   session={s}
                   selectedIndex={selectedNearClimaxIdx}
                   onSelectIndex={setSelectedNearClimaxIdx}
+                  onEventsRefined={(refined) => setSession((prev) => ({ ...prev, ai_near_climax_events: refined }))}
                 />
               )}
               {timelineRows.length > 0 && (
