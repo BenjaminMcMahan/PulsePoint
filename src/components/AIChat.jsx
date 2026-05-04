@@ -85,8 +85,8 @@ export default function AIChat({
     const history = updated.map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n");
 
     const systemPrompt = mode === "profile"
-      ? `You are an expert physiologist helping someone build a detailed personal arousal profile. Respond to the user's answer with a brief physiological insight or a natural follow-up question in the same topic area. Be specific, warm, and concise. Do not shift to unrelated topics.`
-      : `You are an expert physiologist analyzing a specific sexual response session. Respond to the user's answer with a relevant insight or follow-up question strictly about THIS SESSION. Do not ask general profile questions. Be direct and concise.`;
+      ? `You are an expert physiologist helping someone build a detailed personal arousal profile. Respond to their answer briefly (1-2 sentences max) then IMMEDIATELY ask a question about a DIFFERENT aspect of their physiology or arousal profile — do NOT keep drilling into the same topic unless their answer raises a specific, highly clinically relevant detail that absolutely must be clarified. Move forward, cover new ground.`
+      : `You are an expert physiologist analyzing a specific sexual response session. Respond to their answer briefly (1-2 sentences max) then IMMEDIATELY ask a question about a DIFFERENT aspect of THIS SESSION — do NOT keep asking about the same subject unless their answer introduces a new specific anatomical or physiological detail that requires immediate clarification. Stay session-specific, move to new ground.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
       prompt: `${systemPrompt}\n\nContext:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,

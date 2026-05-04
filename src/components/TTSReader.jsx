@@ -356,10 +356,122 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
   const isActive = state === "playing" || state === "paused" || state === "buffering";
   const savedIdx = sessionId ? parseInt(localStorage.getItem(`tts_progress_${sessionId}`) || "-1", 10) : -1;
 
+  // Build an ID3v2.3 tag with title, artist, album, year, comment, and optional artwork
+  const buildID3Tag = async (meta) => {
+    const enc = new TextEncoder();
+
+    const makeTextFrame = (id, text) => {
+      const textBytes = enc.encode("\x00" + text); // encoding byte (ISO-8859-1) + text
+      const size = textBytes.length;
+      const frame = new Uint8Array(10 + size);
+      for (let i = 0; i < 4; i++) frame[i] = id.charCodeAt(i);
+      frame[4] = (size >> 24) & 0xff;
+      frame[5] = (size >> 16) & 0xff;
+      frame[6] = (size >> 8) & 0xff;
+      frame[7] = size & 0xff;
+      frame[8] = 0; frame[9] = 0; // flags
+      frame.set(textBytes, 10);
+      return frame;
+    };
+
+    const makeCommentFrame = (text) => {
+      // COMM frame: encoding(1) + lang(3) + short desc(1 null) + text
+      const textBytes = enc.encode(text);
+      const payload = new Uint8Array(1 + 3 + 1 + textBytes.length);
+      payload[0] = 0x00; // ISO-8859-1
+      payload[1] = 0x65; payload[2] = 0x6e; payload[3] = 0x67; // "eng"
+      payload[4] = 0x00; // empty short description
+      payload.set(textBytes, 5);
+      const size = payload.length;
+      const frame = new Uint8Array(10 + size);
+      frame[0] = 0x43; frame[1] = 0x4f; frame[2] = 0x4d; frame[3] = 0x4d; // "COMM"
+      frame[4] = (size >> 24) & 0xff; frame[5] = (size >> 16) & 0xff;
+      frame[6] = (size >> 8) & 0xff; frame[7] = size & 0xff;
+      frame.set(payload, 10);
+      return frame;
+    };
+
+    const makeAPICFrame = (imageBytes, mimeType) => {
+      // APIC: encoding(1) + mime(null-terminated) + pic type(1) + description(1 null) + data
+      const mimeBytes = enc.encode(mimeType);
+      const header = new Uint8Array(1 + mimeBytes.length + 1 + 1 + 1);
+      header[0] = 0x00; // encoding
+      header.set(mimeBytes, 1);
+      header[1 + mimeBytes.length] = 0x00; // null terminator
+      header[1 + mimeBytes.length + 1] = 0x03; // cover art
+      header[1 + mimeBytes.length + 2] = 0x00; // empty description
+      const payload = new Uint8Array(header.length + imageBytes.length);
+      payload.set(header, 0);
+      payload.set(imageBytes, header.length);
+      const size = payload.length;
+      const frame = new Uint8Array(10 + size);
+      frame[0] = 0x41; frame[1] = 0x50; frame[2] = 0x49; frame[3] = 0x43; // "APIC"
+      frame[4] = (size >> 24) & 0xff; frame[5] = (size >> 16) & 0xff;
+      frame[6] = (size >> 8) & 0xff; frame[7] = size & 0xff;
+      payload.forEach((b, i) => frame[10 + i] = b);
+      return frame;
+    };
+
+    const frames = [
+      makeTextFrame("TIT2", meta.title || "Audio Export"),
+      makeTextFrame("TPE1", meta.artist || "PhysioLog"),
+      makeTextFrame("TALB", meta.album || "PhysioLog Sessions"),
+      makeTextFrame("TYER", meta.year || new Date().getFullYear().toString()),
+      makeTextFrame("TCON", "Podcast"),
+    ];
+
+    if (meta.comment) frames.push(makeCommentFrame(meta.comment));
+
+    // Try to fetch artwork
+    try {
+      const artRes = await fetch("https://base44.com/logo_v2.svg");
+      // Convert SVG to a small PNG-like data via canvas
+      const svgText = await artRes.text();
+      const blob = new Blob([svgText], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 512; canvas.height = 512;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(0, 0, 512, 512);
+          ctx.drawImage(img, 64, 64, 384, 384);
+          canvas.toBlob((pngBlob) => {
+            pngBlob.arrayBuffer().then((buf) => {
+              frames.push(makeAPICFrame(new Uint8Array(buf), "image/png"));
+              URL.revokeObjectURL(url);
+              resolve();
+            });
+          }, "image/png");
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+        img.src = url;
+      });
+    } catch (_) { /* artwork optional */ }
+
+    // Compute total frames size
+    const totalFrameSize = frames.reduce((a, f) => a + f.length, 0);
+    // ID3v2.3 header: "ID3" + version(2.3) + flags(0) + syncsafe size(4)
+    const tagSize = totalFrameSize; // no padding
+    const ss = (n) => [
+      (n >> 21) & 0x7f, (n >> 14) & 0x7f, (n >> 7) & 0x7f, n & 0x7f
+    ];
+    const tag = new Uint8Array(10 + totalFrameSize);
+    tag[0] = 0x49; tag[1] = 0x44; tag[2] = 0x33; // "ID3"
+    tag[3] = 0x03; tag[4] = 0x00; // version 2.3.0
+    tag[5] = 0x00; // flags
+    const syncSize = ss(tagSize);
+    tag[6] = syncSize[0]; tag[7] = syncSize[1]; tag[8] = syncSize[2]; tag[9] = syncSize[3];
+    let pos = 10;
+    for (const f of frames) { tag.set(f, pos); pos += f.length; }
+    return tag;
+  };
+
   const downloadAudio = async () => {
     setDownloading(true);
     try {
-      // Fetch all chunks for all paragraphs
       const allChunks = [];
       for (const para of paragraphs) {
         const cleaned = cleanTextForSpeech(para);
@@ -367,113 +479,72 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         allChunks.push(...chunks);
       }
 
-      console.log(`Starting download: ${allChunks.length} chunks`);
-
-      // Fetch all audio buffers in parallel
-      const buffers = await Promise.all(
+      // Fetch raw MP3 bytes for each chunk (no decode needed — concatenate directly)
+      const mp3Chunks = await Promise.all(
         allChunks.map(chunk =>
           base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current })
             .then(res => {
               const binary = atob(res.data.audio);
               const bytes = new Uint8Array(binary.length);
               for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-              const ctx = getAudioCtx();
-              return ctx.decodeAudioData(bytes.buffer.slice(0));
+              return bytes;
             })
         )
       );
 
-      console.log(`Fetched ${buffers.length} audio buffers, combining...`);
-
-      // Combine all buffers into one
-      const totalLength = buffers.reduce((sum, buf) => sum + buf.length, 0);
-      const ctx = getAudioCtx();
-      const combined = ctx.createBuffer(1, totalLength, ctx.sampleRate);
-      const data = combined.getChannelData(0);
+      // Concatenate all MP3 frames
+      const totalSize = mp3Chunks.reduce((a, c) => a + c.length, 0);
+      const combined = new Uint8Array(totalSize);
       let offset = 0;
-      for (const buf of buffers) {
-        data.set(buf.getChannelData(0), offset);
-        offset += buf.length;
-      }
+      for (const chunk of mp3Chunks) { combined.set(chunk, offset); offset += chunk.length; }
 
-      console.log(`Combined buffer created, encoding to WAV...`);
-
-      // Encode to WAV
-      const samples = combined.getChannelData(0);
-      const wavData = createWavHeader(samples, ctx.sampleRate);
-      const wavBlob = new Blob([wavData], { type: "audio/wav" });
       const datePart = sessionDate ? sessionDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
       const titlePart = title ? title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() : "section";
-      const fileName = `${datePart}_${titlePart}.wav`;
-      const url = URL.createObjectURL(wavBlob);
+      const displayTitle = title ? `${datePart} — ${title}` : datePart;
+      const fileName = `${datePart}_${titlePart}.mp3`;
+
+      // Build ID3 tag
+      const id3 = await buildID3Tag({
+        title: displayTitle,
+        artist: "PhysioLog",
+        album: "PhysioLog Sessions",
+        year: datePart.slice(0, 4),
+        comment: `Recorded ${datePart}${sessionDate ? " · " + sessionDate.slice(0, 16).replace("T", " ") : ""}`,
+      });
+
+      // Prepend ID3 tag to MP3 data
+      const mp3WithMeta = new Uint8Array(id3.length + combined.length);
+      mp3WithMeta.set(id3, 0);
+      mp3WithMeta.set(combined, id3.length);
+
+      const mp3Blob = new Blob([mp3WithMeta], { type: "audio/mpeg" });
+
+      // Trigger download
+      const url = URL.createObjectURL(mp3Blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = fileName;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 100);
 
-      // Save to library
-      const file = new File([wavBlob], fileName, { type: "audio/wav" });
+      // Save to library (approximate duration from file size at ~128kbps)
+      const approxDuration = (combined.length * 8) / 128000;
+      const file = new File([mp3Blob], fileName, { type: "audio/mpeg" });
       const uploadRes = await base44.integrations.Core.UploadFile({ file });
-      
+
       await base44.entities.AudioExport.create({
-        title: title ? `${datePart} — ${title}` : fileName.replace(".wav", ""),
+        title: displayTitle,
         file_url: uploadRes.file_url,
-        duration_seconds: combined.duration,
+        duration_seconds: Math.round(approxDuration),
         voice: voiceRef.current,
         speed: speedRef.current,
       });
 
-      console.log("Download complete and saved to library");
       setDownloading(false);
     } catch (err) {
       console.error("Download failed:", err);
       setDownloading(false);
     }
-  };
-
-  const createWavHeader = (samples, sampleRate) => {
-    const channels = 1;
-    const bytesPerSample = 2;
-    const frameLength = samples.length;
-    const dataLength = frameLength * channels * bytesPerSample;
-    
-    // Create header
-    const header = new ArrayBuffer(44);
-    const view = new DataView(header);
-
-    const writeString = (offset, string) => {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-      }
-    };
-
-    writeString(0, "RIFF");
-    view.setUint32(4, 36 + dataLength, true);
-    writeString(8, "WAVE");
-    writeString(12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, channels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * channels * bytesPerSample, true);
-    view.setUint16(32, channels * bytesPerSample, true);
-    view.setUint16(34, 16, true);
-    writeString(36, "data");
-    view.setUint32(40, dataLength, true);
-
-    // Convert float samples to 16-bit PCM
-    const pcmData = new Int16Array(frameLength);
-    for (let i = 0; i < frameLength; i++) {
-      pcmData[i] = samples[i] < 0 ? samples[i] * 0x8000 : samples[i] * 0x7FFF;
-    }
-
-    // Combine header + PCM data
-    const wavFile = new Uint8Array(44 + dataLength);
-    wavFile.set(new Uint8Array(header), 0);
-    wavFile.set(new Uint8Array(pcmData.buffer), 44);
-    
-    return wavFile;
   };
 
   return (
@@ -512,7 +583,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
           disabled={downloading}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50 active:opacity-70 transition-colors text-xs font-medium select-none ml-auto"
           style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
-          title="Download full section as WAV"
+          title="Download full section as MP3 with metadata"
         >
           {downloading ? (
             <>
