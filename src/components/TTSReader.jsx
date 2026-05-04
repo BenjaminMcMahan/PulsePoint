@@ -356,113 +356,57 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
   const isActive = state === "playing" || state === "paused" || state === "buffering";
   const savedIdx = sessionId ? parseInt(localStorage.getItem(`tts_progress_${sessionId}`) || "-1", 10) : -1;
 
-  // Build an ID3v2.3 tag with title, artist, album, year, comment, and optional artwork
-  const buildID3Tag = async (meta) => {
-    const enc = new TextEncoder();
+  // Build an ID3v2.3 tag — UTF-8 encoded text frames (encoding byte 0x03)
+  const buildID3Tag = (meta) => {
+    const enc = new TextEncoder(); // UTF-8
 
+    // ID3v2.3 text frame: encoding(1=UTF-8 as 0x03) + UTF-8 bytes
     const makeTextFrame = (id, text) => {
-      const textBytes = enc.encode("\x00" + text); // encoding byte (ISO-8859-1) + text
-      const size = textBytes.length;
-      const frame = new Uint8Array(10 + size);
-      for (let i = 0; i < 4; i++) frame[i] = id.charCodeAt(i);
-      frame[4] = (size >> 24) & 0xff;
-      frame[5] = (size >> 16) & 0xff;
-      frame[6] = (size >> 8) & 0xff;
-      frame[7] = size & 0xff;
-      frame[8] = 0; frame[9] = 0; // flags
-      frame.set(textBytes, 10);
-      return frame;
-    };
-
-    const makeCommentFrame = (text) => {
-      // COMM frame: encoding(1) + lang(3) + short desc(1 null) + text
       const textBytes = enc.encode(text);
-      const payload = new Uint8Array(1 + 3 + 1 + textBytes.length);
-      payload[0] = 0x00; // ISO-8859-1
-      payload[1] = 0x65; payload[2] = 0x6e; payload[3] = 0x67; // "eng"
-      payload[4] = 0x00; // empty short description
-      payload.set(textBytes, 5);
-      const size = payload.length;
-      const frame = new Uint8Array(10 + size);
-      frame[0] = 0x43; frame[1] = 0x4f; frame[2] = 0x4d; frame[3] = 0x4d; // "COMM"
-      frame[4] = (size >> 24) & 0xff; frame[5] = (size >> 16) & 0xff;
-      frame[6] = (size >> 8) & 0xff; frame[7] = size & 0xff;
+      const payload = new Uint8Array(1 + textBytes.length);
+      payload[0] = 0x03; // UTF-8
+      payload.set(textBytes, 1);
+      const frame = new Uint8Array(10 + payload.length);
+      for (let i = 0; i < 4; i++) frame[i] = id.charCodeAt(i);
+      frame[4] = (payload.length >> 24) & 0xff;
+      frame[5] = (payload.length >> 16) & 0xff;
+      frame[6] = (payload.length >> 8) & 0xff;
+      frame[7] = payload.length & 0xff;
       frame.set(payload, 10);
       return frame;
     };
 
-    const makeAPICFrame = (imageBytes, mimeType) => {
-      // APIC: encoding(1) + mime(null-terminated) + pic type(1) + description(1 null) + data
-      const mimeBytes = enc.encode(mimeType);
-      const header = new Uint8Array(1 + mimeBytes.length + 1 + 1 + 1);
-      header[0] = 0x00; // encoding
-      header.set(mimeBytes, 1);
-      header[1 + mimeBytes.length] = 0x00; // null terminator
-      header[1 + mimeBytes.length + 1] = 0x03; // cover art
-      header[1 + mimeBytes.length + 2] = 0x00; // empty description
-      const payload = new Uint8Array(header.length + imageBytes.length);
-      payload.set(header, 0);
-      payload.set(imageBytes, header.length);
-      const size = payload.length;
-      const frame = new Uint8Array(10 + size);
-      frame[0] = 0x41; frame[1] = 0x50; frame[2] = 0x49; frame[3] = 0x43; // "APIC"
-      frame[4] = (size >> 24) & 0xff; frame[5] = (size >> 16) & 0xff;
-      frame[6] = (size >> 8) & 0xff; frame[7] = size & 0xff;
-      payload.forEach((b, i) => frame[10 + i] = b);
+    // COMM frame
+    const makeCommentFrame = (text) => {
+      const textBytes = enc.encode(text);
+      const payload = new Uint8Array(1 + 3 + 1 + textBytes.length);
+      payload[0] = 0x03; // UTF-8
+      payload[1] = 0x65; payload[2] = 0x6e; payload[3] = 0x67; // "eng"
+      payload[4] = 0x00; // empty short description
+      payload.set(textBytes, 5);
+      const frame = new Uint8Array(10 + payload.length);
+      frame[0] = 0x43; frame[1] = 0x4f; frame[2] = 0x4d; frame[3] = 0x4d;
+      frame[4] = (payload.length >> 24) & 0xff; frame[5] = (payload.length >> 16) & 0xff;
+      frame[6] = (payload.length >> 8) & 0xff; frame[7] = payload.length & 0xff;
+      frame.set(payload, 10);
       return frame;
     };
 
     const frames = [
       makeTextFrame("TIT2", meta.title || "Audio Export"),
-      makeTextFrame("TPE1", meta.artist || "PhysioLog"),
-      makeTextFrame("TALB", meta.album || "PhysioLog Sessions"),
+      makeTextFrame("TPE1", "PhysioLog"),
+      makeTextFrame("TALB", "PhysioLog Sessions"),
       makeTextFrame("TYER", meta.year || new Date().getFullYear().toString()),
       makeTextFrame("TCON", "Podcast"),
     ];
-
     if (meta.comment) frames.push(makeCommentFrame(meta.comment));
 
-    // Try to fetch artwork
-    try {
-      const artRes = await fetch("https://base44.com/logo_v2.svg");
-      // Convert SVG to a small PNG-like data via canvas
-      const svgText = await artRes.text();
-      const blob = new Blob([svgText], { type: "image/svg+xml" });
-      const url = URL.createObjectURL(blob);
-      await new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = 512; canvas.height = 512;
-          const ctx = canvas.getContext("2d");
-          ctx.fillStyle = "#0f172a";
-          ctx.fillRect(0, 0, 512, 512);
-          ctx.drawImage(img, 64, 64, 384, 384);
-          canvas.toBlob((pngBlob) => {
-            pngBlob.arrayBuffer().then((buf) => {
-              frames.push(makeAPICFrame(new Uint8Array(buf), "image/png"));
-              URL.revokeObjectURL(url);
-              resolve();
-            });
-          }, "image/png");
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
-        img.src = url;
-      });
-    } catch (_) { /* artwork optional */ }
-
-    // Compute total frames size
     const totalFrameSize = frames.reduce((a, f) => a + f.length, 0);
-    // ID3v2.3 header: "ID3" + version(2.3) + flags(0) + syncsafe size(4)
-    const tagSize = totalFrameSize; // no padding
-    const ss = (n) => [
-      (n >> 21) & 0x7f, (n >> 14) & 0x7f, (n >> 7) & 0x7f, n & 0x7f
-    ];
+    const ss = (n) => [(n >> 21) & 0x7f, (n >> 14) & 0x7f, (n >> 7) & 0x7f, n & 0x7f];
     const tag = new Uint8Array(10 + totalFrameSize);
     tag[0] = 0x49; tag[1] = 0x44; tag[2] = 0x33; // "ID3"
-    tag[3] = 0x03; tag[4] = 0x00; // version 2.3.0
-    tag[5] = 0x00; // flags
-    const syncSize = ss(tagSize);
+    tag[3] = 0x03; tag[4] = 0x00; tag[5] = 0x00;
+    const syncSize = ss(totalFrameSize);
     tag[6] = syncSize[0]; tag[7] = syncSize[1]; tag[8] = syncSize[2]; tag[9] = syncSize[3];
     let pos = 10;
     for (const f of frames) { tag.set(f, pos); pos += f.length; }
@@ -498,18 +442,20 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       let offset = 0;
       for (const chunk of mp3Chunks) { combined.set(chunk, offset); offset += chunk.length; }
 
-      const datePart = sessionDate ? sessionDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
-      const titlePart = title ? title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() : "section";
-      const displayTitle = title ? `${datePart} — ${title}` : datePart;
-      const fileName = `${datePart}_${titlePart}.mp3`;
+      const dateObj = sessionDate ? new Date(sessionDate) : new Date();
+      const monthName = dateObj.toLocaleDateString("en-US", { month: "long" });
+      const dayNum = dateObj.getDate();
+      const yearNum = dateObj.getFullYear();
+      const friendlyDate = `${monthName} ${dayNum}`;
+      const displayTitle = title ? `${friendlyDate} ${title}` : `${friendlyDate} Recording`;
+      const fileSlug = displayTitle.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+      const fileName = `${fileSlug}.mp3`;
 
       // Build ID3 tag
-      const id3 = await buildID3Tag({
+      const id3 = buildID3Tag({
         title: displayTitle,
-        artist: "PhysioLog",
-        album: "PhysioLog Sessions",
-        year: datePart.slice(0, 4),
-        comment: `Recorded ${datePart}${sessionDate ? " · " + sessionDate.slice(0, 16).replace("T", " ") : ""}`,
+        year: String(yearNum),
+        comment: `Recorded ${friendlyDate}, ${yearNum}`,
       });
 
       // Prepend ID3 tag to MP3 data
@@ -533,7 +479,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       const uploadRes = await base44.integrations.Core.UploadFile({ file });
 
       await base44.entities.AudioExport.create({
-        title: displayTitle,
+        title: displayTitle,  // e.g. "April 23 Cascade Overview"
         file_url: uploadRes.file_url,
         duration_seconds: Math.round(approxDuration),
         voice: voiceRef.current,
