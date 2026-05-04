@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Brain, Activity, AlertCircle, Zap, TrendingUp, Heart, Lightbulb, User } from "lucide-react";
 import TTSReader from "../components/TTSReader";
-import TTSButton from "../components/TTSButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -495,20 +494,11 @@ Be interpretive, insightful, and speak directly to the person. Reference specifi
     <SectionCard icon={<Zap className="w-4 h-4" />} title="Near-Climax Event Analysis" color="hsl(var(--chart-3))">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">Detects erratic HR spikes & reversals that resemble — but don't complete — a climax cascade.</p>
-        <div className="flex items-center gap-2">
-          {result && <TTSButton getText={() => {
-            const parts = [result.summary, result.physiological_interpretation, result.role_in_arousal_arc];
-            result.pattern_analysis?.forEach((s) => parts.push(s));
-            result.contextual_triggers?.forEach((s) => parts.push(s));
-            result.recommendations?.forEach((s) => parts.push(s));
-            return parts.filter(Boolean).join('. ');
-          }} />}
-        <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5 shrink-0 ml-2">
+        <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5 shrink-0">
           {loading ?
             <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</> :
             <><Brain className="w-3 h-3" />{result ? "Re-run" : "Analyze"}</>}
         </Button>
-        </div>
       </div>
 
       {displayStats &&
@@ -540,55 +530,70 @@ Be interpretive, insightful, and speak directly to the person. Reference specifi
         </div>
       }
 
-      {result &&
-      <div className="space-y-3 pt-1">
-          {result.summary &&
-        <p className="text-base text-foreground leading-relaxed border-l-2 border-chart-3 pl-3 font-medium">{result.summary}</p>
+      {result && (() => {
+        const SECTIONS = [
+          { key: "physiological_interpretation", label: "Physiological Interpretation", single: true, color: "hsl(var(--chart-3))" },
+          { key: "pattern_analysis", label: "Pattern Analysis", color: "hsl(var(--primary))" },
+          { key: "contextual_triggers", label: "Contextual Triggers", color: "hsl(var(--chart-4))" },
+          { key: "role_in_arousal_arc", label: "Role in Arousal Arc", single: true, color: "hsl(var(--chart-2))" },
+          { key: "recommendations", label: "Recommendations", color: "hsl(var(--accent))" },
+        ];
+
+        const paras = [];
+        const paraMeta = [];
+        if (result.summary) { paras.push(result.summary); paraMeta.push({ type: "summary" }); }
+        for (const sec of SECTIONS) {
+          if (sec.single) {
+            if (result[sec.key]) { paras.push(result[sec.key]); paraMeta.push({ type: "section", sec, first: true }); }
+          } else {
+            (result[sec.key] || []).forEach((item, itemIdx) => {
+              paras.push(item);
+              paraMeta.push({ type: "section", sec, first: itemIdx === 0 });
+            });
+          }
         }
-          {result.physiological_interpretation &&
-        <div className="bg-muted/60 rounded-lg p-3">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Physiological Interpretation</p>
-              <p className="text-foreground text-base leading-relaxed">{result.physiological_interpretation}</p>
-            </div>
-        }
-          {result.pattern_analysis?.length > 0 &&
-        <div>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Pattern Analysis</p>
-              <ul className="space-y-2">
-                {result.pattern_analysis.map((s, i) =>
-            <li key={i} className="text-[#ffffff] pl-3 text-sm leading-relaxed border-l-2 border-primary/40">• {s}</li>
-            )}
-              </ul>
-            </div>
-        }
-          {result.contextual_triggers?.length > 0 &&
-        <div>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Contextual Triggers</p>
-              <ul className="space-y-2">
-                {result.contextual_triggers.map((s, i) =>
-            <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
-            )}
-              </ul>
-            </div>
-        }
-          {result.role_in_arousal_arc &&
-        <div className="bg-muted/60 rounded-lg p-3">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Role in Arousal Arc</p>
-              <p className="text-sm text-foreground leading-relaxed">{result.role_in_arousal_arc}</p>
-            </div>
-        }
-          {result.recommendations?.length > 0 &&
-        <div>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider">Recommendations</p>
-              <ul className="space-y-2">
-                {result.recommendations.map((s, i) =>
-            <li key={i} className="text-sm text-foreground/90 pl-3 border-l-2 border-primary/40 leading-relaxed">• {s}</li>
-            )}
-              </ul>
-            </div>
-        }
-        </div>
-      }
+
+        return (
+          <TTSReader
+            sessionId="profiler_near_climax"
+            title="Near-Climax Event Analysis"
+            paragraphs={paras}
+            renderParagraph={(text, idx, isActive, isBuffering) => {
+              const meta = paraMeta[idx];
+              if (!meta) return null;
+              if (meta.type === "summary") {
+                return (
+                  <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${isActive ? "border-primary bg-primary/8 text-foreground" : "border-chart-3 text-foreground"}`}>
+                    {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+                    {text}
+                  </p>
+                );
+              }
+              const { sec, first } = meta;
+              return (
+                <div>
+                  {first && (
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5 tracking-wider mt-3" style={{ color: sec.color }}>
+                      {sec.label}
+                    </p>
+                  )}
+                  <li
+                    className="text-sm pl-3 border-l-2 py-1 leading-relaxed list-none transition-all duration-200 rounded-r-md flex items-center gap-2"
+                    style={{
+                      borderColor: isActive ? sec.color : sec.color + "55",
+                      background: isActive ? sec.color + "18" : "transparent",
+                      color: "hsl(var(--foreground))",
+                    }}
+                  >
+                    {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: sec.color, borderTopColor: "transparent" }} />}
+                    {text}
+                  </li>
+                </div>
+              );
+            }}
+          />
+        );
+      })()}
     </SectionCard>);
 
 }
