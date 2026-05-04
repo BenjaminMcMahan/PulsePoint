@@ -340,6 +340,7 @@ Write as a cohesive, intelligent personal profile — speak directly to the pers
       {result && (
         <TTSReader
           sessionId="profiler_ai_profile"
+          title="AI Physiological Profile"
           paragraphs={paras}
           renderParagraph={(text, idx, isActive) => {
             const meta = paraMeta[idx];

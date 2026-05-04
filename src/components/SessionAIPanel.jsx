@@ -233,6 +233,8 @@ Provide an insightful, experience-centered analysis. Be specific, reference actu
         return (
           <TTSReader
             sessionId={session.id}
+            title="AI Session Analysis"
+            sessionDate={session.date}
             paragraphs={paras}
             renderParagraph={(text, paraIdx, isActive, isBuffering) => {
               // Find which section this paragraph belongs to

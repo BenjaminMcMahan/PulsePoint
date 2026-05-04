@@ -259,6 +259,8 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
         return (
           <TTSReader
             sessionId={session.id}
+            title="Cascade Overview"
+            sessionDate={session.date}
             paragraphs={paras.map(p => p.text)}
             renderParagraph={(text, idx, isActive, isBuffering) => {
               const meta = paras[idx];

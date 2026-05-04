@@ -6,7 +6,7 @@ import { base44 } from "@/api/base44Client";
 
 const OAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
 
-export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
+export default function TTSReader({ paragraphs, renderParagraph, sessionId, title, sessionDate }) {
   const [state, setState] = useState("idle"); // idle | buffering | playing | paused
   const [currentPara, setCurrentPara] = useState(-1);
   const [bufferingPara, setBufferingPara] = useState(-1); // which paragraph is currently fetching
@@ -402,7 +402,9 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       const samples = combined.getChannelData(0);
       const wavData = createWavHeader(samples, ctx.sampleRate);
       const wavBlob = new Blob([wavData], { type: "audio/wav" });
-      const fileName = `tts-section-${Date.now()}.wav`;
+      const datePart = sessionDate ? sessionDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
+      const titlePart = title ? title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() : "section";
+      const fileName = `${datePart}_${titlePart}.wav`;
       const url = URL.createObjectURL(wavBlob);
       const a = document.createElement("a");
       a.href = url;
@@ -415,7 +417,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
       const uploadRes = await base44.integrations.Core.UploadFile({ file });
       
       await base44.entities.AudioExport.create({
-        title: fileName.replace(".wav", ""),
+        title: title ? `${datePart} — ${title}` : fileName.replace(".wav", ""),
         file_url: uploadRes.file_url,
         duration_seconds: combined.duration,
         voice: voiceRef.current,
