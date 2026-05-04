@@ -105,6 +105,9 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     playNextChunk(gen);
   };
 
+  // Persistent client-side audio cache key (voice+speed+text → base64)
+  const clientCacheKey = (chunk) => `tts_cache:${voiceRef.current}:${speedRef.current}:${chunk}`;
+
   // Fetch a chunk and decode it, using the prefetch cache when available.
   // Returns a decoded AudioBuffer or throws.
   const fetchDecoded = async (chunk, gen) => {
@@ -114,8 +117,17 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId }) {
     }
     // Start (or reuse) a pending promise so concurrent callers share the same fetch
     const promise = (async () => {
-      const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
-      const base64 = response.data.audio;
+      // Check sessionStorage for a previously fetched base64
+      let base64 = null;
+      try { base64 = sessionStorage.getItem(clientCacheKey(chunk)); } catch (_) {}
+
+      if (!base64) {
+        const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
+        base64 = response.data.audio;
+        // Store in sessionStorage for reuse within this browser session
+        try { sessionStorage.setItem(clientCacheKey(chunk), base64); } catch (_) {}
+      }
+
       const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
