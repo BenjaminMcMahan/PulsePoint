@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { User, Heart, Activity, Pill, RefreshCw, CheckCircle, Flame } from "lucide-react";
+import AIChat from "../components/AIChat";
 
 function Field({ label, hint, children }) {
   return (
@@ -75,6 +76,7 @@ export default function Profile() {
   const [saved, setSaved] = useState(false);
   const [computing, setComputing] = useState(false);
   const [computedRecovery, setComputedRecovery] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
 
   useEffect(() => {
     base44.auth.me().then((u) => {
@@ -94,6 +96,7 @@ export default function Profile() {
         refractory_pattern: u.refractory_pattern ?? null,
         arousal_notes: u.arousal_notes ?? "",
       });
+      setChatMessages(u.profile_chat_messages || []);
     });
   }, []);
 
@@ -360,6 +363,32 @@ export default function Profile() {
           />
         </Field>
       </div>
+
+      {/* AI Interview */}
+      <AIChat
+        mode="profile"
+        context={[
+          `Age: ${form.age ?? "not set"}, Weight: ${form.weight_kg ?? "not set"}kg, Fitness: ${form.fitness_level ?? "not set"}`,
+          `Resting HR: ${form.resting_hr ?? "not set"} bpm, Max HR: ${form.max_hr ?? "not set"} bpm, Recovery HR drop 60s: ${form.recovery_hr_60s ?? "not set"} bpm`,
+          `Medications/conditions: ${form.medications || "none"}`,
+          `Arousal response style: ${form.arousal_response_style ?? "not set"}`,
+          `Typical build duration: ${form.typical_build_duration ?? "not set"}`,
+          `Climax sensitivity: ${form.climax_sensitivity ?? "not set"}`,
+          `Refractory pattern: ${form.refractory_pattern ?? "not set"}`,
+          `Preferred stimulation: ${(form.preferred_stimulation || []).join(", ") || "not set"}`,
+          `Arousal notes: ${form.arousal_notes || "none"}`,
+        ].join("\n")}
+        savedMessages={chatMessages}
+        savedNotes={form.arousal_notes}
+        onSaveMessages={async (msgs) => {
+          setChatMessages(msgs);
+          await base44.auth.updateMe({ profile_chat_messages: msgs });
+        }}
+        onSaveNotes={async (merged) => {
+          setForm((f) => ({ ...f, arousal_notes: merged }));
+          await base44.auth.updateMe({ arousal_notes: merged });
+        }}
+      />
 
       <Button onClick={save} disabled={saving} className="w-full gap-2">
         {saved

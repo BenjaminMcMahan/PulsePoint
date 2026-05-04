@@ -94,7 +94,14 @@
     },
     "arousal_notes": {
       "type": "string",
-      "description": "Free-text notes on arousal patterns, what works, what doesn't, unique characteristics"
+      "description": "Free-text notes on arousal patterns, what works, what doesn't, unique characteristics \u2014 also stores AI interview findings"
+    },
+    "profile_chat_messages": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Persisted AI interview chat messages for the profile page"
     }
   },
   "required": [

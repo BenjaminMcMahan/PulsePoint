@@ -4,6 +4,31 @@ import { Brain, AlertCircle, Activity, Lightbulb, TrendingUp, Zap, ChevronDown, 
 import TTSReader from "./TTSReader";
 import { Button } from "@/components/ui/button";
 import { EVENT_CATEGORIES } from "./session-form/EventTimelineSection";
+import AIChat from "./AIChat";
+
+function buildSessionContext(session, timelineRows) {
+  const hrMin = timelineRows.length ? Math.round(Math.min(...timelineRows.map(r => Number(r.hr)))) : null;
+  const hrMax = timelineRows.length ? Math.round(Math.max(...timelineRows.map(r => Number(r.hr)))) : null;
+  return [
+    `Session date: ${session.date?.slice(0, 10)}`,
+    `Duration: ${session.duration_minutes ?? "?"}min`,
+    `Methods: ${(session.methods || []).join(", ")}`,
+    session.foley_size ? `Foley: ${session.foley_size}Fr ${session.foley_type || ""}` : null,
+    session.estim_notes ? `E-Stim notes: ${session.estim_notes}` : null,
+    `Intensity: ${session.intensity}/10, Build quality: ${session.build_quality}/10, Satisfaction: ${session.satisfaction}/10`,
+    `Build type: ${session.build_type}${session.custom_build_type ? " — " + session.custom_build_type : ""}`,
+    `Climax duration: ${session.climax_duration ?? "?"}`,
+    `Mood: ${session.mood}, Hydration: ${session.hydration}`,
+    hrMin != null ? `HR: min ${hrMin}, avg ${session.avg_hr ?? "?"}, max ${hrMax}, at climax ${session.hr_at_climax ?? "?"}` : null,
+    session.pre_climax_offset_s != null ? `Phase markers: pre-climax ${Math.round(session.pre_climax_offset_s)}s, climax ${Math.round(session.climax_offset_s)}s, recovery ${session.recovery_offset_s != null ? Math.round(session.recovery_offset_s) + "s" : "?"}` : null,
+    session.ejaculate_volume ? `Ejaculate: ${session.ejaculate_volume}` : null,
+    session.unusual_sensations ? `Unusual sensations: ${session.unusual_sensations}` : null,
+    (session.discomfort_entries || []).length ? `Discomfort: ${session.discomfort_entries.map(e => `sev ${e.severity}/10 — ${e.note}`).join("; ")}` : null,
+    (session.event_timeline || []).length ? `Events: ${session.event_timeline.map(e => `[${e.time_s}s] ${e.note}`).join(" | ")}` : null,
+    session.notes ? `Session notes: ${session.notes}` : null,
+    session.ai_analysis?.summary ? `AI analysis summary: ${session.ai_analysis.summary}` : null,
+  ].filter(Boolean).join("\n");
+}
 
 function getCategoryMeta(value) {
   return EVENT_CATEGORIES.find((c) => c.value === value) || EVENT_CATEGORIES[EVENT_CATEGORIES.length - 1];
@@ -41,6 +66,8 @@ export default function SessionAIPanel({ session, timelineRows, userProfile }) {
   const [collapsed, setCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(session.ai_analysis ?? null);
+  const [chatMessages, setChatMessages] = useState(session.ai_analysis?._chat_messages || []);
+  const [sessionNotes, setSessionNotes] = useState(session.notes || "");
 
   const analyze = async () => {
     setLoading(true);
@@ -228,6 +255,24 @@ Provide a rich, physiologically-grounded analysis that tells the story of this s
         <p className="text-xs text-muted-foreground">
           Click Analyze to generate a detailed AI physiological breakdown of this session. Uses Claude Sonnet.
         </p>
+      )}
+
+      {!collapsed && (
+        <AIChat
+          mode="session"
+          context={buildSessionContext(session, timelineRows)}
+          savedMessages={chatMessages}
+          savedNotes={sessionNotes}
+          onSaveMessages={async (msgs) => {
+            setChatMessages(msgs);
+            const updated = { ...(result || {}), _chat_messages: msgs };
+            await base44.entities.Session.update(session.id, { ai_analysis: updated });
+          }}
+          onSaveNotes={async (merged) => {
+            setSessionNotes(merged);
+            await base44.entities.Session.update(session.id, { notes: merged });
+          }}
+        />
       )}
 
       {!collapsed && result && (() => {
