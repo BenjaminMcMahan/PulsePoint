@@ -14,6 +14,9 @@ export default function SessionCard({ session, selectable, selected, onSelect })
   const scorePct = computeSessionScore(session, []);
   const gradeInfo = scorePct != null ? gradeFromPct(scorePct) : null;
   const aiSummary = session.ai_analysis?.summary;
+  const hasEMG = session.emg_enabled ||
+    session.emg_general_notes || session.emg_left_placement_notes || session.emg_right_placement_notes ||
+    (session.emg_placement_photos || []).length > 0;
 
   const content = (
     <div className={`bg-card rounded-xl border p-4 transition-all ${
@@ -46,6 +49,11 @@ export default function SessionCard({ session, selectable, selected, onSelect })
           {session.no_climax && (
             <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
               <XCircle className="w-2.5 h-2.5" /> NC
+            </span>
+          )}
+          {hasEMG && (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-chart-2/15 text-chart-2 border border-chart-2/30">
+              EMG
             </span>
           )}
           {session.is_quick_entry && <Zap className="w-4 h-4 text-primary" />}
