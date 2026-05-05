@@ -113,6 +113,7 @@ export default function EditSession() {
         const CHUNK = 500;
         for (let i = 0; i < rows.length; i += CHUNK) {
           await base44.entities.HeartRateTimeline.bulkCreate(rows.slice(i, i + CHUNK));
+          if (i + CHUNK < rows.length) await new Promise((r) => setTimeout(r, 300));
         }
       }
       if (_emg_rows && _emg_rows.length > 0) {
@@ -125,11 +126,12 @@ export default function EditSession() {
           offset += existing.length;
           if (existing.length < 1000) break;
         }
-        // BulkCreate in chunks of 500 to avoid network timeouts
+        // BulkCreate in chunks with delay to avoid rate limits
         const rows = _emg_rows.map((r) => ({ ...r, session: id }));
         const CHUNK = 500;
         for (let i = 0; i < rows.length; i += CHUNK) {
           await base44.entities.EMGTimeline.bulkCreate(rows.slice(i, i + CHUNK));
+          if (i + CHUNK < rows.length) await new Promise((r) => setTimeout(r, 300));
         }
       }
       toast({ title: "Session updated!", duration: 2000 });
