@@ -445,7 +445,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       const mp3Chunks = new Array(allChunks.length);
       setDownloadProgress({ current: 0, total: allChunks.length });
       let completed = 0;
-      const CONCURRENCY = 3;
+      const CONCURRENCY = 8;
 
       const fetchChunk = async (i) => {
         const chunk = allChunks[i];
