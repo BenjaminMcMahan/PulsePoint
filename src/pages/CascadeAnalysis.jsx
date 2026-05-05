@@ -135,15 +135,24 @@ function AIInsightPanel({ sessions }) {
       });
 
       // Build cascade shape: HR at pre-climax, climax, and recovery markers
+      const fmtDurWords = (sec) => {
+        const m = Math.floor(sec / 60);
+        const s2 = sec % 60;
+        if (m === 0) return `${s2} second${s2 !== 1 ? "s" : ""}`;
+        if (s2 === 0) return `${m} minute${m !== 1 ? "s" : ""}`;
+        return `${m} minute${m !== 1 ? "s" : ""} and ${s2} second${s2 !== 1 ? "s" : ""}`;
+      };
+      const buildDurRaw = s.pre_climax_offset_s != null ? Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null;
+      const recOnsetRaw = s.recovery_offset_s != null ? Math.round(s.recovery_offset_s - s.climax_offset_s) : null;
+      const hrRise = (s.hr_at_climax || hrAt(s.climax_offset_s)) != null && hrAt(s.pre_climax_offset_s) != null ?
+        Math.round((s.hr_at_climax || hrAt(s.climax_offset_s)) - hrAt(s.pre_climax_offset_s)) : null;
       const cascadeShape = {
         hr_at_pre_climax_marker: hrAt(s.pre_climax_offset_s),
         hr_at_climax_marker: s.hr_at_climax || hrAt(s.climax_offset_s),
         hr_at_recovery_marker: hrAt(s.recovery_offset_s),
-        build_duration_s: s.pre_climax_offset_s != null ? Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null,
-        recovery_onset_s: s.recovery_offset_s != null ? Math.round(s.recovery_offset_s - s.climax_offset_s) : null,
-        hr_rise_pre_to_climax: (s.hr_at_climax || hrAt(s.climax_offset_s)) != null && hrAt(s.pre_climax_offset_s) != null ?
-        Math.round((s.hr_at_climax || hrAt(s.climax_offset_s)) - hrAt(s.pre_climax_offset_s)) :
-        null
+        build_duration: buildDurRaw != null ? fmtDurWords(buildDurRaw) : null,
+        recovery_onset: recOnsetRaw != null ? fmtDurWords(recOnsetRaw) : null,
+        hr_rise_pre_to_climax_bpm: hrRise,
       };
 
       const spokenDate = s.date ? (() => {
@@ -212,7 +221,7 @@ ${JSON.stringify(summary, null, 2)}
 
 Provide a structured analysis covering:
 
-1. CASCADE OVERVIEW: Describe the physiological arc across sessions — how the pre-climax build unfolds, the nature of the climax peak, and the recovery trajectory. Identify what is consistent and what varies. ${avgRecoveryOnset ? `Average recovery onset is approximately ${avgRecoveryOnset} seconds post-climax.` : ""}
+1. CASCADE OVERVIEW: Describe the physiological arc across sessions — how the pre-climax build unfolds, the nature of the climax peak, and the recovery trajectory. Identify what is consistent and what varies. ${avgRecoveryOnset ? `Average recovery onset is approximately ${avgRecoveryOnset >= 60 ? `${Math.floor(avgRecoveryOnset/60)} minute${Math.floor(avgRecoveryOnset/60) !== 1 ? "s" : ""}${avgRecoveryOnset % 60 > 0 ? ` and ${avgRecoveryOnset % 60} seconds` : ""}` : `${avgRecoveryOnset} seconds`} post-climax.` : ""}
 
 2. EVENT NOTE PATTERNS: Analyze the annotated event notes across sessions. What physiological states are associated with logged events? Do events cluster at specific phases? Do event types correlate with heart rate inflections or cascade shape?
 
@@ -296,12 +305,13 @@ Be specific and reference actual values — but always written as spoken words, 
         return (
           <TTSReader
             paragraphs={paras}
-            renderParagraph={(text, idx, isActive) => (
-              <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md ${
+            renderParagraph={(text, idx, isActive, isBuffering) => (
+              <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${
                 idx === 0
                   ? isActive ? "border-primary bg-primary/10 text-foreground font-bold" : "border-primary text-foreground font-medium"
-                  : isActive ? "border-primary bg-primary/8 text-foreground font-medium" : "border-primary/30 text-[#ffffff]"
+                  : isActive ? "border-primary bg-primary/10 text-foreground font-medium" : "border-primary/30 text-foreground/80"
               }`}>
+                {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
                 {text}
               </p>
             )}
