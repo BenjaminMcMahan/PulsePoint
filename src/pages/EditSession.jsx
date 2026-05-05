@@ -101,16 +101,36 @@ export default function EditSession() {
         duration_minutes: duration || data.duration_minutes,
       });
       if (_csv_rows && _csv_rows.length > 0) {
-        const existing = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
-        await Promise.all(existing.map((r) => base44.entities.HeartRateTimeline.delete(r.id)));
+        let offset = 0;
+        while (true) {
+          const existing = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 1000);
+          if (!existing.length) break;
+          await Promise.all(existing.map((r) => base44.entities.HeartRateTimeline.delete(r.id)));
+          offset += existing.length;
+          if (existing.length < 1000) break;
+        }
         const rows = _csv_rows.map((r) => ({ ...r, session: id }));
-        await base44.entities.HeartRateTimeline.bulkCreate(rows);
+        const CHUNK = 500;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          await base44.entities.HeartRateTimeline.bulkCreate(rows.slice(i, i + CHUNK));
+        }
       }
       if (_emg_rows && _emg_rows.length > 0) {
-        const existing = await base44.entities.EMGTimeline.filter({ session: id }, "time_s", 10000);
-        await Promise.all(existing.map((r) => base44.entities.EMGTimeline.delete(r.id)));
+        // Delete all existing EMG rows in batches
+        let offset = 0;
+        while (true) {
+          const existing = await base44.entities.EMGTimeline.filter({ session: id }, "time_s", 1000);
+          if (!existing.length) break;
+          await Promise.all(existing.map((r) => base44.entities.EMGTimeline.delete(r.id)));
+          offset += existing.length;
+          if (existing.length < 1000) break;
+        }
+        // BulkCreate in chunks of 500 to avoid network timeouts
         const rows = _emg_rows.map((r) => ({ ...r, session: id }));
-        await base44.entities.EMGTimeline.bulkCreate(rows);
+        const CHUNK = 500;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          await base44.entities.EMGTimeline.bulkCreate(rows.slice(i, i + CHUNK));
+        }
       }
       toast({ title: "Session updated!", duration: 2000 });
       navigate(`/sessions/${id}`);
