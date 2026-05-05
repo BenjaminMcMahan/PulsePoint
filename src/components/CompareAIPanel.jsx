@@ -106,16 +106,29 @@ Use this profile to contextualize the comparison — note which sessions aligned
 
       const res = await base44.integrations.Core.InvokeLLM({
         model: "claude_sonnet_4_6",
-        prompt: `You are a physiological research assistant. Compare the following ${sessions.length} sexual response sessions side-by-side.${arousalProfile}
+        prompt: `You are a physiological research assistant and anatomist specializing in sexual response. Compare the following ${sessions.length} sessions side-by-side, analyzing the full cascade arc: Build Phase → Pre-Climax → Climax → Recovery. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
 
-For each session, analyze the full cascade arc: Build Phase → Pre-Climax → Climax → Recovery.
-Focus on: HR trajectories, phase durations, build types, climax quality, recovery speed, and any event notes.
-Identify meaningful physiological differences and patterns across sessions.
+PHYSIOLOGICAL & ANATOMICAL LENS — apply throughout:
+- Interpret HR trajectories as windows into sympathetic nervous system activation, parasympathetic withdrawal, and autonomic arousal state
+- Reference relevant anatomy where appropriate: pelvic floor engagement, prostatic engorgement, pudendal nerve pathways, bulbocavernosus/ischiocavernosus activity
+- Connect phase durations and HR inflections to their likely anatomical and neurological drivers
+- Interpret build types physiologically — what does a "gradual" vs "stepwise" vs "spike" pattern suggest about autonomic ramp-up?
+
+CRITICAL FOR TEXT-TO-SPEECH QUALITY:
+- Write all times as words: "ten minutes and thirty seconds" not "10:30"
+- Spell out all numbers as words (e.g., "seventy-two beats per minute" not "72 bpm", "eight out of ten" not "8/10")
+- Write "beats per minute" not "bpm", "heart rate" not "HR", "seconds" not "s", "minutes" not "min"
+- Write in conversational, sentence-based prose with natural pauses — no bullet points, no lists, no markdown
+- Use short sentences and simple grammar optimized for audio readability
+- Explain anatomical terms briefly and accessibly — don't assume medical background
+- Use commas and periods to create natural speech cadence
+- Never start a sentence with a digit — restructure if needed
+${arousalProfile}
 
 Sessions:
 ${JSON.stringify(summary, null, 2)}
 
-Provide a structured comparative analysis.`,
+Provide a structured comparative analysis covering key differences, HR patterns, phase timing, and recommendations.`,
         response_json_schema: {
           type: "object",
           properties: {
