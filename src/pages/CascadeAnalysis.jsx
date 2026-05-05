@@ -116,16 +116,22 @@ function AIInsightPanel({ sessions }) {
         return nearestHR(rows, offset_s);
       };
 
-      // Annotate events with HR and category
+      // Annotate events with HR and category — TTS-friendly word format
+      const formatTimeWords = (seconds) => {
+        const m = Math.floor(seconds / 60);
+        const sec = Math.round(seconds % 60);
+        if (m === 0) return `${sec} second${sec !== 1 ? "s" : ""}`;
+        if (sec === 0) return `${m} minute${m !== 1 ? "s" : ""}`;
+        return `${m} minute${m !== 1 ? "s" : ""} and ${sec} second${sec !== 1 ? "s" : ""}`;
+      };
       const annotatedEvents = (s.event_timeline || []).map((e) => {
-        const m = Math.floor(e.time_s / 60);
-        const sec = (e.time_s % 60).toString().padStart(2, "0");
+        const timeWords = formatTimeWords(e.time_s);
         const hr = nearestHR(rows, e.time_s);
         const relToClimax = s.climax_offset_s != null ? Math.round(e.time_s - s.climax_offset_s) : null;
-        const relStr = relToClimax != null ? ` (${relToClimax >= 0 ? "+" : ""}${relToClimax}s vs climax)` : "";
+        const relStr = relToClimax != null ? ` (${formatTimeWords(Math.abs(relToClimax))} ${relToClimax >= 0 ? "after" : "before"} climax)` : "";
         const cats = Array.isArray(e.category) ? e.category : [e.category].filter(Boolean);
         const catStr = cats.length ? `[${cats.join("+")}]` : "";
-        return `${catStr} ${m}:${sec}${relStr} — ${e.note}${hr != null ? ` [HR: ${hr} bpm]` : ""}`.trim();
+        return `${catStr} at ${timeWords}${relStr} — ${e.note}${hr != null ? ` (heart rate: ${hr} beats per minute)` : ""}`.trim();
       });
 
       // Build cascade shape: HR at pre-climax, climax, and recovery markers
@@ -180,29 +186,40 @@ Use this profile throughout the analysis — compare observed cascade patterns a
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological research assistant analyzing sexual response cascade data across ${sessions.length} sessions.${arousalProfile}
+      prompt: `You are a physiological research assistant analyzing sexual response cascade data across ${sessions.length} sessions. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
 
-Each session includes the full cascade arc: pre-climax buildup → climax peak → recovery onset.
-Where available, event notes are annotated with HR values and their timing relative to the climax marker.
+CRITICAL FOR TEXT-TO-SPEECH QUALITY:
+- Write all times as words: "ten minutes and thirty seconds" not "10:30"
+- Spell out all numbers as words (e.g., "seventy-two beats per minute" not "72 bpm", "eight out of ten" not "8/10")
+- Write "beats per minute" not "bpm", "heart rate" not "HR", "seconds" not "s", "minutes" not "min"
+- Write in conversational, sentence-based prose with natural pauses — no bullet points, no lists, no markdown
+- Use short sentences and simple grammar optimized for audio readability
+- Explain anatomical terms briefly and accessibly — don't assume medical background
+- Use commas and periods to create natural speech cadence
+- Never start a sentence with a digit — restructure if needed
+${arousalProfile}
+
+Each session includes the full cascade arc: pre-climax buildup, climax peak, and recovery onset.
+Where available, event notes are annotated with heart rate values and their timing relative to the climax marker.
 
 Session data:
 ${JSON.stringify(summary, null, 2)}
 
 Provide a structured analysis covering:
 
-1. CASCADE OVERVIEW: Describe the physiological arc across sessions — how the pre-climax build unfolds (rate of HR rise, build duration), the nature of the climax peak (intensity, HR at peak, climax duration), and the recovery trajectory (onset timing, recovery speed). Identify what is consistent and what varies. ${avgRecoveryOnset ? `Average recovery onset is ~${avgRecoveryOnset}s post-climax.` : ""}
+1. CASCADE OVERVIEW: Describe the physiological arc across sessions — how the pre-climax build unfolds, the nature of the climax peak, and the recovery trajectory. Identify what is consistent and what varies. ${avgRecoveryOnset ? `Average recovery onset is approximately ${avgRecoveryOnset} seconds post-climax.` : ""}
 
-2. EVENT NOTE PATTERNS: Analyze the annotated event notes across sessions. What physiological states (HR levels) are associated with logged events? Do events cluster at specific phases of the cascade? Do event types (stimulation changes, pauses, sensations) correlate with HR inflections or cascade shape?
+2. EVENT NOTE PATTERNS: Analyze the annotated event notes across sessions. What physiological states are associated with logged events? Do events cluster at specific phases? Do event types correlate with heart rate inflections or cascade shape?
 
 3. COMMON SIGNATURES: Recurring physiological patterns across the full cascade arc.
 
-4. PREDICTIVE INSIGHTS: Which factors (methods, mood, build_type, event patterns) best predict cascade quality (intensity, climax duration, recovery speed)?
+4. PREDICTIVE INSIGHTS: Which factors best predict cascade quality — intensity, climax duration, recovery speed?
 
-5. ANOMALIES: Sessions with unusual cascade shapes, unexpected HR behavior, or atypical event-HR correlations.
+5. ANOMALIES: Sessions with unusual cascade shapes, unexpected heart rate behavior, or atypical event correlations.
 
 6. PHENOTYPE CLUSTERS: Distinct cascade response profiles visible in this data.
 
-Be specific, research-oriented, and reference actual data values where relevant.`,
+Be specific and reference actual values — but always written as spoken words, never digits or abbreviations.`,
       response_json_schema: {
         type: "object",
         properties: {
