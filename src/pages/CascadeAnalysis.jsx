@@ -289,7 +289,7 @@ Be specific and reference actual values — but always written as spoken words, 
           ...(result.common_signatures || []),
           ...(result.predictive_insights || []),
           ...(result.phenotype_clusters || []),
-          ...(result.anomalies || []),
+          ...(result.anomalies || []).map((a) => typeof a === "string" ? a : `${a.session_date}: ${a.finding}`),
         ].filter(Boolean);
 
         if (!paras.length) return <p className="text-xs text-muted-foreground italic">Analysis returned no content. Please try again.</p>;
