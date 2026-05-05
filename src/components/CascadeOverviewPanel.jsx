@@ -117,22 +117,22 @@ PHYSIOLOGICAL & ANATOMICAL LENS — apply per phase:
 - CLIMAX: Expulsion reflex — rhythmic bulbocavernosus and ischiocavernosus contractions (typically every ~0.8 seconds), external urethral sphincter release, peak sympathetic output reflected in HR apex, ejaculate volume relative to congestion level
 - RECOVERY: Parasympathetic rebound, detumescence, pelvic floor relaxation, HR descent rate as a proxy for autonomic recovery speed, refractory state driven by prolactin/oxytocin release and sympathetic exhaustion
 
-CRITICAL FOR TEXT-TO-SPEECH QUALITY:
-- Write all times as words: "ten minutes and thirty seconds" not "10:30"
-- Spell out all numbers as words (e.g., "ten beats per minute" not "10 bpm")
-- Write in conversational, sentence-based prose with natural pauses
-- Use short sentences and simple grammar optimized for audio readability
-- Explain anatomical terms briefly and accessibly — don't assume medical background
-- Use commas and periods to create natural speech cadence
+MANDATORY TEXT-TO-SPEECH FORMATTING — FOLLOW EXACTLY:
+- Every number must be written as words. No digits anywhere. "seventy-two beats per minute" not "72 bpm". "eight minutes and forty seconds" not "8:40". "ten out of ten" not "10/10".
+- No abbreviations. Write "beats per minute" not "bpm". Write "beats per minute" not "BPM". Write "heart rate" not "HR". Write "seconds" not "s". Write "minutes" not "min".
+- No bullet points, dashes, colons used as lists, or markdown. Only complete flowing sentences with commas and periods.
+- No parentheses mid-sentence. No em-dashes. No slashes. No symbols of any kind.
+- Write as if you are speaking aloud in a calm, clinical but conversational voice. Every sentence should sound natural when read by a text-to-speech engine.
+- Each phase output must be 2 to 4 complete, well-formed sentences. Not fragments. Not lists. Full prose.
+- Explain anatomical terms in plain language immediately after using them, e.g. "the bulbocavernosus muscle, which wraps around the base of the penis".
+- Never start a sentence with a number. Restructure if needed.
 ${arousalProfile}
 
-Focus exclusively on the four phases, grounding each in both the HR/event data and the underlying physiology:
-1. BUILD: Arousal arc, HR climb, stimulation dynamics, autonomic activation trajectory
-2. PRE-CLIMAX: Final ascent, emission phase signals, HR acceleration pattern, sensory events
-3. CLIMAX: Peak physiology, contraction pattern implied by duration/intensity, ejaculate correlates
-4. RECOVERY: Autonomic rebound rate, refractory physiology, post-climax sensations
-
-Be specific, reference actual values, and connect what happened physiologically to what was felt subjectively.
+Analyze each of the four phases as complete, flowing prose paragraphs. Ground each in the HR data and physiology but speak naturally:
+1. BUILD: describe the arousal arc, the heart rate climb, stimulation dynamics, and autonomic activation in plain spoken sentences.
+2. PRE-CLIMAX: describe the final ascent, emission signals, heart rate acceleration, and any sensory events in plain spoken sentences.
+3. CLIMAX: describe peak physiology, contraction patterns, ejaculate, and what was felt, in plain spoken sentences.
+4. RECOVERY: describe the autonomic rebound, heart rate descent, refractory physiology, and post-climax sensations in plain spoken sentences.
 
 Session cascade data:
 ${JSON.stringify({
@@ -169,10 +169,10 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
         type: "object",
         properties: {
           summary: { type: "string" },
-          build_phase: { type: "array", items: { type: "string" } },
-          pre_climax_phase: { type: "array", items: { type: "string" } },
-          climax_phase: { type: "array", items: { type: "string" } },
-          recovery_phase: { type: "array", items: { type: "string" } },
+          build_phase: { type: "string" },
+          pre_climax_phase: { type: "string" },
+          climax_phase: { type: "string" },
+          recovery_phase: { type: "string" },
           cascade_quality: { type: "string" }
         },
         required: ["summary", "build_phase", "pre_climax_phase", "climax_phase", "recovery_phase", "cascade_quality"]
@@ -252,11 +252,16 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
         ];
 
         // Build flat paragraph list with metadata for rendering
+        // phases are now strings (prose), support both string and legacy array format
         const paras = [];
         if (result.summary) paras.push({ text: result.summary, type: "summary", color: null });
         for (const ph of PHASES) {
-          for (const item of (result[ph.key] || [])) {
-            paras.push({ text: item, type: "phase", color: ph.color, title: ph.title });
+          const val = result[ph.key];
+          if (!val) continue;
+          if (Array.isArray(val)) {
+            for (const item of val) paras.push({ text: item, type: "phase", color: ph.color, title: ph.title });
+          } else {
+            paras.push({ text: val, type: "phase", color: ph.color, title: ph.title });
           }
         }
         if (result.cascade_quality) paras.push({ text: result.cascade_quality, type: "quality", color: null });
@@ -286,19 +291,21 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline:\n${annotatedEvents.j
                   </div>
                 );
               }
-              // phase item
+              // phase item (prose paragraph)
               return (
-                <li
-                  className={`text-sm pl-3 border-l-2 py-1 leading-relaxed list-none transition-all duration-200 rounded-r-md flex items-center gap-2`}
+                <div
+                  className="pl-3 border-l-2 py-2 leading-relaxed transition-all duration-200 rounded-r-md"
                   style={{
                     borderColor: isActive ? meta.color : isBuffering ? meta.color + "99" : meta.color + "66",
                     background: isActive ? meta.color + "18" : isBuffering ? meta.color + "0f" : "transparent",
-                    color: isActive ? "#fff" : "#a8b4cc",
                   }}
                 >
-                  {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: meta.color, borderTopColor: "transparent" }} />}
-                  • {text}
-                </li>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1 flex items-center gap-1" style={{ color: meta.color }}>
+                    {isBuffering && <span className="shrink-0 w-2.5 h-2.5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: meta.color, borderTopColor: "transparent" }} />}
+                    {meta.title}
+                  </p>
+                  <p className="text-sm" style={{ color: isActive ? "#fff" : "hsl(var(--foreground))" }}>{text}</p>
+                </div>
               );
             }}
           />
