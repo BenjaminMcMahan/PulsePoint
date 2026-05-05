@@ -167,30 +167,6 @@ export default function EMGSection({ data, onChange }) {
         </select>
       </div>
 
-      {/* Calibration values */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs text-muted-foreground">Rest Level (Left/Single)</Label>
-          <Input type="number" value={data.emg_rest_left || ""} onChange={(e) => update({ emg_rest_left: Number(e.target.value) })} className="h-10 mt-1 font-mono text-center" placeholder="0" />
-        </div>
-        <div>
-          <Label className="text-xs text-muted-foreground">Max Level (Left/Single)</Label>
-          <Input type="number" value={data.emg_max_left || ""} onChange={(e) => update({ emg_max_left: Number(e.target.value) })} className="h-10 mt-1 font-mono text-center" placeholder="0" />
-        </div>
-        {(data.emg_channels === "dual") && (
-          <>
-            <div>
-              <Label className="text-xs text-muted-foreground">Rest Level (Right)</Label>
-              <Input type="number" value={data.emg_rest_right || ""} onChange={(e) => update({ emg_rest_right: Number(e.target.value) })} className="h-10 mt-1 font-mono text-center" placeholder="0" />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Max Level (Right)</Label>
-              <Input type="number" value={data.emg_max_right || ""} onChange={(e) => update({ emg_max_right: Number(e.target.value) })} className="h-10 mt-1 font-mono text-center" placeholder="0" />
-            </div>
-          </>
-        )}
-      </div>
-
       {/* L/R flip */}
       {data.emg_channels === "dual" && (
         <div className="flex items-center gap-3">
@@ -274,15 +250,6 @@ export default function EMGSection({ data, onChange }) {
             />
           </div>
         )}
-        <div>
-          <Label className="text-xs text-muted-foreground">Calibration Notes</Label>
-          <textarea
-            value={data.emg_calibration_notes || ""}
-            onChange={(e) => update({ emg_calibration_notes: e.target.value })}
-            className="mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm resize-none h-16"
-            placeholder="Calibration procedure, max contraction quality, etc."
-          />
-        </div>
         <div>
           <Label className="text-xs text-muted-foreground">General EMG Notes</Label>
           <textarea

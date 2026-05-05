@@ -37,10 +37,10 @@ export default function EMGTimelineChart({
   const [showEvents, setShowEvents] = useState(true);
   const [viewMode, setViewMode] = useState("pct"); // "pct" | "raw"
 
-  // Downsample to at most 1500 points for performance
+  // Downsample to at most 2000 points for performance
   const chartData = useMemo(() => {
     if (!rows.length) return [];
-    const step = Math.max(1, Math.floor(rows.length / 1500));
+    const step = Math.max(1, Math.floor(rows.length / 2000));
     return rows
       .filter((_, i) => i % step === 0)
       .map((r) => ({

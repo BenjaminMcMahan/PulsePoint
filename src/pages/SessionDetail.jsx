@@ -108,7 +108,7 @@ export default function SessionDetail() {
       setUserProfile(me);
       const [rows, emgData] = await Promise.all([
         base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000),
-        base44.entities.EMGTimeline.filter({ session: id }, "time_s", 100000),
+        base44.entities.EMGTimeline.filter({ session: id }, "time_s", 500000),
       ]);
       setTimelineRows(rows);
       setEmgRows(emgData);
