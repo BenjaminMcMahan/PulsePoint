@@ -14,6 +14,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
   const [showVoicePicker, setShowVoicePicker] = useState(false);
   const [speed, setSpeed] = useState(() => parseFloat(localStorage.getItem("tts_speed") || "1.0"));
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
+  const [requestStatus, setRequestStatus] = useState(null); // { type: "fetching"|"ok"|"error", msg: string }
   const [currentWordIdx, setCurrentWordIdx] = useState(-1); // index of highlighted word in current para
   const speedRef = useRef(parseFloat(localStorage.getItem("tts_speed") || "1.0"));
 
@@ -77,6 +79,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       updateIntervalRef.current = null;
     }
     setBufferingPara(-1);
+    setRequestStatus(null);
     setS("idle");
     setCP(-1);
   };
@@ -126,9 +129,14 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
           try { base64 = sessionStorage.getItem(clientCacheKey(chunk)); } catch (_) {}
 
           if (!base64) {
+            setRequestStatus({ type: "fetching", msg: "Fetching audio…" });
             const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
+            if (response.data?.error) throw new Error(response.data.error);
             base64 = response.data.audio;
             try { sessionStorage.setItem(clientCacheKey(chunk), base64); } catch (_) {}
+            setRequestStatus({ type: "ok", msg: "Audio ready" });
+          } else {
+            setRequestStatus({ type: "ok", msg: "Audio ready (cached)" });
           }
 
           const binary = atob(base64);
@@ -138,6 +146,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
           const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
           resolve(decoded);
         } catch (err) {
+          setRequestStatus({ type: "error", msg: err.message || "TTS request failed" });
           reject(err);
         }
       });
@@ -179,6 +188,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       decoded = await fetchDecoded(chunk, gen);
     } catch (err) {
       console.error("TTS fetch failed:", err);
+      setRequestStatus({ type: "error", msg: err.message || "TTS request failed" });
       stop();
       return;
     }
@@ -431,18 +441,32 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         allChunks.push(...chunks);
       }
 
-      // Fetch raw MP3 bytes for each chunk (no decode needed — concatenate directly)
-      const mp3Chunks = await Promise.all(
-        allChunks.map(chunk =>
-          base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current })
-            .then(res => {
-              const binary = atob(res.data.audio);
-              const bytes = new Uint8Array(binary.length);
-              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-              return bytes;
-            })
-        )
-      );
+      // Fetch raw MP3 bytes for each chunk sequentially to avoid rate limits
+      const mp3Chunks = [];
+      setDownloadProgress({ current: 0, total: allChunks.length });
+      for (let i = 0; i < allChunks.length; i++) {
+        const chunk = allChunks[i];
+        setDownloadProgress({ current: i + 1, total: allChunks.length });
+        setRequestStatus({ type: "fetching", msg: `Fetching chunk ${i + 1} of ${allChunks.length}…` });
+
+        // Check sessionStorage cache first
+        let base64 = null;
+        const cacheKey = `tts_cache:${voiceRef.current}:${speedRef.current}:${chunk}`;
+        try { base64 = sessionStorage.getItem(cacheKey); } catch (_) {}
+
+        if (!base64) {
+          const res = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
+          if (res.data?.error) throw new Error(res.data.error);
+          base64 = res.data.audio;
+          try { sessionStorage.setItem(cacheKey, base64); } catch (_) {}
+        }
+
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+        mp3Chunks.push(bytes);
+        setRequestStatus({ type: "ok", msg: `Chunk ${i + 1} of ${allChunks.length} ready` });
+      }
 
       // Concatenate all MP3 frames
       const totalSize = mp3Chunks.reduce((a, c) => a + c.length, 0);
@@ -494,9 +518,13 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         speed: speedRef.current,
       });
 
+      setRequestStatus({ type: "ok", msg: "Download complete" });
+      setDownloadProgress({ current: 0, total: 0 });
       setDownloading(false);
     } catch (err) {
       console.error("Download failed:", err);
+      setRequestStatus({ type: "error", msg: err.message || "Download failed" });
+      setDownloadProgress({ current: 0, total: 0 });
       setDownloading(false);
     }
   };
@@ -590,6 +618,22 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
           )}
         </div>
       </div>
+
+      {/* API Request Status */}
+      {requestStatus && (
+        <div className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-md mb-1 ${
+          requestStatus.type === "fetching" ? "bg-primary/10 text-primary" :
+          requestStatus.type === "ok" ? "bg-green-500/10 text-green-500" :
+          "bg-destructive/10 text-destructive"
+        }`}>
+          {requestStatus.type === "fetching" && <span className="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />}
+          {requestStatus.type === "ok" && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
+          {requestStatus.type === "error" && <span className="w-2 h-2 rounded-full bg-destructive shrink-0" />}
+          {downloading && downloadProgress.total > 0
+            ? `Downloading: chunk ${downloadProgress.current} / ${downloadProgress.total} — ${requestStatus.msg}`
+            : requestStatus.msg}
+        </div>
+      )}
 
       {/* Resume from saved position */}
       {sessionId && currentPara === -1 && state === "idle" && savedIdx >= 0 && savedIdx < paragraphs.length && (
