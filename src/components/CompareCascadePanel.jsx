@@ -62,37 +62,44 @@ export default function CompareCascadePanel({ sessions, timelineMap, userProfile
         return Math.round(Number(best.hr));
       };
 
+      const fmtDurWords = (sec) => {
+        if (sec == null) return null;
+        const m = Math.floor(sec / 60);
+        const s2 = Math.round(sec % 60);
+        if (m === 0) return `${s2} second${s2 !== 1 ? "s" : ""}`;
+        if (s2 === 0) return `${m} minute${m !== 1 ? "s" : ""}`;
+        return `${m} minute${m !== 1 ? "s" : ""} and ${s2} second${s2 !== 1 ? "s" : ""}`;
+      };
+      const fmtHR = (bpm) => bpm != null ? `${bpm} beats per minute` : null;
+
       const sessionSummaries = sessions.map((s) => {
         const rows = timelineMap[s.id] || [];
         const hrAtPre = s.pre_climax_offset_s != null ? nearestHR(rows, s.pre_climax_offset_s) : null;
         const hrAtClimax = s.hr_at_climax || (s.climax_offset_s != null ? nearestHR(rows, s.climax_offset_s) : null);
         const hrAtRecovery = s.recovery_offset_s != null ? nearestHR(rows, s.recovery_offset_s) : null;
         const buildDur = s.pre_climax_offset_s != null && s.climax_offset_s != null ?
-        Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null;
+          Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null;
         const recoveryOnset = s.recovery_offset_s != null && s.climax_offset_s != null ?
-        Math.round(s.recovery_offset_s - s.climax_offset_s) : null;
+          Math.round(s.recovery_offset_s - s.climax_offset_s) : null;
 
         return {
           label: moment(s.date).format("MMM D, YYYY"),
           build_type: s.build_type,
-          build_quality: s.build_quality,
-          intensity: s.intensity,
-          satisfaction: s.satisfaction,
+          build_quality_out_of_ten: s.build_quality,
+          intensity_out_of_ten: s.intensity,
+          satisfaction_out_of_ten: s.satisfaction,
           climax_duration: s.climax_duration,
           mood: s.mood,
           methods: s.methods,
-          avg_hr: s.avg_hr,
-          max_hr: s.max_hr,
-          hr_at_pre_climax: hrAtPre,
-          hr_at_climax: hrAtClimax,
-          hr_at_recovery: hrAtRecovery,
-          hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
-          hr_avg_at_climax_window: s.hr_avg_at_climax_window,
-          pre_climax_offset_s: s.pre_climax_offset_s,
-          climax_offset_s: s.climax_offset_s,
-          recovery_offset_s: s.recovery_offset_s,
-          build_duration_s: buildDur,
-          recovery_onset_s: recoveryOnset,
+          avg_heart_rate: fmtHR(s.avg_hr),
+          max_heart_rate: fmtHR(s.max_hr),
+          heart_rate_at_pre_climax: fmtHR(hrAtPre),
+          heart_rate_at_climax: fmtHR(hrAtClimax),
+          heart_rate_at_recovery: fmtHR(hrAtRecovery),
+          heart_rate_avg_pre_to_climax: fmtHR(s.hr_avg_pre_to_climax),
+          heart_rate_avg_at_climax_window: fmtHR(s.hr_avg_at_climax_window),
+          build_duration: fmtDurWords(buildDur),
+          recovery_onset: fmtDurWords(recoveryOnset),
           ejaculate_volume: s.ejaculate_volume,
           unusual_sensations: s.unusual_sensations || undefined,
           discomfort_entries: s.discomfort_entries?.length ? s.discomfort_entries : undefined,
@@ -118,9 +125,19 @@ Use this profile to interpret cascade phase differences — compare observed arc
 
       const res = await base44.integrations.Core.InvokeLLM({
         model: "claude_sonnet_4_6",
-        prompt: `You are a physiological research assistant. Perform a comparative cascade analysis across ${sessions.length} sexual response sessions.${arousalProfile}
+        prompt: `You are a physiological research assistant specializing in sexual response. Perform a comparative cascade analysis across ${sessions.length} sessions. Write directly to the person — use "you" and "your" throughout.${arousalProfile}
 
-For each of the four cascade phases — Build, Pre-Climax, Climax, Recovery — identify meaningful differences and patterns between the sessions. Reference specific values (HR, timings, ratings). Focus on what changed between sessions and what those changes imply physiologically.
+For each cascade phase — Build, Pre-Climax, Climax, Recovery — identify meaningful differences and patterns. Reference specific values when relevant. Focus on what changed between sessions and what those changes imply physiologically.
+
+CRITICAL FOR TEXT-TO-SPEECH QUALITY — these rules are mandatory, no exceptions:
+- All numeric values are already pre-formatted as words in the data (e.g. "seventy-two beats per minute", "three minutes and forty seconds") — use them verbatim, never substitute digits
+- NEVER use parenthetical numbers like "(9)" or "(72 bpm)" — always write the value as a full phrase in the sentence
+- NEVER write abbreviations: "bpm", "HR", "s", "min" — always write the full words
+- Write in short, spoken sentences — maximum two clauses per sentence
+- No bullet points, no lists, no markdown, no em-dashes used to stack clauses
+- Each item in the JSON arrays must be a single focused idea, 2–3 sentences max
+- Use commas and periods to create natural speech rhythm
+- Never start a sentence with a digit — restructure the sentence instead
 
 Sessions:
 ${JSON.stringify(sessionSummaries, null, 2)}
@@ -203,17 +220,18 @@ Provide structured findings per phase, cross-session notable findings, and a sta
         return (
           <TTSReader
             paragraphs={paras.map(p => p.text)}
-            renderParagraph={(text, idx, isActive) => {
+            renderParagraph={(text, idx, isActive, isBuffering) => {
               const meta = paras[idx];
               return (
                 <p
-                  className={`text-sm pl-3 border-l-2 py-1 leading-relaxed transition-all duration-200 rounded-r-md ${isActive ? "font-medium" : ""}`}
+                  className={`text-sm pl-3 border-l-2 py-1 leading-relaxed transition-all duration-200 rounded-r-md flex items-center gap-2 ${isActive ? "font-medium" : ""}`}
                   style={{
                     borderColor: isActive ? (meta.color || "hsl(var(--primary))") : (meta.color ? meta.color + "66" : "hsl(var(--primary) / 0.4)"),
                     background: isActive ? (meta.color ? meta.color + "18" : "hsl(var(--primary) / 0.08)") : "transparent",
                     color: isActive ? "#fff" : meta.color ? "#ffffff" : "hsl(var(--foreground))",
                   }}
                 >
+                  {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
                   {text}
                 </p>
               );
