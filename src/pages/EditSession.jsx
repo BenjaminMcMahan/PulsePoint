@@ -100,39 +100,37 @@ export default function EditSession() {
         ...sessionData,
         duration_minutes: duration || data.duration_minutes,
       });
-      // Helper: delete all rows for a given entity+session, fetching 500 at a time,
-      // deleting in parallel groups of 20, with a pause between pages.
+      const pause = (ms) => new Promise((res) => setTimeout(res, ms));
+
+      // Delete all rows sequentially, 50 at a time, with pauses
       const deleteAllRows = async (entity, filterKey) => {
         while (true) {
-          const existing = await entity.filter({ session: id }, filterKey, 500);
+          const existing = await entity.filter({ session: id }, filterKey, 50);
           if (!existing.length) break;
-          // Delete in parallel groups of 20
-          for (let i = 0; i < existing.length; i += 20) {
-            await Promise.all(existing.slice(i, i + 20).map((r) => entity.delete(r.id)));
-            await new Promise((res) => setTimeout(res, 100));
+          for (const r of existing) {
+            await entity.delete(r.id);
           }
-          if (existing.length < 500) break;
-          await new Promise((res) => setTimeout(res, 300));
+          await pause(500);
+          if (existing.length < 50) break;
+        }
+      };
+
+      // BulkCreate in small chunks with a pause between each
+      const insertRows = async (entity, rows) => {
+        const CHUNK = 100;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          await entity.bulkCreate(rows.slice(i, i + CHUNK));
+          if (i + CHUNK < rows.length) await pause(600);
         }
       };
 
       if (_csv_rows && _csv_rows.length > 0) {
         await deleteAllRows(base44.entities.HeartRateTimeline, "time_offset_s");
-        const rows = _csv_rows.map((r) => ({ ...r, session: id }));
-        const CHUNK = 300;
-        for (let i = 0; i < rows.length; i += CHUNK) {
-          await base44.entities.HeartRateTimeline.bulkCreate(rows.slice(i, i + CHUNK));
-          if (i + CHUNK < rows.length) await new Promise((res) => setTimeout(res, 400));
-        }
+        await insertRows(base44.entities.HeartRateTimeline, _csv_rows.map((r) => ({ ...r, session: id })));
       }
       if (_emg_rows && _emg_rows.length > 0) {
         await deleteAllRows(base44.entities.EMGTimeline, "time_s");
-        const rows = _emg_rows.map((r) => ({ ...r, session: id }));
-        const CHUNK = 300;
-        for (let i = 0; i < rows.length; i += CHUNK) {
-          await base44.entities.EMGTimeline.bulkCreate(rows.slice(i, i + CHUNK));
-          if (i + CHUNK < rows.length) await new Promise((res) => setTimeout(res, 400));
-        }
+        await insertRows(base44.entities.EMGTimeline, _emg_rows.map((r) => ({ ...r, session: id })));
       }
       toast({ title: "Session updated!", duration: 2000 });
       navigate(`/sessions/${id}`);
