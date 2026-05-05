@@ -146,8 +146,11 @@ function AIInsightPanel({ sessions }) {
         null
       };
 
+      const dateObj = s.date ? new Date(s.date) : null;
+      const spokenDate = dateObj ? dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : null;
+
       return {
-        date: s.date?.slice(0, 10),
+        date: spokenDate,
         cascade_shape: cascadeShape,
         hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
         hr_avg_at_climax_window: s.hr_avg_at_climax_window,
