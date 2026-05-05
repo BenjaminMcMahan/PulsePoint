@@ -117,22 +117,23 @@ PHYSIOLOGICAL & ANATOMICAL LENS — apply per phase:
 - CLIMAX: Expulsion reflex — rhythmic bulbocavernosus and ischiocavernosus contractions (typically every ~0.8 seconds), external urethral sphincter release, peak sympathetic output reflected in HR apex, ejaculate volume relative to congestion level
 - RECOVERY: Parasympathetic rebound, detumescence, pelvic floor relaxation, HR descent rate as a proxy for autonomic recovery speed, refractory state driven by prolactin/oxytocin release and sympathetic exhaustion
 
-MANDATORY TEXT-TO-SPEECH FORMATTING — FOLLOW EXACTLY:
-- Every number must be written as words. No digits anywhere. "seventy-two beats per minute" not "72 bpm". "eight minutes and forty seconds" not "8:40". "ten out of ten" not "10/10".
-- No abbreviations. Write "beats per minute" not "bpm". Write "beats per minute" not "BPM". Write "heart rate" not "HR". Write "seconds" not "s". Write "minutes" not "min".
-- No bullet points, dashes, colons used as lists, or markdown. Only complete flowing sentences with commas and periods.
-- No parentheses mid-sentence. No em-dashes. No slashes. No symbols of any kind.
-- Write as if you are speaking aloud in a calm, clinical but conversational voice. Every sentence should sound natural when read by a text-to-speech engine.
-- Each phase output must be 2 to 4 complete, well-formed sentences. Not fragments. Not lists. Full prose.
-- Explain anatomical terms in plain language immediately after using them, e.g. "the bulbocavernosus muscle, which wraps around the base of the penis".
-- Never start a sentence with a number. Restructure if needed.
+CRITICAL FOR TEXT-TO-SPEECH QUALITY:
+- Write all times as words: "ten minutes and thirty seconds" not "10:30"
+- Spell out all numbers as words (e.g., "seventy-two beats per minute" not "72 bpm", "eight out of ten" not "8/10")
+- Write "beats per minute" not "bpm", "heart rate" not "HR", "seconds" not "s", "minutes" not "min"
+- Write in conversational, sentence-based prose with natural pauses — no bullet points, no lists, no markdown
+- Use short sentences and simple grammar optimized for audio readability
+- Explain anatomical terms briefly and accessibly — don't assume medical background
+- Use commas and periods to create natural speech cadence
+- Never start a sentence with a digit — restructure if needed
+- Each phase must be written as 2–4 complete flowing prose sentences, not fragments
 ${arousalProfile}
 
-Analyze each of the four phases as complete, flowing prose paragraphs. Ground each in the HR data and physiology but speak naturally:
-1. BUILD: describe the arousal arc, the heart rate climb, stimulation dynamics, and autonomic activation in plain spoken sentences.
-2. PRE-CLIMAX: describe the final ascent, emission signals, heart rate acceleration, and any sensory events in plain spoken sentences.
-3. CLIMAX: describe peak physiology, contraction patterns, ejaculate, and what was felt, in plain spoken sentences.
-4. RECOVERY: describe the autonomic rebound, heart rate descent, refractory physiology, and post-climax sensations in plain spoken sentences.
+For each phase write a prose paragraph — speak naturally and directly to the person, grounding each in the HR data and physiology:
+1. BUILD: arousal arc, heart rate climb, stimulation dynamics, autonomic activation trajectory
+2. PRE-CLIMAX: final ascent, emission phase signals, heart rate acceleration, sensory events
+3. CLIMAX: peak physiology, contraction pattern, ejaculate correlates, subjective experience
+4. RECOVERY: autonomic rebound, heart rate descent rate, refractory physiology, post-climax sensations
 
 Session cascade data:
 ${JSON.stringify({
