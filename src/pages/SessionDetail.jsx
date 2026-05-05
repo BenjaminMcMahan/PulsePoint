@@ -9,6 +9,7 @@ import AITagSuggester from "../components/AITagSuggester";
 import SessionExportButton from "../components/SessionExportButton";
 import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
+import EMGTimelineChart from "../components/EMGTimelineChart";
 import HRZoneAnalysis from "../components/HRZoneAnalysis";
 import HREventOverlayChart from "../components/HREventOverlayChart";
 import HRPhysiologicalAnalysis from "../components/HRPhysiologicalAnalysis";
@@ -68,6 +69,7 @@ export default function SessionDetail() {
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [timelineRows, setTimelineRows] = useState([]);
+  const [emgRows, setEmgRows] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedNearClimaxIdx, setSelectedNearClimaxIdx] = useState(null);
@@ -103,8 +105,12 @@ export default function SessionDetail() {
       const s = all[0];
       setSession(s);
       setUserProfile(me);
-      const rows = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
+      const [rows, emgData] = await Promise.all([
+        base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000),
+        base44.entities.EMGTimeline.filter({ session: id }, "time_s", 10000),
+      ]);
       setTimelineRows(rows);
+      setEmgRows(emgData);
 
       // Auto-detect phase markers if not already set
       if (rows.length > 10 && s && !s.climax_offset_s) {
@@ -372,6 +378,43 @@ export default function SessionDetail() {
         </div>
         </div>
 
+        {/* EMG */}
+        {(emgRows.length > 0 || s.emg_enabled) && (
+          <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">EMG</h3>
+            {s.emg_target_area && <p className="text-xs text-muted-foreground">Target: {s.emg_target_area}</p>}
+            {emgRows.length > 0 ? (
+              <EMGTimelineChart
+                rows={emgRows}
+                channelMode={s.emg_channels || "single"}
+                events={s.event_timeline || []}
+                savedMarkers={{
+                  pre_climax_offset_s: s.pre_climax_offset_s,
+                  climax_offset_s: s.climax_offset_s,
+                  recovery_offset_s: s.recovery_offset_s,
+                }}
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">EMG recorded but no timeline data imported yet. Edit session to upload CSV.</p>
+            )}
+            {s.emg_placement_photos?.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Placement Photos</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {s.emg_placement_photos.map((photo, i) => (
+                    <div key={i} className="space-y-1">
+                      <img src={photo.url} alt={photo.caption || ""} className="rounded-lg w-full aspect-square object-cover" />
+                      {photo.caption && <p className="text-[10px] text-muted-foreground text-center">{photo.caption}</p>}
+                      {photo.tag && <p className="text-[10px] text-center text-primary/70">{photo.tag}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {s.emg_general_notes && <p className="text-xs text-foreground/80 whitespace-pre-wrap">{s.emg_general_notes}</p>}
+          </div>
+        )}
+
         {/* Methods */}
         <div className="bg-card rounded-xl border border-border p-4 space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Methods</h3>
@@ -500,7 +543,7 @@ export default function SessionDetail() {
 
         {/* Cascade + AI — only for climax sessions */}
         {!s.no_climax && <CascadeOverviewPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
-        {!s.no_climax && <SessionAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
+        {!s.no_climax && <SessionAIPanel session={s} timelineRows={timelineRows} emgRows={emgRows} userProfile={userProfile} />}
 
         {/* No-Climax AI Analysis */}
         {s.no_climax && <NoClimaxAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}

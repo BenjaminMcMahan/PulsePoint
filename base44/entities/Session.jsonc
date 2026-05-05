@@ -330,6 +330,71 @@
           }
         }
       }
+    },
+    "emg_enabled": {
+      "type": "boolean",
+      "description": "Whether EMG was recorded this session"
+    },
+    "emg_channels": {
+      "type": "string",
+      "enum": [
+        "single",
+        "dual"
+      ],
+      "description": "Number of EMG channels"
+    },
+    "emg_sensor_type": {
+      "type": "string",
+      "description": "Sensor model, e.g. MyoWare 2.0"
+    },
+    "emg_target_area": {
+      "type": "string",
+      "description": "Muscle / body area being monitored"
+    },
+    "emg_left_placement_notes": {
+      "type": "string"
+    },
+    "emg_right_placement_notes": {
+      "type": "string"
+    },
+    "emg_general_notes": {
+      "type": "string"
+    },
+    "emg_calibration_notes": {
+      "type": "string"
+    },
+    "emg_rest_left": {
+      "type": "number"
+    },
+    "emg_max_left": {
+      "type": "number"
+    },
+    "emg_rest_right": {
+      "type": "number"
+    },
+    "emg_max_right": {
+      "type": "number"
+    },
+    "emg_left_right_flipped": {
+      "type": "boolean"
+    },
+    "emg_placement_photos": {
+      "type": "array",
+      "description": "Electrode placement photos with tags and captions",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "required": [

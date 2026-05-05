@@ -62,7 +62,7 @@ function Item({ text }) {
   );
 }
 
-export default function SessionAIPanel({ session, timelineRows, userProfile }) {
+export default function SessionAIPanel({ session, timelineRows, emgRows = [], userProfile }) {
   const [collapsed, setCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(session.ai_analysis ?? null);
@@ -72,6 +72,78 @@ export default function SessionAIPanel({ session, timelineRows, userProfile }) {
   const analyze = async () => {
     setLoading(true);
     setResult(null);
+
+    // Build EMG summary for AI
+    const emgSummary = (() => {
+      if (!emgRows.length) return null;
+      const isDual = emgRows.some((r) => r.left_pct != null || r.right_pct != null);
+      const step = Math.max(1, Math.floor(emgRows.length / 60));
+      const sampled = emgRows.filter((_, i) => i % step === 0);
+
+      if (isDual) {
+        const leftPcts = sampled.map((r) => r.left_pct).filter((v) => v != null);
+        const rightPcts = sampled.map((r) => r.right_pct).filter((v) => v != null);
+        const avg = (arr) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+        const max = (arr) => arr.length ? Math.round(Math.max(...arr)) : null;
+        // Detect clipping
+        const leftClipPct = leftPcts.length ? Math.round((leftPcts.filter((v) => v >= 99).length / leftPcts.length) * 100) : 0;
+        const rightClipPct = rightPcts.length ? Math.round((rightPcts.filter((v) => v >= 99).length / rightPcts.length) * 100) : 0;
+        // Trajectory (sampled as "time_s:pct" pairs)
+        const leftTraj = sampled.filter((r) => r.left_pct != null).map((r) => `${r.time_s.toFixed(1)}s:${Math.round(r.left_pct)}%`).join(" ");
+        const rightTraj = sampled.filter((r) => r.right_pct != null).map((r) => `${r.time_s.toFixed(1)}s:${Math.round(r.right_pct)}%`).join(" ");
+        return {
+          channel_mode: "dual",
+          total_samples: emgRows.length,
+          target_area: session.emg_target_area || undefined,
+          sensor_type: session.emg_sensor_type || undefined,
+          left_avg_pct: avg(leftPcts),
+          left_max_pct: max(leftPcts),
+          left_clip_percent_of_time: leftClipPct,
+          right_avg_pct: avg(rightPcts),
+          right_max_pct: max(rightPcts),
+          right_clip_percent_of_time: rightClipPct,
+          left_trajectory: leftTraj,
+          right_trajectory: rightTraj,
+          calibration: {
+            rest_l: session.emg_rest_left,
+            max_l: session.emg_max_left,
+            rest_r: session.emg_rest_right,
+            max_r: session.emg_max_right,
+            lr_flipped: session.emg_left_right_flipped,
+          },
+          placement_notes: {
+            left: session.emg_left_placement_notes,
+            right: session.emg_right_placement_notes,
+            calibration: session.emg_calibration_notes,
+            general: session.emg_general_notes,
+          },
+          placement_photo_tags: (session.emg_placement_photos || []).map((p) => `${p.tag}: ${p.caption}`).filter(Boolean),
+        };
+      } else {
+        const pcts = sampled.map((r) => r.level_pct).filter((v) => v != null);
+        const avg = (arr) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+        const clipPct = pcts.length ? Math.round((pcts.filter((v) => v >= 99).length / pcts.length) * 100) : 0;
+        const traj = sampled.filter((r) => r.level_pct != null).map((r) => `${r.time_s.toFixed(1)}s:${Math.round(r.level_pct)}%`).join(" ");
+        return {
+          channel_mode: "single",
+          total_samples: emgRows.length,
+          target_area: session.emg_target_area || undefined,
+          sensor_type: session.emg_sensor_type || undefined,
+          avg_pct: avg(pcts),
+          max_pct: pcts.length ? Math.round(Math.max(...pcts)) : null,
+          clip_percent_of_time: clipPct,
+          trajectory: traj,
+          calibration: {
+            rest: session.emg_rest_left,
+            max: session.emg_max_left,
+            calibration_notes: session.emg_calibration_notes,
+          },
+          placement_notes: session.emg_left_placement_notes,
+          general_notes: session.emg_general_notes,
+          placement_photo_tags: (session.emg_placement_photos || []).map((p) => `${p.tag}: ${p.caption}`).filter(Boolean),
+        };
+      }
+    })();
 
     const estimScreenshots = [
       ...(session.estim_screenshots || []),
@@ -153,6 +225,18 @@ PHYSIOLOGICAL & ANATOMICAL LENS — apply throughout:
 - Connect subjective sensations (pressure, throb, tightness, wave) to their likely anatomical generators
 - Interpret discomfort entries through an anatomical lens — likely tissue, nerve, or positional cause
 - Note how stimulation pauses affect sympathetic tone and re-arousal dynamics based on HR recovery pattern
+${emgSummary ? `
+EMG INTERPRETATION RULES — apply carefully:
+- EMG % is NORMALIZED RELATIVE ACTIVATION, NOT absolute force. Never claim EMG % equals muscle force.
+- Left/right comparisons are only valid when each channel was independently calibrated.
+- If placement differs between sides, note that asymmetry may reflect placement differences, not true muscle asymmetry.
+- Clipping (100%) means timing data is useful but high-end intensity detail is compressed — recommend raising max calibration or lowering gain.
+- One flat/noisy channel suggests sensor dropout, poor contact, or cross-talk — call this out.
+- If diff_pct is near zero during high activity, describe bilateral symmetry.
+- If one side rises earlier, describe it as a lead/phase difference.
+- If EMG peaks precede HR rise, describe EMG leading the HR response.
+- If HR rises without EMG change, note this as a possible autonomic or non-muscular response.
+- Describe the likely target muscle based on placement notes and photo tags when available.` : ""}
 
 CRITICAL FOR TEXT-TO-SPEECH QUALITY:
 - Write all times as words: "ten minutes and thirty seconds" not "10:30"
@@ -216,6 +300,7 @@ ${JSON.stringify({
 }, null, 2)}
 
 ${session.discomfort_entries?.length > 0 ? "Discomfort entries present — analyze each for likely anatomical cause (nerve, tissue, positional), severity context, and whether it disrupted the arousal arc." : ""}
+${emgSummary ? `\nEMG DATA:\n${JSON.stringify(emgSummary, null, 2)}\n\nAnalyze EMG activation patterns alongside HR. Reference timing relationships between EMG and HR changes. Check for clipping, asymmetry, noise, and relate activation bursts to event markers and phase markers when present. Describe what muscle the sensor likely captures based on placement notes and target area.` : ""}
 
 Provide a rich, physiologically-grounded analysis that tells the story of this session — from the autonomic and anatomical level up to the subjective experience.`,
       response_json_schema: {
@@ -224,6 +309,7 @@ Provide a rich, physiologically-grounded analysis that tells the story of this s
           summary: { type: "string" },
           arousal_arc: { type: "array", items: { type: "string" } },
           event_analysis: { type: "array", items: { type: "string" } },
+          emg_analysis: { type: "array", items: { type: "string" }, description: "EMG signal quality, activation patterns, L/R comparison, EMG vs HR, calibration notes — only if EMG data present" },
           notable_findings: { type: "array", items: { type: "string" } },
           recommendations: { type: "array", items: { type: "string" } },
         },
@@ -282,11 +368,13 @@ Provide a rich, physiologically-grounded analysis that tells the story of this s
         // Support both old schema (hr_analysis/phase_analysis) and new schema (arousal_arc/event_analysis)
         const arousalItems = result.arousal_arc || result.phase_analysis || [];
         const eventItems = result.event_analysis || result.hr_analysis || [];
+        const emgItems = result.emg_analysis || [];
 
         const paras = [
           result.summary,
           ...arousalItems,
           ...eventItems,
+          ...emgItems,
           ...(result.notable_findings || []),
           ...(result.recommendations || []),
         ].filter(Boolean);
@@ -297,6 +385,7 @@ Provide a rich, physiologically-grounded analysis that tells the story of this s
         if (result.summary) sections.push({ label: null, color: "primary", items: [result.summary], start: idx++ });
         if (arousalItems.length) { sections.push({ label: "Arousal Arc", color: "chart-2", icon: <TrendingUp className="w-3.5 h-3.5" />, items: arousalItems, start: idx }); idx += arousalItems.length; }
         if (eventItems.length) { sections.push({ label: "Event Analysis", color: "chart-1", icon: <Activity className="w-3.5 h-3.5" />, items: eventItems, start: idx }); idx += eventItems.length; }
+        if (emgItems.length) { sections.push({ label: "EMG Analysis", color: "chart-3", icon: <Activity className="w-3.5 h-3.5" />, items: emgItems, start: idx }); idx += emgItems.length; }
         if (result.notable_findings?.length) { sections.push({ label: "Notable Findings", color: "chart-4", icon: <Zap className="w-3.5 h-3.5" />, items: result.notable_findings, start: idx }); idx += result.notable_findings.length; }
         if (result.recommendations?.length) { sections.push({ label: "Recommendations", color: "accent", icon: <Lightbulb className="w-3.5 h-3.5" />, items: result.recommendations, start: idx }); }
 

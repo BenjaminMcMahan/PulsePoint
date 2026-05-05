@@ -13,12 +13,14 @@ import PhysiologicalSection from "../components/session-form/PhysiologicalSectio
 import ContextSection from "../components/session-form/ContextSection";
 import NotesMediaSection from "../components/session-form/NotesMediaSection";
 import EventTimelineSection from "../components/session-form/EventTimelineSection";
+import EMGSection from "../components/session-form/EMGSection";
 import { Zap, Save, ChevronDown, ChevronUp, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const SECTIONS = [
   { id: "info", label: "Session Info" },
   { id: "hr", label: "Heart Rate" },
+  { id: "emg", label: "EMG (MyoWare)" },
   { id: "methods", label: "Methods & Devices" },
   { id: "subjective", label: "Subjective Metrics" },
   { id: "physio", label: "Physiological" },
@@ -69,17 +71,24 @@ export default function NewSession() {
     }
     setSaving(true);
     const duration = calcDuration(data.start_time, data.end_time);
-    const { _csv_rows, ...sessionData } = data;
+    const { _csv_rows, _emg_rows, _emg_channel_mode, ...sessionData } = data;
     const session = await base44.entities.Session.create({
       ...sessionData,
       duration_minutes: duration || data.duration_minutes,
     });
-    // Import HeartRateTimeline rows — delete any existing first, then bulk-create
+    // Import HeartRateTimeline rows
     if (_csv_rows && _csv_rows.length > 0) {
       const existing = await base44.entities.HeartRateTimeline.filter({ session: session.id }, "time_offset_s", 10000);
       await Promise.all(existing.map((r) => base44.entities.HeartRateTimeline.delete(r.id)));
       const rows = _csv_rows.map((r) => ({ ...r, session: session.id }));
       await base44.entities.HeartRateTimeline.bulkCreate(rows);
+    }
+    // Import EMGTimeline rows
+    if (_emg_rows && _emg_rows.length > 0) {
+      const existing = await base44.entities.EMGTimeline.filter({ session: session.id }, "time_s", 10000);
+      await Promise.all(existing.map((r) => base44.entities.EMGTimeline.delete(r.id)));
+      const rows = _emg_rows.map((r) => ({ ...r, session: session.id }));
+      await base44.entities.EMGTimeline.bulkCreate(rows);
     }
     toast({ title: "Session saved!", duration: 2000 });
     navigate("/sessions");
@@ -95,6 +104,7 @@ export default function NewSession() {
       case "physio": return <PhysiologicalSection {...props} />;
       case "context": return <ContextSection {...props} />;
       case "events": return <EventTimelineSection {...props} />;
+      case "emg": return <EMGSection {...props} />;
       case "notes": return <NotesMediaSection {...props} />;
       default: return null;
     }

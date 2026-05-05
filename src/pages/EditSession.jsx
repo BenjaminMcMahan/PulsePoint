@@ -13,11 +13,13 @@ import PhysiologicalSection from "../components/session-form/PhysiologicalSectio
 import ContextSection from "../components/session-form/ContextSection";
 import NotesMediaSection from "../components/session-form/NotesMediaSection";
 import EventTimelineSection from "../components/session-form/EventTimelineSection";
+import EMGSection from "../components/session-form/EMGSection";
 import { Save, ChevronDown, ChevronUp, ArrowLeft, XCircle } from "lucide-react";
 
 const SECTIONS = [
   { id: "info", label: "Session Info" },
   { id: "hr", label: "Heart Rate" },
+  { id: "emg", label: "EMG (MyoWare)" },
   { id: "methods", label: "Methods & Devices" },
   { id: "subjective", label: "Subjective Metrics" },
   { id: "physio", label: "Physiological" },
@@ -81,7 +83,7 @@ export default function EditSession() {
     try {
       const duration = calcDuration(data.start_time, data.end_time);
       // Exclude internal/computed fields that shouldn't be re-saved
-      const { _csv_rows, ai_analysis, ai_cascade, ...sessionData } = data;
+      const { _csv_rows, _emg_rows, _emg_channel_mode, ai_analysis, ai_cascade, ...sessionData } = data;
 
       // Sanitize event_timeline: ensure category is always a clean array of strings
       const LEGACY = ["pause", "resume", "paused", "resumed"];
@@ -104,6 +106,12 @@ export default function EditSession() {
         const rows = _csv_rows.map((r) => ({ ...r, session: id }));
         await base44.entities.HeartRateTimeline.bulkCreate(rows);
       }
+      if (_emg_rows && _emg_rows.length > 0) {
+        const existing = await base44.entities.EMGTimeline.filter({ session: id }, "time_s", 10000);
+        await Promise.all(existing.map((r) => base44.entities.EMGTimeline.delete(r.id)));
+        const rows = _emg_rows.map((r) => ({ ...r, session: id }));
+        await base44.entities.EMGTimeline.bulkCreate(rows);
+      }
       toast({ title: "Session updated!", duration: 2000 });
       navigate(`/sessions/${id}`);
     } catch (err) {
@@ -122,6 +130,7 @@ export default function EditSession() {
       case "physio": return <PhysiologicalSection {...props} />;
       case "context": return <ContextSection {...props} />;
       case "events": return <EventTimelineSection {...props} />;
+      case "emg": return <EMGSection {...props} />;
       case "notes": return <NotesMediaSection {...props} />;
       default: return null;
     }
