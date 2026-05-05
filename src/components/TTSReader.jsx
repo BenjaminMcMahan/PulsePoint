@@ -34,6 +34,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
   const chunkStartTimeRef = useRef(0); // AudioContext time when current chunk started
   const wordRefs = useRef(new Map()); // map of word element refs for auto-scroll
   const updateIntervalRef = useRef(null); // track update interval to clear it
+  // Global TTS request serializer — ensures only one fetch runs at a time
+  const fetchQueueRef = useRef(Promise.resolve());
 
 
   const getAudioCtx = () => {
@@ -115,25 +117,31 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
     if (prefetchCacheRef.current.has(cacheKey)) {
       return prefetchCacheRef.current.get(cacheKey);
     }
-    // Start (or reuse) a pending promise so concurrent callers share the same fetch
-    const promise = (async () => {
-      // Check sessionStorage for a previously fetched base64
-      let base64 = null;
-      try { base64 = sessionStorage.getItem(clientCacheKey(chunk)); } catch (_) {}
+    // Serialize all TTS fetches through a single queue so only one hits the API at a time
+    const promise = new Promise((resolve, reject) => {
+      fetchQueueRef.current = fetchQueueRef.current.then(async () => {
+        try {
+          // Check sessionStorage for a previously fetched base64
+          let base64 = null;
+          try { base64 = sessionStorage.getItem(clientCacheKey(chunk)); } catch (_) {}
 
-      if (!base64) {
-        const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
-        base64 = response.data.audio;
-        // Store in sessionStorage for reuse within this browser session
-        try { sessionStorage.setItem(clientCacheKey(chunk), base64); } catch (_) {}
-      }
+          if (!base64) {
+            const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
+            base64 = response.data.audio;
+            try { sessionStorage.setItem(clientCacheKey(chunk), base64); } catch (_) {}
+          }
 
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const ctx = getAudioCtx();
-      return ctx.decodeAudioData(bytes.buffer.slice(0));
-    })();
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const ctx = getAudioCtx();
+          const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
+          resolve(decoded);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
     prefetchCacheRef.current.set(cacheKey, promise);
     return promise;
   };

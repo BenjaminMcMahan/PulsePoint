@@ -25,19 +25,23 @@ Deno.serve(async (req) => {
       return Response.json({ audio: audioCache.get(key), cached: true });
     }
 
-    const response = await fetch("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "tts-1",
-        input: text,
-        voice,
-        speed,
-      }),
-    });
+    // Retry up to 4 times with exponential backoff on rate limit (429)
+    let response;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      response = await fetch("https://api.openai.com/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: "tts-1", input: text, voice, speed }),
+      });
+      if (response.status !== 429) break;
+      // Respect Retry-After header if present, else use exponential backoff
+      const retryAfter = response.headers.get("retry-after");
+      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : (500 * Math.pow(2, attempt));
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
 
     if (!response.ok) {
       const err = await response.text();
