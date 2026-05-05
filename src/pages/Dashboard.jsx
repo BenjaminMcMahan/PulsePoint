@@ -48,7 +48,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     (async () => {
-      const data = await base44.entities.Session.list("-date", 200);
+      const data = await base44.entities.Session.list("-date", 100);
       setSessions(data);
       setLoading(false);
     })();
