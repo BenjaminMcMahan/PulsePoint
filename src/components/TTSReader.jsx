@@ -441,17 +441,16 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         allChunks.push(...chunks);
       }
 
-      // Fetch raw MP3 bytes for each chunk sequentially to avoid rate limits
-      const mp3Chunks = [];
+      // Fetch MP3 chunks in parallel (max 3 concurrent) for speed
+      const mp3Chunks = new Array(allChunks.length);
       setDownloadProgress({ current: 0, total: allChunks.length });
-      for (let i = 0; i < allChunks.length; i++) {
-        const chunk = allChunks[i];
-        setDownloadProgress({ current: i + 1, total: allChunks.length });
-        setRequestStatus({ type: "fetching", msg: `Fetching chunk ${i + 1} of ${allChunks.length}…` });
+      let completed = 0;
+      const CONCURRENCY = 3;
 
-        // Check sessionStorage cache first
-        let base64 = null;
+      const fetchChunk = async (i) => {
+        const chunk = allChunks[i];
         const cacheKey = `tts_cache:${voiceRef.current}:${speedRef.current}:${chunk}`;
+        let base64 = null;
         try { base64 = sessionStorage.getItem(cacheKey); } catch (_) {}
 
         if (!base64) {
@@ -464,8 +463,15 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         const binary = atob(base64);
         const bytes = new Uint8Array(binary.length);
         for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
-        mp3Chunks.push(bytes);
-        setRequestStatus({ type: "ok", msg: `Chunk ${i + 1} of ${allChunks.length} ready` });
+        mp3Chunks[i] = bytes;
+        completed++;
+        setDownloadProgress({ current: completed, total: allChunks.length });
+        setRequestStatus({ type: "fetching", msg: `Fetching chunk ${completed} of ${allChunks.length}…` });
+      };
+
+      // Run with concurrency limit
+      for (let i = 0; i < allChunks.length; i += CONCURRENCY) {
+        await Promise.all(allChunks.slice(i, i + CONCURRENCY).map((_, j) => fetchChunk(i + j)));
       }
 
       // Concatenate all MP3 frames

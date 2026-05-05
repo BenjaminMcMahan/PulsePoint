@@ -3,9 +3,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 // In-memory cache: hash → base64 audio string (lives as long as the Deno isolate)
 const audioCache = new Map();
 
-// In-process serializer — ensures only one OpenAI TTS call runs at a time per isolate
-let requestQueue = Promise.resolve();
-
 async function hashKey(text, voice, speed) {
   const raw = `${voice}|${speed}|${text}`;
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
@@ -13,10 +10,9 @@ async function hashKey(text, voice, speed) {
 }
 
 async function fetchTTS(text, voice, speed) {
-  // Retry up to 5 times with aggressive exponential backoff on 429
-  // OpenAI TTS rate limits reset on a ~60s window
+  // Retry up to 3 times with backoff on 429
   let response;
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
@@ -28,11 +24,10 @@ async function fetchTTS(text, voice, speed) {
 
     if (response.status !== 429) break;
 
-    // Respect Retry-After header; fall back to exponential backoff (5s, 10s, 20s, 40s, 60s)
     const retryAfter = response.headers.get("retry-after");
     const waitMs = retryAfter
-      ? Math.max(parseFloat(retryAfter) * 1000, 5000)
-      : Math.min(5000 * Math.pow(2, attempt), 60000);
+      ? Math.max(parseFloat(retryAfter) * 1000, 1000)
+      : 2000 * (attempt + 1); // 2s, 4s, 6s
     console.log(`TTS 429 — attempt ${attempt + 1}, waiting ${Math.round(waitMs / 1000)}s`);
     await new Promise((r) => setTimeout(r, waitMs));
   }
@@ -56,47 +51,26 @@ Deno.serve(async (req) => {
       return Response.json({ audio: audioCache.get(key), cached: true });
     }
 
-    // Serialize all OpenAI calls — only one runs at a time within this isolate
-    let resultBase64 = null;
-    let resultError = null;
+    const response = await fetchTTS(text, voice, speed);
 
-    await new Promise((resolve) => {
-      requestQueue = requestQueue.then(async () => {
-        // Re-check cache inside the queue (populated by a concurrent request)
-        if (audioCache.has(key)) {
-          resultBase64 = audioCache.get(key);
-          resolve();
-          return;
-        }
-
-        const response = await fetchTTS(text, voice, speed);
-
-        if (!response.ok) {
-          resultError = { status: response.status, body: await response.text() };
-          resolve();
-          return;
-        }
-
-        const audioBuffer = await response.arrayBuffer();
-        const bytes = new Uint8Array(audioBuffer);
-        let binary = "";
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        resultBase64 = btoa(binary);
-
-        // Cache (cap at 100 entries)
-        if (audioCache.size >= 100) {
-          audioCache.delete(audioCache.keys().next().value);
-        }
-        audioCache.set(key, resultBase64);
-        resolve();
-      });
-    });
-
-    if (resultError) {
-      return Response.json({ error: resultError.body }, { status: resultError.status });
+    if (!response.ok) {
+      const err = await response.text();
+      return Response.json({ error: err }, { status: response.status });
     }
 
-    return Response.json({ audio: resultBase64 });
+    const audioBuffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(audioBuffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    const base64 = btoa(binary);
+
+    // Cache (cap at 100 entries)
+    if (audioCache.size >= 100) {
+      audioCache.delete(audioCache.keys().next().value);
+    }
+    audioCache.set(key, base64);
+
+    return Response.json({ audio: base64 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
