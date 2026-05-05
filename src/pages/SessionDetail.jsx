@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,7 @@ export default function SessionDetail() {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedNearClimaxIdx, setSelectedNearClimaxIdx] = useState(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState(null);
 
   const nearClimaxEvents = useMemo(() => {
     if (!session) return [];
@@ -107,7 +108,7 @@ export default function SessionDetail() {
       setUserProfile(me);
       const [rows, emgData] = await Promise.all([
         base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000),
-        base44.entities.EMGTimeline.filter({ session: id }, "time_s", 10000),
+        base44.entities.EMGTimeline.filter({ session: id }, "time_s", 100000),
       ]);
       setTimelineRows(rows);
       setEmgRows(emgData);
@@ -397,21 +398,60 @@ export default function SessionDetail() {
             ) : (
               <p className="text-xs text-muted-foreground">EMG recorded but no timeline data imported yet. Edit session to upload CSV.</p>
             )}
-            {s.emg_placement_photos?.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Placement Photos</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {s.emg_placement_photos.map((photo, i) => (
-                    <div key={i} className="space-y-1">
-                      <img src={photo.url} alt={photo.caption || ""} className="rounded-lg w-full aspect-square object-cover" />
-                      {photo.caption && <p className="text-[10px] text-muted-foreground text-center">{photo.caption}</p>}
-                      {photo.tag && <p className="text-[10px] text-center text-primary/70">{photo.tag}</p>}
-                    </div>
-                  ))}
-                </div>
+            {/* Placement photos (thumbnails) + notes side by side */}
+            {(s.emg_placement_photos?.length > 0 || s.emg_general_notes || s.emg_left_placement_notes || s.emg_right_placement_notes) && (
+              <div className="flex gap-3 items-start">
+                {s.emg_placement_photos?.length > 0 && (
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    {s.emg_placement_photos.map((photo, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setLightboxPhoto(photo)}
+                        className="block rounded-lg overflow-hidden border border-border hover:border-primary transition-colors focus:outline-none focus:ring-1 focus:ring-primary"
+                        title={photo.caption || photo.tag || "View photo"}
+                      >
+                        <img src={photo.url} alt={photo.caption || ""} className="w-16 h-16 object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {(s.emg_general_notes || s.emg_left_placement_notes || s.emg_right_placement_notes) && (
+                  <div className="flex-1 space-y-1.5 text-xs text-foreground/80">
+                    {s.emg_left_placement_notes && (
+                      <p><span className="font-semibold text-muted-foreground">Left: </span>{s.emg_left_placement_notes}</p>
+                    )}
+                    {s.emg_right_placement_notes && (
+                      <p><span className="font-semibold text-muted-foreground">Right: </span>{s.emg_right_placement_notes}</p>
+                    )}
+                    {s.emg_general_notes && <p className="whitespace-pre-wrap">{s.emg_general_notes}</p>}
+                  </div>
+                )}
               </div>
             )}
-            {s.emg_general_notes && <p className="text-xs text-foreground/80 whitespace-pre-wrap">{s.emg_general_notes}</p>}
+          </div>
+        )}
+
+        {/* Lightbox */}
+        {lightboxPhoto && (
+          <div
+            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+            onClick={() => setLightboxPhoto(null)}
+          >
+            <div className="max-w-lg w-full space-y-2" onClick={(e) => e.stopPropagation()}>
+              <img src={lightboxPhoto.url} alt={lightboxPhoto.caption || ""} className="rounded-xl w-full object-contain max-h-[70vh]" />
+              {(lightboxPhoto.caption || lightboxPhoto.tag) && (
+                <div className="text-center">
+                  {lightboxPhoto.caption && <p className="text-sm text-white">{lightboxPhoto.caption}</p>}
+                  {lightboxPhoto.tag && <p className="text-xs text-white/60">{lightboxPhoto.tag}</p>}
+                </div>
+              )}
+              <button
+                onClick={() => setLightboxPhoto(null)}
+                className="w-full text-xs text-white/60 hover:text-white py-2"
+              >
+                Tap to close
+              </button>
+            </div>
           </div>
         )}
 
