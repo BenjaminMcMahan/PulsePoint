@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { User, Heart, Activity, Pill, RefreshCw, CheckCircle, Flame } from "lucide-react";
+import { User, Heart, Activity, Scan, RefreshCw, CheckCircle, Flame } from "lucide-react";
 import AIChat from "../components/AIChat";
 
 function Field({ label, hint, children }) {
@@ -241,17 +241,22 @@ export default function Profile() {
         </Field>
       </div>
 
-      {/* Medications */}
+      {/* Physical & Anatomical Context */}
       <div className="bg-card rounded-xl border border-border p-4 space-y-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
-          <Pill className="w-3.5 h-3.5" /> Medications & Conditions
-        </h2>
-        <Field label="Medications or conditions affecting HR" hint="e.g. beta-blockers, stimulants, arrhythmia — used by AI to contextualize HR data">
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+            <Scan className="w-3.5 h-3.5" /> Physical & Anatomical Overview
+          </h2>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Describes your current physical state — used by AI to contextualize HR, EMG, and arousal data.
+          </p>
+        </div>
+        <Field label="Current Physical & Anatomical Context" hint="Anatomy, surgeries, chronic conditions, medications, nerve/muscle factors affecting response — anything the AI should factor into its interpretation">
           <textarea
             value={form.medications ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, medications: e.target.value }))}
-            placeholder="e.g. Metoprolol 25mg daily (beta-blocker)"
-            rows={3}
+            placeholder="e.g. Prostate enlargement, prior inguinal hernia repair (left side), on Tamsulosin. Reduced pudendal nerve sensitivity since 2022. Pelvic floor tends to hypertonate under stress."
+            rows={4}
             className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
           />
         </Field>
@@ -370,7 +375,7 @@ export default function Profile() {
         context={[
           `Age: ${form.age ?? "not set"}, Weight: ${form.weight_kg ?? "not set"}kg, Fitness: ${form.fitness_level ?? "not set"}`,
           `Resting HR: ${form.resting_hr ?? "not set"} bpm, Max HR: ${form.max_hr ?? "not set"} bpm, Recovery HR drop 60s: ${form.recovery_hr_60s ?? "not set"} bpm`,
-          `Medications/conditions: ${form.medications || "none"}`,
+          `Physical & anatomical context: ${form.medications || "none"}`,
           `Arousal response style: ${form.arousal_response_style ?? "not set"}`,
           `Typical build duration: ${form.typical_build_duration ?? "not set"}`,
           `Climax sensitivity: ${form.climax_sensitivity ?? "not set"}`,
