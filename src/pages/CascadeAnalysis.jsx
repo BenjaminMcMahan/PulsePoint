@@ -146,10 +146,9 @@ function AIInsightPanel({ sessions }) {
         null
       };
 
-      const dateStr = s.date?.slice(0, 10);
-      const spokenDate = dateStr ? (() => {
-        const [y, m, d] = dateStr.split("-").map(Number);
-        return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      const spokenDate = s.date ? (() => {
+        const d = new Date(s.date);
+        return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
       })() : null;
 
       return {

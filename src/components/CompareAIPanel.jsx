@@ -62,7 +62,10 @@ export default function CompareAIPanel({ sessions, userProfile }) {
         h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night" :
         undefined;
         return {
-          date: s.date?.slice(0, 10),
+          date: s.date ? (() => {
+            const d = new Date(s.date);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+          })() : undefined,
           start_time_et: s.start_time || undefined,
           time_of_day: timeOfDay,
           duration_minutes: s.duration_minutes,

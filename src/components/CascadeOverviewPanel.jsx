@@ -137,7 +137,10 @@ For each phase write a prose paragraph — speak naturally and directly to the p
 
 Session cascade data:
 ${JSON.stringify({
-        date: session.date?.slice(0, 10),
+        date: session.date ? (() => {
+          const d = new Date(session.date);
+          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+        })() : undefined,
         start_time_et: session.start_time || undefined,
         time_of_day: timeOfDay || undefined,
         duration_minutes: session.duration_minutes,

@@ -177,7 +177,10 @@ Use this to trace sympathetic activation patterns, identify arousal plateaus, an
 
 Session data:
 ${JSON.stringify({
-  date: session.date?.slice(0, 10),
+  date: session.date ? (() => {
+    const d = new Date(session.date);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  })() : undefined,
   time_of_day: session.start_time ? (() => {
     const h = parseInt(session.start_time.split(":")[0], 10);
     if (h >= 5 && h < 12) return "morning";
