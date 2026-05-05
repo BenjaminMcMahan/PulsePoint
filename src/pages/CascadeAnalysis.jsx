@@ -228,17 +228,7 @@ Be specific and reference actual values — but always written as spoken words, 
           event_note_patterns: { type: "array", items: { type: "string" } },
           common_signatures: { type: "array", items: { type: "string" } },
           predictive_insights: { type: "array", items: { type: "string" } },
-          anomalies: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                session_date: { type: "string" },
-                finding: { type: "string" }
-              },
-              required: ["session_date", "finding"]
-            }
-          },
+          anomalies: { type: "array", items: { type: "string" } },
           phenotype_clusters: { type: "array", items: { type: "string" } }
         },
         required: ["summary", "cascade_overview", "event_note_patterns", "common_signatures", "predictive_insights", "anomalies", "phenotype_clusters"]
@@ -293,7 +283,7 @@ Be specific and reference actual values — but always written as spoken words, 
           ...(result.common_signatures || []),
           ...(result.predictive_insights || []),
           ...(result.phenotype_clusters || []),
-          ...(result.anomalies || []).map((a) => `${a.session_date}: ${a.finding}`),
+          ...(result.anomalies || []),
         ].filter(Boolean);
 
         if (!paras.length) return <p className="text-xs text-muted-foreground italic">Analysis returned no content. Please try again.</p>;
