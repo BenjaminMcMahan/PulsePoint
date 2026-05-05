@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { Button } from "@/components/ui/button";
-import { Play, Pause, Square, Upload, Volume2, VolumeX, ChevronDown } from "lucide-react";
+import { Play, Pause, Square, Upload, Volume2, VolumeX, ChevronDown, ChevronLeft, ChevronRight, ZoomOut } from "lucide-react";
 import { EVENT_CATEGORIES } from "@/components/session-form/EventTimelineSection";
+import {
+  ResponsiveContainer, ComposedChart, Line, XAxis, YAxis,
+  Tooltip, CartesianGrid, ReferenceLine,
+} from "recharts";
 import moment from "moment";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -35,63 +38,54 @@ function CategoryPill({ value }) {
   );
 }
 
-const OAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+function nearestHR(chartData, time_s) {
+  if (!chartData.length) return null;
+  let best = chartData[0];
+  let bestDist = Math.abs(chartData[0].t - time_s);
+  for (const pt of chartData) {
+    const d = Math.abs(pt.t - time_s);
+    if (d < bestDist) { bestDist = d; best = pt; }
+  }
+  return Math.round(best.hr);
+}
 
-// ── TTS fetch helper ──────────────────────────────────────────────────────────
+const OAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+const EVENT_COLORS = ["#f59e0b","#a855f7","#10b981","#f43f5e","#0ea5e9","#fb923c","#84cc16","#e879f9","#34d399","#f87171"];
+
+// ── TTS helpers ───────────────────────────────────────────────────────────────
 
 async function fetchTTSBase64(text, voice, speed) {
   const cacheKey = `tts_cache:${voice}:${speed}:${text}`;
-  try {
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) return cached;
-  } catch (_) {}
+  try { const c = sessionStorage.getItem(cacheKey); if (c) return c; } catch (_) {}
   const res = await base44.functions.invoke("openaiTTS", { text, voice, speed });
   const b64 = res.data.audio;
   try { sessionStorage.setItem(cacheKey, b64); } catch (_) {}
   return b64;
 }
 
-async function decodeBase64ToAudioBuffer(ctx, b64) {
+async function decodeToBuffer(ctx, b64) {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return ctx.decodeAudioData(bytes.buffer.slice(0));
 }
 
-// ── EventCard ─────────────────────────────────────────────────────────────────
+// ── AI Text paragraph renderer (synced) ───────────────────────────────────────
 
-function EventCard({ ev, idx, isActive, isUpcoming, isFired, onJump }) {
-  const cats = getCategories(ev);
-  const primary = getCategoryMeta(cats[0]);
+function AIParagraph({ text, isActive, isBuffering, onClick }) {
   return (
-    <button
-      onClick={() => onJump(ev.time_s)}
-      className={`w-full text-left flex items-start gap-2 rounded-xl px-3 py-2.5 transition-all duration-300 border ${
-        isActive
-          ? "border-primary shadow-lg scale-[1.01]"
-          : isUpcoming
-          ? "border-border opacity-70"
-          : "border-transparent opacity-40"
-      }`}
-      style={{
-        background: isActive ? primary.color + "25" : primary.color + "0d",
-        borderLeftColor: primary.color,
-        borderLeftWidth: 3,
-      }}
+    <p
+      onClick={onClick}
+      className={[
+        "text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md cursor-pointer flex items-center gap-2 flex-wrap",
+        isActive ? "border-primary bg-primary/10 text-foreground font-medium" :
+        isBuffering ? "border-primary/60 bg-primary/5 text-foreground" :
+        "border-primary/30 text-foreground/70",
+      ].join(" ")}
     >
-      <div className="shrink-0 mt-0.5 font-mono text-[10px] font-bold w-10" style={{ color: primary.color }}>
-        {fmtMmSs(ev.time_s)}
-      </div>
-      <div className="flex-1 min-w-0 space-y-0.5">
-        <div className="flex flex-wrap gap-1">
-          {cats.map((c) => <CategoryPill key={c} value={c} />)}
-        </div>
-        <p className={`text-sm leading-snug ${isActive ? "text-foreground font-medium" : "text-foreground/80"}`}>{ev.note}</p>
-      </div>
-      {isActive && (
-        <span className="shrink-0 w-2 h-2 rounded-full bg-primary animate-pulse mt-1" />
-      )}
-    </button>
+      {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+      {text}
+    </p>
   );
 }
 
@@ -100,16 +94,17 @@ function EventCard({ ev, idx, isActive, isUpcoming, isFired, onJump }) {
 export default function EventSyncPlayer() {
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [hrRows, setHrRows] = useState([]);
   const [loadingSession, setLoadingSession] = useState(false);
 
-  // Playback state
-  const [playbackTime, setPlaybackTime] = useState(0); // seconds
+  // Playback
+  const [playbackTime, setPlaybackTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeEventIdx, setActiveEventIdx] = useState(-1);
 
   // Video
   const [videoSrc, setVideoSrc] = useState(null);
-  const [videoMode, setVideoMode] = useState(false); // true when video loaded
+  const [videoMode, setVideoMode] = useState(false);
   const videoRef = useRef(null);
   const videoUrlRef = useRef(null);
 
@@ -118,33 +113,77 @@ export default function EventSyncPlayer() {
   const [speed] = useState(() => parseFloat(localStorage.getItem("tts_speed") || "1.0"));
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const [ttsMode, setTtsMode] = useState("events"); // "events" | "cascade" | "analysis"
+  // TTS paragraph reading state
+  const [activePara, setActivePara] = useState(-1);
+  const [bufferingPara, setBufferingPara] = useState(-1);
 
-  // TTS playback internals
+  // TTS internals
   const audioCtxRef = useRef(null);
   const ttsSourceRef = useRef(null);
-  const firedEventsRef = useRef(new Set()); // event indices already spoken this playback
+  const firedEventsRef = useRef(new Set());
   const voiceRef = useRef(voice);
   const ttsEnabledRef = useRef(ttsEnabled);
+  const ttsModeRef = useRef(ttsMode);
+  // AI reading chain refs
+  const aiReadingRef = useRef(false);
+  const aiGenRef = useRef(0);
+  const aiParasRef = useRef([]);
 
-  // Timer playback (no video)
+  // Timer
   const timerRef = useRef(null);
-  const timerStartRef = useRef(null); // real time when timer started
-  const timerOffsetRef = useRef(0);  // playbackTime at timer start
+  const timerStartRef = useRef(null);
+  const timerOffsetRef = useRef(0);
 
-  const events = (selectedSession?.event_timeline || []).slice().sort((a, b) => a.time_s - b.time_s);
+  // HR chart zoom
+  const [zoomDomain, setZoomDomain] = useState(null);
+  const dragStartRef = useRef(null);
+  const [dragRange, setDragRange] = useState(null);
 
-  // ── Load sessions list ────────────────────────────────────────────────────
+  const events = useMemo(() =>
+    (selectedSession?.event_timeline || []).slice().sort((a, b) => a.time_s - b.time_s),
+    [selectedSession]
+  );
 
-  useEffect(() => {
-    base44.entities.Session.list("-date", 100).then(setSessions);
-  }, []);
+  const chartData = useMemo(() =>
+    hrRows.map((r) => ({ t: Number(r.time_offset_s), hr: Math.round(Number(r.hr_smoothed || r.hr)) })),
+    [hrRows]
+  );
 
-  // ── Sync voice/tts refs ───────────────────────────────────────────────────
+  // AI paragraph lists
+  const cascadeParas = useMemo(() => {
+    const c = selectedSession?.ai_cascade;
+    if (!c) return [];
+    const parts = [];
+    if (c.summary) parts.push(c.summary);
+    for (const k of ["build_phase","pre_climax_phase","climax_phase","recovery_phase"]) {
+      if (c[k]) { if (Array.isArray(c[k])) parts.push(...c[k]); else parts.push(c[k]); }
+    }
+    if (c.cascade_quality) parts.push(c.cascade_quality);
+    return parts.filter(Boolean);
+  }, [selectedSession]);
 
+  const analysisParas = useMemo(() => {
+    const a = selectedSession?.ai_analysis;
+    if (!a) return [];
+    const parts = [];
+    if (a.summary) parts.push(a.summary);
+    for (const k of ["arousal_arc","event_analysis","phase_analysis","notable_findings","recommendations"]) {
+      if (a[k]?.length) parts.push(...a[k]);
+    }
+    return parts.filter(Boolean);
+  }, [selectedSession]);
+
+  const activeTTSParas = ttsMode === "cascade" ? cascadeParas : ttsMode === "analysis" ? analysisParas : [];
+
+  // ── effects ───────────────────────────────────────────────────────────────
+
+  useEffect(() => { base44.entities.Session.list("-date", 100).then(setSessions); }, []);
   useEffect(() => { voiceRef.current = voice; }, [voice]);
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
+  useEffect(() => { ttsModeRef.current = ttsMode; }, [ttsMode]);
 
-  // ── AudioContext helper ───────────────────────────────────────────────────
+  // ── Audio ctx ─────────────────────────────────────────────────────────────
 
   const getCtx = () => {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
@@ -153,26 +192,63 @@ export default function EventSyncPlayer() {
     return audioCtxRef.current;
   };
 
-  const stopTTS = () => {
+  const stopTTS = useCallback(() => {
+    aiGenRef.current++;
+    aiReadingRef.current = false;
     if (ttsSourceRef.current) { try { ttsSourceRef.current.stop(); } catch (_) {} ttsSourceRef.current = null; }
-  };
+    setActivePara(-1);
+    setBufferingPara(-1);
+  }, []);
 
-  const speakEvent = useCallback(async (ev) => {
+  // Speak a single text (event note)
+  const speakText = useCallback(async (text) => {
     if (!ttsEnabledRef.current) return;
     stopTTS();
-    const text = ev.note;
     const ctx = getCtx();
     if (ctx.state === "suspended") await ctx.resume();
     const b64 = await fetchTTSBase64(text, voiceRef.current, speed);
-    const buffer = await decodeBase64ToAudioBuffer(ctx, b64);
+    const buffer = await decodeToBuffer(ctx, b64);
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     src.connect(ctx.destination);
     src.start(0);
     ttsSourceRef.current = src;
+  }, [speed, stopTTS]);
+
+  // Read AI paragraphs sequentially
+  const startAIReading = useCallback(async (paras, fromIdx = 0) => {
+    if (!ttsEnabledRef.current || !paras.length) return;
+    aiGenRef.current++;
+    const gen = aiGenRef.current;
+    aiReadingRef.current = true;
+    aiParasRef.current = paras;
+
+    for (let i = fromIdx; i < paras.length; i++) {
+      if (gen !== aiGenRef.current) return;
+      setBufferingPara(i);
+      const ctx = getCtx();
+      if (ctx.state === "suspended") await ctx.resume();
+      const b64 = await fetchTTSBase64(paras[i], voiceRef.current, speed);
+      if (gen !== aiGenRef.current) return;
+      const buffer = await decodeToBuffer(ctx, b64);
+      if (gen !== aiGenRef.current) return;
+      setBufferingPara(-1);
+      setActivePara(i);
+      await new Promise((resolve) => {
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        src.connect(ctx.destination);
+        src.onended = resolve;
+        src.start(0);
+        ttsSourceRef.current = src;
+      });
+      if (gen !== aiGenRef.current) return;
+    }
+    aiReadingRef.current = false;
+    setActivePara(-1);
   }, [speed]);
 
-  // ── Check which event is active at current playback time ──────────────────
+  // ── Event sync ────────────────────────────────────────────────────────────
 
   const updateActiveEvent = useCallback((time) => {
     if (!events.length) return;
@@ -182,17 +258,17 @@ export default function EventSyncPlayer() {
     }
     setActiveEventIdx(activeIdx);
 
-    // Speak newly passed events
-    for (let i = 0; i < events.length; i++) {
-      const ev = events[i];
-      if (time >= ev.time_s && !firedEventsRef.current.has(i)) {
-        firedEventsRef.current.add(i);
-        speakEvent(ev);
+    if (ttsModeRef.current === "events") {
+      for (let i = 0; i < events.length; i++) {
+        if (time >= events[i].time_s && !firedEventsRef.current.has(i)) {
+          firedEventsRef.current.add(i);
+          speakText(events[i].note);
+        }
       }
     }
-  }, [events, speakEvent]);
+  }, [events, speakText]);
 
-  // ── Timer-based playback (no video) ──────────────────────────────────────
+  // ── Timer ─────────────────────────────────────────────────────────────────
 
   const startTimer = useCallback((fromTime) => {
     clearInterval(timerRef.current);
@@ -206,89 +282,70 @@ export default function EventSyncPlayer() {
     }, 100);
   }, [updateActiveEvent]);
 
-  const stopTimer = useCallback(() => {
-    clearInterval(timerRef.current);
-    timerRef.current = null;
-  }, []);
+  const stopTimer = useCallback(() => { clearInterval(timerRef.current); timerRef.current = null; }, []);
 
-  // ── Video time sync ───────────────────────────────────────────────────────
+  // ── Video sync ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const vid = videoRef.current;
     if (!vid) return;
-
-    const onTimeUpdate = () => {
-      const t = vid.currentTime;
-      setPlaybackTime(t);
-      updateActiveEvent(t);
-    };
+    const onTimeUpdate = () => { const t = vid.currentTime; setPlaybackTime(t); updateActiveEvent(t); };
     vid.addEventListener("timeupdate", onTimeUpdate);
     return () => vid.removeEventListener("timeupdate", onTimeUpdate);
   }, [videoMode, updateActiveEvent]);
 
-  // ── Play / Pause ──────────────────────────────────────────────────────────
+  // ── Controls ──────────────────────────────────────────────────────────────
 
   const handlePlayPause = async () => {
     if (videoMode && videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-        stopTTS();
-        setIsPlaying(false);
-      } else {
-        await videoRef.current.play();
-        setIsPlaying(true);
-      }
+      if (isPlaying) { videoRef.current.pause(); stopTTS(); setIsPlaying(false); }
+      else { await videoRef.current.play(); setIsPlaying(true); }
       return;
     }
-
-    // Timer mode
     if (isPlaying) {
-      stopTimer();
-      stopTTS();
-      setIsPlaying(false);
-      timerOffsetRef.current = playbackTime;
+      stopTimer(); stopTTS(); setIsPlaying(false); timerOffsetRef.current = playbackTime;
     } else {
+      // If AI mode, start reading from beginning (or resume)
+      if (ttsMode !== "events" && activeTTSParas.length) {
+        startAIReading(activeTTSParas, Math.max(0, activePara >= 0 ? activePara : 0));
+      }
       startTimer(playbackTime);
       setIsPlaying(true);
     }
   };
 
-  const handleStop = () => {
-    stopTimer();
-    stopTTS();
+  const handleStop = useCallback(() => {
+    stopTimer(); stopTTS();
     if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0; }
-    setIsPlaying(false);
-    setPlaybackTime(0);
-    setActiveEventIdx(-1);
+    setIsPlaying(false); setPlaybackTime(0); setActiveEventIdx(-1);
     firedEventsRef.current = new Set();
-  };
+  }, [stopTimer, stopTTS]);
 
-  const handleJump = (time_s) => {
+  const handleJump = useCallback((time_s) => {
     firedEventsRef.current = new Set(
       events.map((_, i) => i).filter((i) => events[i].time_s < time_s)
     );
-    if (videoMode && videoRef.current) {
-      videoRef.current.currentTime = time_s;
-    } else {
-      setPlaybackTime(time_s);
-      if (isPlaying) {
-        startTimer(time_s);
-      }
-    }
+    if (videoMode && videoRef.current) { videoRef.current.currentTime = time_s; }
+    else { setPlaybackTime(time_s); if (isPlaying) startTimer(time_s); }
     updateActiveEvent(time_s);
-  };
+  }, [events, videoMode, isPlaying, startTimer, updateActiveEvent]);
 
   // ── Session select ────────────────────────────────────────────────────────
 
   const selectSession = async (id) => {
     handleStop();
+    if (!id) { setSelectedSession(null); setHrRows([]); return; }
     setLoadingSession(true);
     const sess = sessions.find((s) => s.id === id);
     setSelectedSession(sess || null);
+    if (sess) {
+      const rows = await base44.entities.HeartRateTimeline.filter({ session: sess.id }, "time_offset_s", 10000);
+      setHrRows(rows);
+    }
     setLoadingSession(false);
   };
 
-  // ── Video load ────────────────────────────────────────────────────────────
+  // ── Video ─────────────────────────────────────────────────────────────────
 
   const handleVideoFile = (e) => {
     const file = e.target.files?.[0];
@@ -296,52 +353,82 @@ export default function EventSyncPlayer() {
     if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
     const url = URL.createObjectURL(file);
     videoUrlRef.current = url;
-    setVideoSrc(url);
-    setVideoMode(true);
-    handleStop();
+    setVideoSrc(url); setVideoMode(true); handleStop();
   };
 
   const clearVideo = () => {
     if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
-    videoUrlRef.current = null;
-    setVideoSrc(null);
-    setVideoMode(false);
-    handleStop();
+    videoUrlRef.current = null; setVideoSrc(null); setVideoMode(false); handleStop();
   };
+
+  // ── Scrubber ──────────────────────────────────────────────────────────────
+
+  const maxTime = selectedSession?.duration_minutes
+    ? selectedSession.duration_minutes * 60
+    : (events.length ? events[events.length - 1].time_s + 30 : 600);
+
+  const handleScrub = (e) => {
+    const t = Number(e.target.value);
+    firedEventsRef.current = new Set(events.map((_, i) => i).filter((i) => events[i].time_s < t));
+    if (videoMode && videoRef.current) videoRef.current.currentTime = t;
+    else { setPlaybackTime(t); if (isPlaying) startTimer(t); }
+    updateActiveEvent(t);
+  };
+
+  // ── HR chart drag-to-zoom ─────────────────────────────────────────────────
+
+  const chartRef = useRef(null);
+  const handleChartMouseDown = (e) => {
+    if (!e?.activeLabel) return;
+    dragStartRef.current = Number(e.activeLabel);
+  };
+  const handleChartMouseMove = (e) => {
+    if (dragStartRef.current == null || !e?.activeLabel) return;
+    const x2 = Number(e.activeLabel);
+    setDragRange({ x1: Math.min(dragStartRef.current, x2), x2: Math.max(dragStartRef.current, x2) });
+  };
+  const handleChartMouseUp = () => {
+    if (dragRange && Math.abs(dragRange.x2 - dragRange.x1) > 5) setZoomDomain(dragRange);
+    dragStartRef.current = null; setDragRange(null);
+  };
+
+  const xDomain = zoomDomain ? [zoomDomain.x1, zoomDomain.x2] : ["dataMin", "dataMax"];
+
+  const displayData = useMemo(() => {
+    if (!zoomDomain) return chartData;
+    return chartData.filter((d) => d.t >= zoomDomain.x1 && d.t <= zoomDomain.x2);
+  }, [chartData, zoomDomain]);
+
+  // Phase markers
+  const phaseMarkers = [
+    selectedSession?.pre_climax_offset_s != null && { time_s: selectedSession.pre_climax_offset_s, label: "Pre-Climax", color: "#a855f7" },
+    selectedSession?.climax_offset_s != null && { time_s: selectedSession.climax_offset_s, label: "Climax", color: "#ef4444" },
+    selectedSession?.recovery_offset_s != null && { time_s: selectedSession.recovery_offset_s, label: "Recovery", color: "#3b82f6" },
+  ].filter(Boolean);
 
   // cleanup
   useEffect(() => () => { stopTimer(); stopTTS(); if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current); }, []);
 
-  // ── Scrubber ──────────────────────────────────────────────────────────────
+  // current nearest HR to playback
+  const currentHR = useMemo(() => nearestHR(chartData, playbackTime), [chartData, playbackTime]);
 
-  const maxTime = selectedSession?.duration_minutes ? selectedSession.duration_minutes * 60 : (events.length ? events[events.length - 1].time_s + 30 : 600);
+  // Active event for navigator
+  const navEv = activeEventIdx >= 0 ? events[activeEventIdx] : null;
+  const navColor = navEv ? EVENT_COLORS[activeEventIdx % EVENT_COLORS.length] : "#888";
 
-  const handleScrub = (e) => {
-    const t = Number(e.target.value);
-    firedEventsRef.current = new Set(
-      events.map((_, i) => i).filter((i) => events[i].time_s < t)
-    );
-    if (videoMode && videoRef.current) {
-      videoRef.current.currentTime = t;
-    } else {
-      setPlaybackTime(t);
-      if (isPlaying) startTimer(t);
-    }
-    updateActiveEvent(t);
-  };
-
-  const pct = maxTime > 0 ? (playbackTime / maxTime) * 100 : 0;
+  const hasCascade = cascadeParas.length > 0;
+  const hasAnalysis = analysisParas.length > 0;
 
   return (
-    <div className="px-4 py-6 pb-28 space-y-5 max-w-2xl mx-auto">
+    <div className="px-3 py-5 pb-28 space-y-4 max-w-2xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Event Sync Player</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Play a session timeline with TTS event narration, synced to a timer or local video.</p>
+        <h1 className="text-2xl font-bold tracking-tight">Session Playback</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">HR timeline + event overlay + AI narration, synced to real-time playback.</p>
       </div>
 
       {/* Session selector */}
       <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Select Session</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Session</h2>
         <div className="relative">
           <select
             className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-8"
@@ -353,151 +440,291 @@ export default function EventSyncPlayer() {
               <option key={s.id} value={s.id}>
                 {moment(s.date).format("MMM D, YYYY")}
                 {s.duration_minutes ? ` · ${s.duration_minutes}min` : ""}
-                {(s.event_timeline?.length) ? ` · ${s.event_timeline.length} events` : ""}
+                {s.event_timeline?.length ? ` · ${s.event_timeline.length} events` : ""}
               </option>
             ))}
           </select>
           <ChevronDown className="absolute right-2.5 top-2.5 w-4 h-4 text-muted-foreground pointer-events-none" />
         </div>
-        {loadingSession && <p className="text-xs text-muted-foreground">Loading…</p>}
-        {selectedSession && !events.length && (
-          <p className="text-xs text-muted-foreground">This session has no event timeline entries.</p>
+        {loadingSession && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            Loading HR data…
+          </div>
         )}
       </div>
 
-      {/* Video loader */}
-      <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Local Video (optional)</h2>
-          {videoMode && (
-            <button onClick={clearVideo} className="text-[10px] text-destructive hover:opacity-70">Remove</button>
-          )}
-        </div>
-        {!videoMode ? (
-          <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg px-4 py-3 hover:bg-muted/40 transition-colors">
-            <Upload className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Load video file…</span>
-            <input type="file" accept="video/*" className="hidden" onChange={handleVideoFile} />
-          </label>
-        ) : (
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            className="w-full rounded-lg max-h-64 bg-black"
-            controls={false}
-            playsInline
-          />
-        )}
-        {!videoMode && (
-          <p className="text-[10px] text-muted-foreground">Video stays local — not uploaded anywhere. Events will narrate at their timestamps during playback.</p>
-        )}
-      </div>
-
-      {/* Playback controls */}
       {selectedSession && (
-        <div className="bg-card rounded-xl border border-border p-4 space-y-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={handlePlayPause}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium transition-colors"
-            >
-              {isPlaying ? <><Pause className="w-4 h-4" />Pause</> : <><Play className="w-4 h-4" />Play</>}
-            </button>
-            <button
-              onClick={handleStop}
-              className="p-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Square className="w-4 h-4" />
-            </button>
+        <>
+          {/* Video loader */}
+          <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Local Video (optional)</h2>
+              {videoMode && <button onClick={clearVideo} className="text-[10px] text-destructive hover:opacity-70">Remove</button>}
+            </div>
+            {!videoMode ? (
+              <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg px-4 py-3 hover:bg-muted/40 transition-colors">
+                <Upload className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Load video file…</span>
+                <input type="file" accept="video/*" className="hidden" onChange={handleVideoFile} />
+              </label>
+            ) : (
+              <video ref={videoRef} src={videoSrc} className="w-full rounded-lg max-h-56 bg-black" controls={false} playsInline />
+            )}
+          </div>
 
-            {/* TTS toggle */}
-            <button
-              onClick={() => setTtsEnabled((v) => !v)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${ttsEnabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
-              title={ttsEnabled ? "TTS On" : "TTS Off"}
-            >
-              {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              TTS
-            </button>
+          {/* HR + Event Overlay Chart */}
+          {chartData.length > 0 && (
+            <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h2>
+                {zoomDomain && (
+                  <button onClick={() => setZoomDomain(null)} className="flex items-center gap-1 text-[10px] text-primary border border-primary rounded px-2 py-0.5">
+                    <ZoomOut className="w-3 h-3" /> Reset Zoom
+                  </button>
+                )}
+                {!zoomDomain && <span className="text-[10px] text-muted-foreground">Drag to zoom</span>}
+              </div>
 
-            {/* Voice picker */}
-            <div className="relative">
-              <button
-                onClick={() => setShowVoicePicker((v) => !v)}
-                className="flex items-center gap-1 px-2 py-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-xs capitalize transition-colors"
+              <div
+                className="h-56 cursor-crosshair select-none"
+                onMouseLeave={handleChartMouseUp}
               >
-                {voice} <ChevronDown className="w-3 h-3" />
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart
+                    data={displayData}
+                    margin={{ top: 8, right: 4, bottom: 0, left: -20 }}
+                    onMouseDown={handleChartMouseDown}
+                    onMouseMove={handleChartMouseMove}
+                    onMouseUp={handleChartMouseUp}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtMmSs} tickCount={8} type="number" domain={xDomain} />
+                    <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
+                    <Tooltip
+                      formatter={(val) => [`${Math.round(val)} bpm`, "HR"]}
+                      labelFormatter={(v) => fmtMmSs(Math.round(Number(v)))}
+                      contentStyle={{ fontSize: 11 }}
+                    />
+
+                    {/* Phase markers */}
+                    {phaseMarkers.map((pm) => (
+                      <ReferenceLine key={pm.label} x={pm.time_s} stroke={pm.color} strokeWidth={1.5}
+                        strokeDasharray="4 2" label={{ value: pm.label, fontSize: 7, fill: pm.color, position: "top" }} />
+                    ))}
+
+                    {/* Event markers */}
+                    {events.map((ev, i) => {
+                      const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                      return (
+                        <ReferenceLine key={i} x={ev.time_s} stroke={color} strokeWidth={1.5} strokeDasharray="2 3"
+                          strokeOpacity={activeEventIdx === i ? 1 : 0.5}
+                          label={{ value: `E${i + 1}`, fontSize: 7, fill: color, position: "insideTopLeft" }}
+                        />
+                      );
+                    })}
+
+                    {/* Playback cursor */}
+                    <ReferenceLine x={playbackTime} stroke="hsl(var(--primary))" strokeWidth={2}
+                      label={{ value: fmtMmSs(playbackTime), fontSize: 8, fill: "hsl(var(--primary))", position: "top" }} />
+
+                    <Line type="monotone" dataKey="hr" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Playback controls */}
+          <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handlePlayPause}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium"
+              >
+                {isPlaying ? <><Pause className="w-4 h-4" />Pause</> : <><Play className="w-4 h-4" />Play</>}
               </button>
-              {showVoicePicker && (
-                <div className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[100px]">
-                  {OAI_VOICES.map((v) => (
-                    <button key={v} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted capitalize transition-colors ${voice === v ? "text-primary font-medium" : "text-foreground"}`}
-                      onClick={() => { setVoice(v); voiceRef.current = v; localStorage.setItem("tts_oai_voice", v); setShowVoicePicker(false); }}>
-                      {v}
+              <button onClick={handleStop} className="p-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground">
+                <Square className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => setTtsEnabled((v) => !v)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${ttsEnabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
+              >
+                {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                TTS
+              </button>
+
+              {/* Voice picker */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowVoicePicker((v) => !v)}
+                  className="flex items-center gap-1 px-2 py-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-xs capitalize"
+                >
+                  {voice} <ChevronDown className="w-3 h-3" />
+                </button>
+                {showVoicePicker && (
+                  <div className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[100px]">
+                    {OAI_VOICES.map((v) => (
+                      <button key={v} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted capitalize ${voice === v ? "text-primary font-medium" : "text-foreground"}`}
+                        onClick={() => { setVoice(v); voiceRef.current = v; localStorage.setItem("tts_oai_voice", v); setShowVoicePicker(false); }}>
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {currentHR && (
+                <span className="font-mono text-sm font-bold text-primary ml-auto">{currentHR} bpm</span>
+              )}
+              <span className="font-mono text-sm text-muted-foreground">{fmtMmSs(playbackTime)}</span>
+            </div>
+
+            {/* Scrubber */}
+            <div className="space-y-1">
+              <input type="range" min={0} max={maxTime} step={0.5} value={playbackTime} onChange={handleScrub}
+                className="w-full h-1.5 cursor-pointer" style={{ accentColor: "hsl(var(--primary))" }} />
+              {/* Event ticks */}
+              <div className="relative h-2">
+                {events.map((ev, i) => {
+                  const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                  return (
+                    <button key={i} onClick={() => handleJump(ev.time_s)}
+                      className="absolute top-0 w-1 h-2 rounded-full transform -translate-x-0.5 opacity-80 hover:opacity-100 hover:scale-150 transition-all"
+                      style={{ left: `${(ev.time_s / maxTime) * 100}%`, background: color }}
+                      title={`${fmtMmSs(ev.time_s)} — ${ev.note}`} />
+                  );
+                })}
+              </div>
+              <div className="flex justify-between text-[9px] text-muted-foreground">
+                <span>0:00</span><span>{fmtMmSs(maxTime)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Current event navigator */}
+          {events.length > 0 && (
+            <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Current Event</h2>
+
+              {navEv ? (
+                <div className="rounded-lg px-3 py-3" style={{ background: navColor + "18", borderLeft: `3px solid ${navColor}` }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <button onClick={() => handleJump(events[Math.max(0, activeEventIdx - 1)].time_s)} className="p-0.5 rounded hover:bg-black/10">
+                      <ChevronLeft className="w-4 h-4" style={{ color: navColor }} />
                     </button>
+                    <div className="flex-1 flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-[11px] font-bold" style={{ color: navColor }}>
+                        E{activeEventIdx + 1} / {events.length}
+                      </span>
+                      <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(navEv.time_s)}</span>
+                      <div className="flex flex-wrap gap-1">{getCategories(navEv).map((c) => <CategoryPill key={c} value={c} />)}</div>
+                      {currentHR && <span className="font-mono text-[11px] font-bold text-primary">{currentHR} bpm</span>}
+                    </div>
+                    <button onClick={() => handleJump(events[Math.min(events.length - 1, activeEventIdx + 1)].time_s)} className="p-0.5 rounded hover:bg-black/10">
+                      <ChevronRight className="w-4 h-4" style={{ color: navColor }} />
+                    </button>
+                  </div>
+                  <p className="text-sm text-foreground/90 leading-relaxed">{navEv.note}</p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No event reached yet. Press Play or tap an event below.</p>
+              )}
+
+              {/* Events list */}
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {events.map((ev, i) => {
+                  const cats = getCategories(ev);
+                  const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                  const isActive = i === activeEventIdx;
+                  const isPast = i < activeEventIdx;
+                  return (
+                    <button key={i} onClick={() => handleJump(ev.time_s)}
+                      className={`w-full flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-opacity ${isActive ? "" : isPast ? "opacity-40" : "opacity-70"}`}
+                      style={{ background: isActive ? color + "30" : color + "15", borderLeft: `3px solid ${color}`, outline: isActive ? `1px solid ${color}55` : "none" }}>
+                      <span className="font-mono text-[10px] shrink-0 mt-0.5 font-bold" style={{ color }}>
+                        E{i + 1} {fmtMmSs(ev.time_s)}
+                      </span>
+                      <div className="flex-1 flex flex-col gap-0.5">
+                        <div className="flex flex-wrap gap-1">{cats.map((c) => <CategoryPill key={c} value={c} />)}</div>
+                        <span className="text-xs text-foreground/90 leading-snug">{ev.note}</span>
+                      </div>
+                      {(() => { const hr = nearestHR(chartData, ev.time_s); return hr && <span className="font-mono text-[10px] shrink-0 font-bold text-primary/80 mt-0.5">{hr} bpm</span>; })()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* AI Narration panels */}
+          {(hasCascade || hasAnalysis) && (
+            <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">AI Narration</h2>
+                <div className="flex gap-1.5 flex-wrap">
+                  {["events", ...(hasCascade ? ["cascade"] : []), ...(hasAnalysis ? ["analysis"] : [])].map((m) => (
+                    <button key={m} onClick={() => { setTtsMode(m); stopTTS(); }}
+                      className="px-2.5 py-1 rounded-full text-[10px] font-semibold border capitalize transition-colors"
+                      style={ttsMode === m
+                        ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", borderColor: "hsl(var(--primary))" }
+                        : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
+                      {m === "cascade" ? "Cascade Overview" : m === "analysis" ? "Session Analysis" : "Events Only"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {ttsMode === "events" && (
+                <p className="text-xs text-muted-foreground">TTS reads each event note as playback reaches it. Switch to Cascade or Analysis to read full AI text.</p>
+              )}
+
+              {ttsMode === "cascade" && hasCascade && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => aiReadingRef.current ? stopTTS() : startAIReading(cascadeParas, 0)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20"
+                    >
+                      {aiReadingRef.current ? <><Pause className="w-3 h-3" />Pause</> : <><Play className="w-3 h-3" />Read Cascade</>}
+                    </button>
+                    <span className="text-[10px] text-muted-foreground">Tap paragraph to jump</span>
+                  </div>
+                  {cascadeParas.map((text, i) => (
+                    <AIParagraph key={i} text={text}
+                      isActive={activePara === i}
+                      isBuffering={bufferingPara === i}
+                      onClick={() => startAIReading(cascadeParas, i)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {ttsMode === "analysis" && hasAnalysis && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => aiReadingRef.current ? stopTTS() : startAIReading(analysisParas, 0)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20"
+                    >
+                      {aiReadingRef.current ? <><Pause className="w-3 h-3" />Pause</> : <><Play className="w-3 h-3" />Read Analysis</>}
+                    </button>
+                    <span className="text-[10px] text-muted-foreground">Tap paragraph to jump</span>
+                  </div>
+                  {analysisParas.map((text, i) => (
+                    <AIParagraph key={i} text={text}
+                      isActive={activePara === i}
+                      isBuffering={bufferingPara === i}
+                      onClick={() => startAIReading(analysisParas, i)}
+                    />
                   ))}
                 </div>
               )}
             </div>
-
-            <span className="font-mono text-sm text-muted-foreground ml-auto">{fmtMmSs(playbackTime)}</span>
-          </div>
-
-          {/* Scrubber */}
-          <div className="space-y-1">
-            <input
-              type="range"
-              min={0}
-              max={maxTime}
-              step={0.5}
-              value={playbackTime}
-              onChange={handleScrub}
-              className="w-full h-1.5 accent-primary cursor-pointer"
-              style={{ accentColor: "hsl(var(--primary))" }}
-            />
-            {/* Event tick marks */}
-            <div className="relative h-2">
-              {events.map((ev, i) => {
-                const cats = getCategories(ev);
-                const color = getCategoryMeta(cats[0]).color;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => handleJump(ev.time_s)}
-                    className="absolute top-0 w-1 h-2 rounded-full transform -translate-x-0.5 opacity-80 hover:opacity-100 hover:scale-150 transition-all"
-                    style={{ left: `${(ev.time_s / maxTime) * 100}%`, background: color }}
-                    title={`${fmtMmSs(ev.time_s)} — ${ev.note}`}
-                  />
-                );
-              })}
-            </div>
-            <div className="flex justify-between text-[9px] text-muted-foreground">
-              <span>0:00</span>
-              <span>{fmtMmSs(maxTime)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Event list */}
-      {selectedSession && events.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Event Timeline</h2>
-          <p className="text-[10px] text-muted-foreground">Events are read aloud by TTS when playback reaches their timestamp. Tap any event to jump there.</p>
-          <div className="space-y-2">
-            {events.map((ev, i) => (
-              <EventCard
-                key={i}
-                ev={ev}
-                idx={i}
-                isActive={i === activeEventIdx}
-                isUpcoming={i > activeEventIdx}
-                isFired={i < activeEventIdx}
-                onJump={handleJump}
-              />
-            ))}
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );
