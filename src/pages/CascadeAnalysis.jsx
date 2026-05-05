@@ -328,12 +328,16 @@ export default function CascadeAnalysis() {
       setSessions(withClimax);
 
       const hrMap = {};
-      await Promise.all(
-        withClimax.map(async (s) => {
-          const rows = await base44.entities.HeartRateTimeline.filter({ session: s.id }, "time_offset_s", 10000);
-          if (rows.length > 0) hrMap[s.id] = rows;
-        })
-      );
+      const BATCH = 5;
+      for (let i = 0; i < withClimax.length; i += BATCH) {
+        const batch = withClimax.slice(i, i + BATCH);
+        await Promise.all(
+          batch.map(async (s) => {
+            const rows = await base44.entities.HeartRateTimeline.filter({ session: s.id }, "time_offset_s", 10000);
+            if (rows.length > 0) hrMap[s.id] = rows;
+          })
+        );
+      }
       setHrData(hrMap);
       setLoading(false);
     })();
