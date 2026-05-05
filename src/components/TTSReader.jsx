@@ -3,6 +3,7 @@ import { Play, Pause, Square, ChevronDown, Download } from "lucide-react";
 import { cleanTextForSpeech, splitIntoChunks } from "./TTSButton";
 import { fmtSecondsInText } from "@/utils/formatSeconds";
 import { base44 } from "@/api/base44Client";
+import { idbGet, idbSet } from "@/lib/ttsCache";
 
 const OAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
 
@@ -110,9 +111,6 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
     playNextChunk(gen);
   };
 
-  // Persistent client-side audio cache key (voice+speed+text → base64)
-  const clientCacheKey = (chunk) => `tts_cache:${voiceRef.current}:${speedRef.current}:${chunk}`;
-
   // Fetch a chunk and decode it, using the prefetch cache when available.
   // Returns a decoded AudioBuffer or throws.
   const fetchDecoded = async (chunk, gen) => {
@@ -124,26 +122,26 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
     const promise = new Promise((resolve, reject) => {
       fetchQueueRef.current = fetchQueueRef.current.then(async () => {
         try {
-          // Check sessionStorage for a previously fetched base64
-          let base64 = null;
-          try { base64 = sessionStorage.getItem(clientCacheKey(chunk)); } catch (_) {}
+          // Check IndexedDB persistent cache first
+          let mp3Buffer = await idbGet(chunk, voiceRef.current, speedRef.current);
 
-          if (!base64) {
+          if (!mp3Buffer) {
             setRequestStatus({ type: "fetching", msg: "Fetching audio…" });
             const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
             if (response.data?.error) throw new Error(response.data.error);
-            base64 = response.data.audio;
-            try { sessionStorage.setItem(clientCacheKey(chunk), base64); } catch (_) {}
+            const base64 = response.data.audio;
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            mp3Buffer = bytes.buffer;
+            idbSet(chunk, voiceRef.current, speedRef.current, mp3Buffer); // fire-and-forget
             setRequestStatus({ type: "ok", msg: "Audio ready" });
           } else {
             setRequestStatus({ type: "ok", msg: "Audio ready (cached)" });
           }
 
-          const binary = atob(base64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
           const ctx = getAudioCtx();
-          const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
+          const decoded = await ctx.decodeAudioData(mp3Buffer.slice(0));
           resolve(decoded);
         } catch (err) {
           setRequestStatus({ type: "error", msg: err.message || "TTS request failed" });
@@ -449,21 +447,22 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
 
       const fetchChunk = async (i) => {
         const chunk = allChunks[i];
-        const cacheKey = `tts_cache:${voiceRef.current}:${speedRef.current}:${chunk}`;
-        let base64 = null;
-        try { base64 = sessionStorage.getItem(cacheKey); } catch (_) {}
 
-        if (!base64) {
+        // Check IndexedDB persistent cache first
+        let mp3Buffer = await idbGet(chunk, voiceRef.current, speedRef.current);
+
+        if (!mp3Buffer) {
           const res = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
           if (res.data?.error) throw new Error(res.data.error);
-          base64 = res.data.audio;
-          try { sessionStorage.setItem(cacheKey, base64); } catch (_) {}
+          const base64 = res.data.audio;
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+          mp3Buffer = bytes.buffer;
+          idbSet(chunk, voiceRef.current, speedRef.current, mp3Buffer); // fire-and-forget
         }
 
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
-        mp3Chunks[i] = bytes;
+        mp3Chunks[i] = new Uint8Array(mp3Buffer);
         completed++;
         setDownloadProgress({ current: completed, total: allChunks.length });
         setRequestStatus({ type: "fetching", msg: `Fetching chunk ${completed} of ${allChunks.length}…` });
