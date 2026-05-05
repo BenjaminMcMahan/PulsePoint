@@ -56,42 +56,52 @@ export default function CompareAIPanel({ sessions, userProfile }) {
   const runAnalysis = async (existingId) => {
     setLoading(true);
     try {
+      const fmtDurWords = (sec) => {
+        if (sec == null) return null;
+        const m = Math.floor(sec / 60);
+        const s2 = Math.round(sec % 60);
+        if (m === 0) return `${s2} second${s2 !== 1 ? "s" : ""}`;
+        if (s2 === 0) return `${m} minute${m !== 1 ? "s" : ""}`;
+        return `${m} minute${m !== 1 ? "s" : ""} and ${s2} second${s2 !== 1 ? "s" : ""}`;
+      };
+      const fmtHR = (bpm) => bpm != null ? `${bpm} beats per minute` : null;
+
       const summary = sessions.map((s) => {
         const h = s.start_time ? parseInt(s.start_time.split(":")[0], 10) : null;
         const timeOfDay = h !== null ?
         h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night" :
         undefined;
+        const buildDur = s.pre_climax_offset_s != null && s.climax_offset_s != null
+          ? Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null;
+        const recOnset = s.recovery_offset_s != null && s.climax_offset_s != null
+          ? Math.round(s.recovery_offset_s - s.climax_offset_s) : null;
         return {
           date: s.date ? (() => {
             const d = new Date(s.date);
-            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+            return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
           })() : undefined,
-          start_time_et: s.start_time || undefined,
           time_of_day: timeOfDay,
-          duration_minutes: s.duration_minutes,
-          intensity: s.intensity,
-          satisfaction: s.satisfaction,
-          build_quality: s.build_quality,
+          duration: s.duration_minutes ? fmtDurWords(s.duration_minutes * 60) : undefined,
+          intensity_out_of_ten: s.intensity,
+          satisfaction_out_of_ten: s.satisfaction,
+          build_quality_out_of_ten: s.build_quality,
           build_type: s.build_type,
           climax_duration: s.climax_duration,
           mood: s.mood,
           methods: s.methods,
-          avg_hr: s.avg_hr,
-          max_hr: s.max_hr,
-          hr_at_climax: s.hr_at_climax,
-          hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
-          hr_avg_at_climax_window: s.hr_avg_at_climax_window,
-          pre_climax_offset_s: s.pre_climax_offset_s,
-          climax_offset_s: s.climax_offset_s,
-          recovery_offset_s: s.recovery_offset_s,
+          avg_heart_rate: fmtHR(s.avg_hr),
+          max_heart_rate: fmtHR(s.max_hr),
+          heart_rate_at_climax: fmtHR(s.hr_at_climax),
+          heart_rate_avg_pre_to_climax: fmtHR(s.hr_avg_pre_to_climax),
+          build_duration: buildDur != null ? fmtDurWords(buildDur) : undefined,
+          recovery_onset_after_climax: recOnset != null ? fmtDurWords(recOnset) : undefined,
           ejaculate_volume: s.ejaculate_volume,
           unusual_sensations: s.unusual_sensations || undefined,
           discomfort_entries: s.discomfort_entries?.length ? s.discomfort_entries : undefined,
           notes: s.notes || undefined,
-          tags: s.tags?.length ? s.tags : undefined,
           event_count: (s.event_timeline || []).length,
-        }; // closes the object literal
-      }); // closes the .map()
+        };
+      });
 
       const arousalProfile = userProfile && (userProfile.arousal_response_style || userProfile.arousal_notes || userProfile.climax_sensitivity) ? `
 
@@ -117,15 +127,16 @@ PHYSIOLOGICAL & ANATOMICAL LENS — apply throughout:
 - Connect phase durations and HR inflections to their likely anatomical and neurological drivers
 - Interpret build types physiologically — what does a "gradual" vs "stepwise" vs "spike" pattern suggest about autonomic ramp-up?
 
-CRITICAL FOR TEXT-TO-SPEECH QUALITY:
-- Write all times as words: "ten minutes and thirty seconds" not "10:30"
-- Spell out all numbers as words (e.g., "seventy-two beats per minute" not "72 bpm", "eight out of ten" not "8/10")
-- Write "beats per minute" not "bpm", "heart rate" not "HR", "seconds" not "s", "minutes" not "min"
-- Write in conversational, sentence-based prose with natural pauses — no bullet points, no lists, no markdown
-- Use short sentences and simple grammar optimized for audio readability
-- Explain anatomical terms briefly and accessibly — don't assume medical background
-- Use commas and periods to create natural speech cadence
-- Never start a sentence with a digit — restructure if needed
+CRITICAL FOR TEXT-TO-SPEECH QUALITY — these rules are mandatory, no exceptions:
+- All numeric values are already pre-formatted as words in the data (e.g. "seventy-two beats per minute", "three minutes and forty seconds") — use them verbatim, never substitute digits
+- NEVER use parenthetical numbers like "(9)" or "(72 bpm)" — always write the value as a full phrase in the sentence
+- NEVER write abbreviations: "bpm", "HR", "s", "min", "bpm/min" — always write the full words
+- Write in short, spoken sentences — maximum two clauses per sentence
+- No bullet points, no lists, no markdown, no em-dashes used to stack clauses
+- Each paragraph in the JSON output must be a single focused idea, 2–3 sentences max
+- Use commas and periods to create natural speech rhythm
+- Never start a sentence with a digit — restructure the sentence instead
+- Explain any anatomical terms briefly in plain language
 ${arousalProfile}
 
 Sessions:
@@ -197,20 +208,16 @@ Provide a structured comparative analysis covering key differences, HR patterns,
         return (
           <TTSReader
             paragraphs={paras}
-            renderParagraph={(text, idx, isActive) => {
-              const isSummary = text === result.summary;
-              return (
-                <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md ${
-                  isActive
-                    ? "border-primary bg-primary/10 text-foreground font-medium"
-                    : isSummary
-                    ? "border-primary/60 text-foreground"
-                    : "border-primary/30 text-[#ffffff]"
-                }`}>
-                  {text}
-                </p>
-              );
-            }}
+            renderParagraph={(text, idx, isActive, isBuffering) => (
+              <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${
+                idx === 0
+                  ? isActive ? "border-primary bg-primary/10 text-foreground font-bold" : "border-primary text-foreground font-medium"
+                  : isActive ? "border-primary bg-primary/10 text-foreground font-medium" : "border-primary/30 text-foreground/80"
+              }`}>
+                {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+                {text}
+              </p>
+            )}
           />
         );
       })()}
