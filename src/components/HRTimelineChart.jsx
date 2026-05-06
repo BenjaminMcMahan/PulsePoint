@@ -32,7 +32,7 @@ function deltaSec(a, b) {
 
 function MarkerDot(props) {
   const { cx, cy, payload } = props;
-  if (!payload?.marker || payload.marker === "build") return <g />;
+  if (!payload?.marker || payload.marker === "build" || payload.marker === "recovery") return <g />;
   const color = MARKER_COLORS[payload.marker];
   if (!color) return <g />;
   return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
