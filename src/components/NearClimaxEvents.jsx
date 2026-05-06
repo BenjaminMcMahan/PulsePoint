@@ -382,7 +382,7 @@ Return an array of near-climax events. If none exist, return an empty array.`,
                   }
                   </div>
                   {ev.ai_interpretation &&
-                <p className="text-[11px] leading-snug mt-1 italic text-[#ffffff]">
+                <p className="leading-snug mt-1 italic text-[#ffffff] text-sm">
                       {ev.ai_interpretation}
                     </p>
                 }
