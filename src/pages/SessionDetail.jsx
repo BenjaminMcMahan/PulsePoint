@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import PageHeader from "../components/PageHeader";
 import { ArrowLeft, Star, Trash2, Heart, Clock, Zap, Pencil, XCircle } from "lucide-react";
 import AITagSuggester from "../components/AITagSuggester";
+import AIChat from "../components/AIChat";
 import SessionExportButton from "../components/SessionExportButton";
 import moment from "moment";
 import HRTimelineChart from "../components/HRTimelineChart";
@@ -74,6 +75,8 @@ export default function SessionDetail() {
   const [loading, setLoading] = useState(true);
   const [selectedNearClimaxIdx, setSelectedNearClimaxIdx] = useState(null);
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [sessionNotes, setSessionNotes] = useState("");
 
   const nearClimaxEvents = useMemo(() => {
     if (!session) return [];
@@ -106,6 +109,8 @@ export default function SessionDetail() {
       const s = all[0];
       setSession(s);
       setUserProfile(me);
+      setChatMessages(s?.ai_analysis?._chat_messages || []);
+      setSessionNotes(s?.notes || "");
       const [rows, emgData] = await Promise.all([
         base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000),
         base44.entities.EMGTimeline.filter({ session: id }, "time_s", 2000000),
@@ -587,6 +592,40 @@ export default function SessionDetail() {
 
         {/* No-Climax AI Analysis */}
         {s.no_climax && <NoClimaxAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
+
+        {/* Ask the AI — Session Deep Dive */}
+        <AIChat
+          mode="session"
+          context={[
+            `Session date: ${s.date?.slice(0, 10)}`,
+            `Duration: ${s.duration_minutes ?? "?"}min`,
+            `Methods: ${(s.methods || []).join(", ")}`,
+            s.foley_size ? `Foley: ${s.foley_size}Fr ${s.foley_type || ""}` : null,
+            s.estim_notes ? `E-Stim notes: ${s.estim_notes}` : null,
+            `Intensity: ${s.intensity}/10, Build quality: ${s.build_quality}/10, Satisfaction: ${s.satisfaction}/10`,
+            `Build type: ${s.build_type}${s.custom_build_type ? " — " + s.custom_build_type : ""}`,
+            `Climax duration: ${s.climax_duration ?? "?"}`,
+            `Mood: ${s.mood}, Hydration: ${s.hydration}`,
+            s.avg_hr ? `HR: avg ${s.avg_hr}, max ${s.max_hr}, at climax ${s.hr_at_climax ?? "?"}` : null,
+            s.pre_climax_offset_s != null ? `Phase markers: pre-climax ${Math.round(s.pre_climax_offset_s)}s, climax ${Math.round(s.climax_offset_s)}s, recovery ${s.recovery_offset_s != null ? Math.round(s.recovery_offset_s) + "s" : "?"}` : null,
+            s.ejaculate_volume ? `Ejaculate: ${s.ejaculate_volume}` : null,
+            s.unusual_sensations ? `Unusual sensations: ${s.unusual_sensations}` : null,
+            (s.discomfort_entries || []).length ? `Discomfort: ${s.discomfort_entries.map(e => `sev ${e.severity}/10 — ${e.note}`).join("; ")}` : null,
+            (s.event_timeline || []).length ? `Events: ${s.event_timeline.map(e => `[${e.time_s}s] ${e.note}`).join(" | ")}` : null,
+            s.notes ? `Session notes: ${s.notes}` : null,
+          ].filter(Boolean).join("\n")}
+          savedMessages={chatMessages}
+          savedNotes={sessionNotes}
+          onSaveMessages={async (msgs) => {
+            setChatMessages(msgs);
+            const updated = { ...(s.ai_analysis || {}), _chat_messages: msgs };
+            await base44.entities.Session.update(id, { ai_analysis: updated });
+          }}
+          onSaveNotes={async (merged) => {
+            setSessionNotes(merged);
+            await base44.entities.Session.update(id, { notes: merged });
+          }}
+        />
 
         {/* Tags */}
         <div className="bg-card rounded-xl border border-border p-4 space-y-3">

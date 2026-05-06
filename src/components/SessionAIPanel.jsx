@@ -4,8 +4,6 @@ import { Brain, AlertCircle, Activity, Lightbulb, TrendingUp, Zap, ChevronDown, 
 import TTSReader from "./TTSReader";
 import { Button } from "@/components/ui/button";
 import { EVENT_CATEGORIES } from "./session-form/EventTimelineSection";
-import AIChat from "./AIChat";
-
 function buildSessionContext(session, timelineRows) {
   const hrMin = timelineRows.length ? Math.round(Math.min(...timelineRows.map(r => Number(r.hr)))) : null;
   const hrMax = timelineRows.length ? Math.round(Math.max(...timelineRows.map(r => Number(r.hr)))) : null;
@@ -66,8 +64,6 @@ export default function SessionAIPanel({ session, timelineRows, emgRows = [], us
   const [collapsed, setCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(session.ai_analysis ?? null);
-  const [chatMessages, setChatMessages] = useState(session.ai_analysis?._chat_messages || []);
-  const [sessionNotes, setSessionNotes] = useState(session.notes || "");
 
   const analyze = async () => {
     setLoading(true);
@@ -346,23 +342,7 @@ Provide a rich, physiologically-grounded analysis that tells the story of this s
         </p>
       )}
 
-      {!collapsed && (
-        <AIChat
-          mode="session"
-          context={buildSessionContext(session, timelineRows)}
-          savedMessages={chatMessages}
-          savedNotes={sessionNotes}
-          onSaveMessages={async (msgs) => {
-            setChatMessages(msgs);
-            const updated = { ...(result || {}), _chat_messages: msgs };
-            await base44.entities.Session.update(session.id, { ai_analysis: updated });
-          }}
-          onSaveNotes={async (merged) => {
-            setSessionNotes(merged);
-            await base44.entities.Session.update(session.id, { notes: merged });
-          }}
-        />
-      )}
+
 
       {!collapsed && result && (() => {
         // Support both old schema (hr_analysis/phase_analysis) and new schema (arousal_arc/event_analysis)
