@@ -117,29 +117,19 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
     if (!SR) return;
     const rec = new SR();
     rec.lang = "en-US";
-    rec.continuous = true;
-    rec.interimResults = true;
+    rec.continuous = false;
+    rec.interimResults = false;
     recognitionRef.current = rec;
-    finalTranscriptRef.current = "";
     rec.onresult = (e) => {
-      let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) {
-          finalTranscriptRef.current += e.results[i][0].transcript + " ";
-        } else {
-          interim += e.results[i][0].transcript;
-        }
-      }
-      setInterimText(interim);
-    };
-    rec.onend = () => {
-      const result = finalTranscriptRef.current.trim();
-      if (result) {
+      const transcript = e.results[0]?.[0]?.transcript?.trim();
+      if (transcript) {
         setNewNote((prev) => {
           const base = prev.trim();
-          return base ? base + " " + result : result;
+          return base ? base + " " + transcript : transcript;
         });
       }
+    };
+    rec.onend = () => {
       setInterimText("");
       setIsListening(false);
     };
@@ -153,7 +143,6 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
-    // onend will fire and clean up
   }, []);
 
   const saveEvents = async (updated) => {
