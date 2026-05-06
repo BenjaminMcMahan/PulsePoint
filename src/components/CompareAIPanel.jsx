@@ -221,8 +221,19 @@ Provide a structured comparative analysis covering key differences, HR patterns,
           ...(result.recommendations || []),
         ].filter(Boolean);
 
+        const sessionDatesLabel = sessions
+          .map(s => {
+            if (!s.date) return null;
+            const d = new Date(s.date);
+            return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+          })
+          .filter(Boolean)
+          .join(" & ");
+        const compareTitle = `Session Comparison – ${sessionDatesLabel}`;
+
         return (
           <TTSReader
+            title={compareTitle}
             paragraphs={paras}
             renderParagraph={(text, idx, isActive, isBuffering) => (
               <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${

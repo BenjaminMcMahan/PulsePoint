@@ -209,6 +209,8 @@ ${JSON.stringify({
         return (
           <TTSReader
             sessionId={session.id}
+            title="AI Incomplete Session Analysis"
+            sessionDate={session.date}
             paragraphs={paras}
             renderParagraph={(text, idx, isActive) => {
               const meta = paraMeta[idx];

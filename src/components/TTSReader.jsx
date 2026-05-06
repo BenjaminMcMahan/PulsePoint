@@ -483,8 +483,13 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       const monthName = dateObj.toLocaleDateString("en-US", { month: "long" });
       const dayNum = dateObj.getDate();
       const yearNum = dateObj.getFullYear();
-      const friendlyDate = `${monthName} ${dayNum}`;
-      const displayTitle = title ? `${friendlyDate} ${title}` : `${friendlyDate} Recording`;
+      const friendlyDate = `${monthName} ${dayNum} ${yearNum}`;
+      // If title already contains the date (e.g. CompareAIPanel passes "Session Comparison – Apr 3 & May 1"),
+      // don't prepend the date again. Otherwise prepend it.
+      const titleHasDate = title && /\d{4}|\bjan\b|\bfeb\b|\bmar\b|\bapr\b|\bmay\b|\bjun\b|\bjul\b|\baug\b|\bsep\b|\boct\b|\bnov\b|\bdec\b/i.test(title);
+      const displayTitle = title
+        ? (titleHasDate ? title : `${friendlyDate} – ${title}`)
+        : `${friendlyDate} – Recording`;
       const fileSlug = displayTitle.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
       const fileName = `${fileSlug}.mp3`;
 
