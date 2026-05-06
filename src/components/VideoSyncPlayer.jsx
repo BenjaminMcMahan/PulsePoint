@@ -257,23 +257,30 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
     };
   }, [handleTimeUpdate, videoSrc]);
 
-  // Keyboard: spacebar to play/pause (skip in text inputs)
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const active = document.activeElement;
+      const inInput = active?.tagName === "INPUT" || active?.tagName === "TEXTAREA" || active?.tagName === "SELECT";
+
+      // Space: play/pause video (skip if typing)
       if (e.code === "Space") {
-        const active = document.activeElement;
-        if (active?.tagName === "INPUT" || active?.tagName === "TEXTAREA" || active?.tagName === "SELECT") {
-          return;
-        }
+        if (inInput) return;
         e.preventDefault();
         if (videoRef.current) {
           videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause();
         }
       }
+
+      // T: toggle transcription when add-event form is open and not typing
+      if (e.code === "KeyT" && addingNew && !inInput && sttSupported) {
+        e.preventDefault();
+        toggleListening();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [addingNew, sttSupported, toggleListening]);
 
   // Click on chart → seek video
   const handleChartClick = useCallback((data) => {
@@ -447,7 +454,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                        type="button"
                        onClick={toggleListening}
                        className={`shrink-0 w-7 h-7 rounded flex items-center justify-center border transition-colors ${isListening ? "bg-destructive/10 border-destructive text-destructive animate-pulse" : "bg-muted border-border text-muted-foreground hover:text-foreground"}`}
-                       title={isListening ? "Stop dictation" : "Dictate"}
+                       title={isListening ? "Stop dictation (T)" : "Dictate (T)"}
                      >
                        {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
                      </button>
@@ -456,8 +463,11 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                  {(isListening || interimText) && (
                    <p className="text-[9px] flex items-center gap-1 text-muted-foreground italic">
                      <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${interimText === "Transcribing…" ? "bg-primary animate-pulse" : "bg-destructive animate-pulse"}`} />
-                     {interimText || "Recording… tap mic to stop"}
+                     {interimText || "Recording… press T or tap mic to stop"}
                    </p>
+                 )}
+                 {!isListening && !interimText && sttSupported && (
+                   <p className="text-[9px] text-muted-foreground/60">Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">T</kbd> to start/stop dictation</p>
                  )}
                  <div className="flex gap-2">
                    <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
@@ -531,7 +541,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                        type="button"
                        onClick={toggleListening}
                        className={`shrink-0 w-7 h-7 rounded flex items-center justify-center border transition-colors ${isListening ? "bg-destructive/10 border-destructive text-destructive animate-pulse" : "bg-muted border-border text-muted-foreground hover:text-foreground"}`}
-                       title={isListening ? "Stop dictation" : "Dictate"}
+                       title={isListening ? "Stop dictation (T)" : "Dictate (T)"}
                      >
                        {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
                      </button>
@@ -540,8 +550,11 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                  {(isListening || interimText) && (
                    <p className="text-[9px] flex items-center gap-1 text-muted-foreground italic">
                      <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${interimText === "Transcribing…" ? "bg-primary animate-pulse" : "bg-destructive animate-pulse"}`} />
-                     {interimText || "Recording… tap mic to stop"}
+                     {interimText || "Recording… press T or tap mic to stop"}
                    </p>
+                 )}
+                 {!isListening && !interimText && sttSupported && (
+                   <p className="text-[9px] text-muted-foreground/60">Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">T</kbd> to start/stop dictation</p>
                  )}
                  <div className="flex gap-2">
                    <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
