@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { Play, Pause, Square, Upload, Volume2, VolumeX, ChevronDown, ChevronLeft, ChevronRight, ZoomOut } from "lucide-react";
+import { Play, Pause, Square, Upload, Volume2, VolumeX, ChevronDown, ChevronLeft, ChevronRight, ZoomOut, Mic, MicOff, Plus } from "lucide-react";
 import { EVENT_CATEGORIES } from "@/components/session-form/EventTimelineSection";
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis,
@@ -134,6 +134,14 @@ export default function EventSyncPlayer() {
   const timerRef = useRef(null);
   const timerStartRef = useRef(null);
   const timerOffsetRef = useRef(0);
+
+  // Log event (with STT)
+  const [newEventNote, setNewEventNote] = useState("");
+  const [newEventCats, setNewEventCats] = useState(["stimulation"]);
+  const [isListening, setIsListening] = useState(false);
+  const [sttSupported] = useState(() => !!(window.SpeechRecognition || window.webkitSpeechRecognition));
+  const recognitionRef = useRef(null);
+  const [savingEvent, setSavingEvent] = useState(false);
 
   // HR chart zoom
   const [zoomDomain, setZoomDomain] = useState(null);
@@ -359,6 +367,58 @@ export default function EventSyncPlayer() {
   const clearVideo = () => {
     if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
     videoUrlRef.current = null; setVideoSrc(null); setVideoMode(false); handleStop();
+  };
+
+  // ── STT ───────────────────────────────────────────────────────────────────
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = "en-US";
+    rec.continuous = true;
+    rec.interimResults = true;
+    recognitionRef.current = rec;
+
+    let finalTranscript = "";
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + " ";
+        else interim += e.results[i][0].transcript;
+      }
+      setNewEventNote((prev) => {
+        const base = prev.replace(/\u200b.*$/, "").trimEnd();
+        const appended = (base ? base + " " : "") + finalTranscript;
+        return appended + "\u200b" + interim;
+      });
+    };
+    rec.onend = () => {
+      setIsListening(false);
+      // Strip zero-width space sentinel and trailing interim on stop
+      setNewEventNote((prev) => prev.replace(/\u200b.*$/, "").trim());
+    };
+    rec.onerror = () => { setIsListening(false); };
+    rec.start();
+    setIsListening(true);
+  }, [isListening]);
+
+  const handleSaveEvent = async () => {
+    const note = newEventNote.replace(/\u200b.*$/, "").trim();
+    if (!note || !selectedSession) return;
+    setSavingEvent(true);
+    const existing = selectedSession.event_timeline || [];
+    const newEv = { time_s: Math.round(playbackTime), note, category: newEventCats };
+    const sorted = [...existing, newEv].sort((a, b) => a.time_s - b.time_s);
+    await base44.entities.Session.update(selectedSession.id, { event_timeline: sorted });
+    setSelectedSession((prev) => ({ ...prev, event_timeline: sorted }));
+    setNewEventNote("");
+    setSavingEvent(false);
   };
 
   // ── Scrubber ──────────────────────────────────────────────────────────────
@@ -658,6 +718,69 @@ export default function EventSyncPlayer() {
               </div>
             </div>
           )}
+
+          {/* Log Event */}
+          <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Log Event at {fmtMmSs(Math.round(playbackTime))}</h2>
+
+            {/* Category selector */}
+            <div className="flex flex-wrap gap-1.5">
+              {EVENT_CATEGORIES.map((c) => {
+                const active = newEventCats.includes(c.value);
+                return (
+                  <button key={c.value} type="button"
+                    onClick={() => setNewEventCats((prev) =>
+                      prev.includes(c.value) ? prev.filter((v) => v !== c.value) : [...prev, c.value]
+                    )}
+                    className="text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all"
+                    style={active
+                      ? { background: c.color, color: "#fff", borderColor: c.color }
+                      : { background: c.color + "18", color: c.color, borderColor: c.color + "44" }
+                    }
+                  >{c.label}</button>
+                );
+              })}
+            </div>
+
+            {/* Textarea + mic */}
+            <div className="flex gap-2 items-end">
+              <textarea
+                value={newEventNote.replace(/\u200b.*$/, "")}
+                onChange={(e) => setNewEventNote(e.target.value)}
+                placeholder="Describe the event… or tap the mic to dictate"
+                rows={2}
+                className="flex-1 resize-none text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              {sttSupported && (
+                <button
+                  onClick={toggleListening}
+                  className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors border ${
+                    isListening
+                      ? "bg-destructive/10 border-destructive text-destructive animate-pulse"
+                      : "bg-muted border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                  title={isListening ? "Stop dictation" : "Start dictation"}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
+              <button
+                onClick={handleSaveEvent}
+                disabled={!newEventNote.replace(/\u200b.*$/, "").trim() || savingEvent}
+                className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                title="Save event"
+              >
+                {savingEvent ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Plus className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {isListening && (
+              <p className="text-[10px] text-destructive flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse inline-block" />
+                Listening… speak your event note
+              </p>
+            )}
+          </div>
 
           {/* AI Narration panels */}
           {(hasCascade || hasAnalysis) && (

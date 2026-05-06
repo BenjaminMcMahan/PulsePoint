@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Play, Pause, Video, ChevronLeft, ChevronRight, Pencil, Trash2, Plus, Check, X, SkipBack, SkipForward } from "lucide-react";
+import { Play, Pause, Video, ChevronLeft, ChevronRight, Pencil, Trash2, Plus, Check, X, SkipBack, SkipForward, Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -101,6 +101,50 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
   const [newMin, setNewMin] = useState("");
   const [newSec, setNewSec] = useState("");
 
+  // STT
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const sttSupported = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = "en-US";
+    rec.continuous = true;
+    rec.interimResults = true;
+    recognitionRef.current = rec;
+    let finalTranscript = "";
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + " ";
+        else interim += e.results[i][0].transcript;
+      }
+      setNewNote((prev) => {
+        const base = prev.replace(/\u200b.*$/, "").trimEnd();
+        return (base ? base + " " : "") + finalTranscript + "\u200b" + interim;
+      });
+    };
+    rec.onend = () => {
+      setIsListening(false);
+      setNewNote((prev) => prev.replace(/\u200b.*$/, "").trim());
+    };
+    rec.onerror = () => setIsListening(false);
+    rec.start();
+    setIsListening(true);
+  }, [isListening]);
+
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  }, []);
+
   const saveEvents = async (updated) => {
     const sorted = [...updated].sort((a, b) => a.time_s - b.time_s);
     setEvents(sorted);
@@ -132,10 +176,12 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
   };
 
   const commitAdd = async () => {
-    if (!newNote.trim()) return;
+    const cleanNote = newNote.replace(/\u200b.*$/, "").trim();
+    if (!cleanNote) return;
+    stopListening();
     const m = parseInt(newMin, 10) || 0;
     const s = Math.min(59, parseInt(newSec, 10) || 0);
-    const ev = { time_s: m * 60 + s, note: newNote.trim(), category: newCats };
+    const ev = { time_s: m * 60 + s, note: cleanNote, category: newCats };
     setLastUsedCat(newCats[0]);
     setAddingNew(false);
     setNewNote(""); setNewMin(""); setNewSec(""); setNewCats([newCats[0]]);
@@ -372,22 +418,35 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                     placeholder="sec" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
                 </div>
                 <CategorySelector selected={newCats} onChange={setNewCats} />
-                <textarea
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}
-                  placeholder="Describe the event…"
-                  rows={2}
-                  className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
-                />
-                <div className="flex gap-2">
-                  <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
-                    <Check className="w-3 h-3" /> Save
-                  </button>
-                  <button onClick={() => setAddingNew(false)} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
-                    <X className="w-3 h-3" /> Cancel
-                  </button>
-                </div>
+                <div className="flex gap-1.5 items-end">
+                   <textarea
+                     value={newNote.replace(/\u200b.*$/, "")}
+                     onChange={(e) => setNewNote(e.target.value)}
+                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}
+                     placeholder="Describe the event… or tap 🎤 to dictate"
+                     rows={2}
+                     className="flex-1 text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
+                   />
+                   {sttSupported && (
+                     <button
+                       type="button"
+                       onClick={toggleListening}
+                       className={`shrink-0 w-7 h-7 rounded flex items-center justify-center border transition-colors ${isListening ? "bg-destructive/10 border-destructive text-destructive animate-pulse" : "bg-muted border-border text-muted-foreground hover:text-foreground"}`}
+                       title={isListening ? "Stop dictation" : "Dictate"}
+                     >
+                       {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                     </button>
+                   )}
+                 </div>
+                 {isListening && <p className="text-[9px] text-destructive flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block" />Listening…</p>}
+                 <div className="flex gap-2">
+                   <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
+                     <Check className="w-3 h-3" /> Save
+                   </button>
+                   <button onClick={() => { stopListening(); setAddingNew(false); }} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
+                     <X className="w-3 h-3" /> Cancel
+                   </button>
+                 </div>
               </div>
             ) : (
               <button
@@ -438,22 +497,35 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                     placeholder="sec" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
                 </div>
                 <CategorySelector selected={newCats} onChange={setNewCats} />
-                <textarea
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}
-                  placeholder="Describe the event…"
-                  rows={2}
-                  className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
-                />
-                <div className="flex gap-2">
-                  <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
-                    <Check className="w-3 h-3" /> Save
-                  </button>
-                  <button onClick={() => setAddingNew(false)} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
-                    <X className="w-3 h-3" /> Cancel
-                  </button>
-                </div>
+                <div className="flex gap-1.5 items-end">
+                   <textarea
+                     value={newNote.replace(/\u200b.*$/, "")}
+                     onChange={(e) => setNewNote(e.target.value)}
+                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}
+                     placeholder="Describe the event… or tap 🎤 to dictate"
+                     rows={2}
+                     className="flex-1 text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
+                   />
+                   {sttSupported && (
+                     <button
+                       type="button"
+                       onClick={toggleListening}
+                       className={`shrink-0 w-7 h-7 rounded flex items-center justify-center border transition-colors ${isListening ? "bg-destructive/10 border-destructive text-destructive animate-pulse" : "bg-muted border-border text-muted-foreground hover:text-foreground"}`}
+                       title={isListening ? "Stop dictation" : "Dictate"}
+                     >
+                       {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                     </button>
+                   )}
+                 </div>
+                 {isListening && <p className="text-[9px] text-destructive flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block" />Listening…</p>}
+                 <div className="flex gap-2">
+                   <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
+                     <Check className="w-3 h-3" /> Save
+                   </button>
+                   <button onClick={() => { stopListening(); setAddingNew(false); }} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
+                     <X className="w-3 h-3" /> Cancel
+                   </button>
+                 </div>
               </div>
             ) : (
               <button
