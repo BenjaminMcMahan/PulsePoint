@@ -143,6 +143,28 @@ export default function EventSyncPlayer() {
   const recognitionRef = useRef(null);
   const [savingEvent, setSavingEvent] = useState(false);
 
+  // Video resize
+  const [videoHeight, setVideoHeight] = useState(320);
+  const resizeDragRef = useRef(null);
+  const resizeStartYRef = useRef(null);
+  const resizeStartHRef = useRef(null);
+
+  const handleResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    resizeStartYRef.current = e.clientY;
+    resizeStartHRef.current = videoHeight;
+    const onMove = (ev) => {
+      const delta = ev.clientY - resizeStartYRef.current;
+      setVideoHeight(Math.max(120, Math.min(800, resizeStartHRef.current + delta)));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [videoHeight]);
+
   // HR chart zoom
   const [zoomDomain, setZoomDomain] = useState(null);
   const dragStartRef = useRef(null);
@@ -531,7 +553,19 @@ export default function EventSyncPlayer() {
                   <input type="file" accept="video/*" className="hidden" onChange={handleVideoFile} />
                 </label>
               ) : (
-                <video ref={videoRef} src={videoSrc} className="w-full rounded-lg bg-black" controls={false} playsInline />
+                <>
+                  <div className="w-full flex items-center justify-center bg-black rounded-lg overflow-hidden" style={{ height: videoHeight }}>
+                    <video ref={videoRef} src={videoSrc} className="max-w-full max-h-full" controls={false} playsInline />
+                  </div>
+                  {/* Resize handle */}
+                  <div
+                    onMouseDown={handleResizeMouseDown}
+                    className="w-full h-3 flex items-center justify-center cursor-ns-resize group -mt-1 -mb-1"
+                    title="Drag to resize video"
+                  >
+                    <div className="w-16 h-1 rounded-full bg-border group-hover:bg-primary transition-colors" />
+                  </div>
+                </>
               )}
             </div>
 
@@ -738,7 +772,7 @@ export default function EventSyncPlayer() {
 
           {/* ── Right sidebar: current event + events list ── */}
           {events.length > 0 && (
-            <div className="w-72 shrink-0 space-y-3 sticky top-4 self-start">
+            <div className="w-72 shrink-0 space-y-3 sticky top-4 self-start" style={{ maxHeight: videoMode ? videoHeight + 80 : undefined, overflowY: videoMode ? "auto" : undefined }}>
               {/* Current event */}
               <div className="bg-card rounded-xl border border-border p-3 space-y-2">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Current Event</h2>
