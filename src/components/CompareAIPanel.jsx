@@ -99,7 +99,16 @@ export default function CompareAIPanel({ sessions, userProfile }) {
           unusual_sensations: s.unusual_sensations || undefined,
           discomfort_entries: s.discomfort_entries?.length ? s.discomfort_entries : undefined,
           notes: s.notes || undefined,
-          event_count: (s.event_timeline || []).length,
+          events: (() => {
+            const evs = (s.event_timeline || []).filter((e) => e.note?.trim());
+            if (!evs.length) return undefined;
+            return evs.map((e) => {
+              const m = Math.floor(e.time_s / 60);
+              const sec = e.time_s % 60;
+              const cats = Array.isArray(e.category) ? e.category : [e.category].filter(Boolean);
+              return `[${m}:${String(sec).padStart(2, "0")}${cats.length ? ` · ${cats.join(", ")}` : ""}] ${e.note}`;
+            });
+          })(),
         };
       });
 
@@ -142,7 +151,14 @@ ${arousalProfile}
 Sessions:
 ${JSON.stringify(summary, null, 2)}
 
-Provide a structured comparative analysis covering key differences, HR patterns, phase timing, and recommendations.`,
+EVENT NOTES INSTRUCTIONS:
+- Each session includes a timestamped event log. These are first-person notes the user wrote during or after the session.
+- When the AI finds an event particularly relevant — e.g., a sensation, stimulation change, or physical event that correlates with an HR shift, a phase transition, or a meaningful difference between sessions — incorporate its content directly into the analysis.
+- Quote or paraphrase the note naturally within a sentence rather than listing it separately.
+- Do not attempt to reference every event. Only surface events that add genuine insight to the comparison.
+- When citing an event, mention its approximate time in the session (e.g., "around the eight-minute mark").
+
+Provide a structured comparative analysis covering key differences, HR patterns, phase timing, event notes, and recommendations.`,
         response_json_schema: {
           type: "object",
           properties: {
