@@ -101,49 +101,64 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
   const [newMin, setNewMin] = useState("");
   const [newSec, setNewSec] = useState("");
 
-  // STT
+  // STT — Whisper via MediaRecorder
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState("");
-  const recognitionRef = useRef(null);
-  const finalTranscriptRef = useRef("");
-  const sttSupported = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-
-  const toggleListening = useCallback(() => {
-    if (isListening) {
-      recognitionRef.current?.stop();
-      return;
-    }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    const rec = new SR();
-    rec.lang = "en-US";
-    rec.continuous = false;
-    rec.interimResults = false;
-    recognitionRef.current = rec;
-    rec.onresult = (e) => {
-      const transcript = e.results[0]?.[0]?.transcript?.trim();
-      if (transcript) {
-        setNewNote((prev) => {
-          const base = prev.trim();
-          return base ? base + " " + transcript : transcript;
-        });
-      }
-    };
-    rec.onend = () => {
-      setInterimText("");
-      setIsListening(false);
-    };
-    rec.onerror = () => {
-      setInterimText("");
-      setIsListening(false);
-    };
-    rec.start();
-    setIsListening(true);
-  }, [isListening]);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const sttSupported = !!navigator.mediaDevices?.getUserMedia;
 
   const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
   }, []);
+
+  const toggleListening = useCallback(async () => {
+    if (isListening) {
+      stopListening();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setIsListening(false);
+        setInterimText("Transcribing…");
+        try {
+          const blob = new Blob(audioChunksRef.current, { type: mimeType });
+          // Convert blob to base64 to send via SDK
+          const arrayBuffer = await blob.arrayBuffer();
+          const uint8 = new Uint8Array(arrayBuffer);
+          let binary = "";
+          for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+          const base64Audio = btoa(binary);
+          const res = await base44.functions.invoke("whisperSTT", { audio_base64: base64Audio, mime_type: mimeType });
+          const data = res.data;
+          if (data.text) {
+            setNewNote((prev) => {
+              const base = prev.trim();
+              return base ? base + " " + data.text.trim() : data.text.trim();
+            });
+          }
+        } catch (err) {
+          console.error("Whisper STT error:", err);
+        }
+        setInterimText("");
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsListening(true);
+    } catch (err) {
+      console.error("Mic access error:", err);
+    }
+  }, [isListening, stopListening]);
 
   const saveEvents = async (updated) => {
     const sorted = [...updated].sort((a, b) => a.time_s - b.time_s);
@@ -438,10 +453,10 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                      </button>
                    )}
                  </div>
-                 {isListening && (
+                 {(isListening || interimText) && (
                    <p className="text-[9px] flex items-center gap-1 text-muted-foreground italic">
-                     <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block shrink-0" />
-                     {interimText || "Listening…"}
+                     <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${interimText === "Transcribing…" ? "bg-primary animate-pulse" : "bg-destructive animate-pulse"}`} />
+                     {interimText || "Recording… tap mic to stop"}
                    </p>
                  )}
                  <div className="flex gap-2">
@@ -522,10 +537,10 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                      </button>
                    )}
                  </div>
-                 {isListening && (
+                 {(isListening || interimText) && (
                    <p className="text-[9px] flex items-center gap-1 text-muted-foreground italic">
-                     <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block shrink-0" />
-                     {interimText || "Listening…"}
+                     <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${interimText === "Transcribing…" ? "bg-primary animate-pulse" : "bg-destructive animate-pulse"}`} />
+                     {interimText || "Recording… tap mic to stop"}
                    </p>
                  )}
                  <div className="flex gap-2">
