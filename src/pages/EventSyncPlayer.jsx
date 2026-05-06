@@ -515,340 +515,283 @@ export default function EventSyncPlayer() {
       </div>
 
       {selectedSession && (
-        <>
-          {/* Video loader */}
-          <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Local Video (optional)</h2>
-              {videoMode && <button onClick={clearVideo} className="text-[10px] text-destructive hover:opacity-70">Remove</button>}
-            </div>
-            {!videoMode ? (
-              <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg px-4 py-3 hover:bg-muted/40 transition-colors">
-                <Upload className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Load video file…</span>
-                <input type="file" accept="video/*" className="hidden" onChange={handleVideoFile} />
-              </label>
-            ) : (
-              <video ref={videoRef} src={videoSrc} className="w-full rounded-lg bg-black" controls={false} playsInline />
-            )}
-          </div>
-
-          {/* HR + Event Overlay Chart */}
-          {chartData.length > 0 && (
+        <div className="flex gap-4 items-start">
+          {/* ── Left column: video + chart + controls + log ── */}
+          <div className="flex-1 min-w-0 space-y-4">
+            {/* Video loader */}
             <div className="bg-card rounded-xl border border-border p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h2>
-                {zoomDomain && (
-                  <button onClick={() => setZoomDomain(null)} className="flex items-center gap-1 text-[10px] text-primary border border-primary rounded px-2 py-0.5">
-                    <ZoomOut className="w-3 h-3" /> Reset Zoom
-                  </button>
-                )}
-                {!zoomDomain && <span className="text-[10px] text-muted-foreground">Drag to zoom</span>}
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Local Video (optional)</h2>
+                {videoMode && <button onClick={clearVideo} className="text-[10px] text-destructive hover:opacity-70">Remove</button>}
               </div>
+              {!videoMode ? (
+                <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg px-4 py-3 hover:bg-muted/40 transition-colors">
+                  <Upload className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Load video file…</span>
+                  <input type="file" accept="video/*" className="hidden" onChange={handleVideoFile} />
+                </label>
+              ) : (
+                <video ref={videoRef} src={videoSrc} className="w-full rounded-lg bg-black" controls={false} playsInline />
+              )}
+            </div>
 
-              <div
-                className="h-56 cursor-crosshair select-none"
-                onMouseLeave={handleChartMouseUp}
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart
-                    data={displayData}
-                    margin={{ top: 8, right: 4, bottom: 0, left: -20 }}
-                    onMouseDown={handleChartMouseDown}
-                    onMouseMove={handleChartMouseMove}
-                    onMouseUp={handleChartMouseUp}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtMmSs} tickCount={8} type="number" domain={xDomain} />
-                    <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
-                    <Tooltip
-                      formatter={(val) => [`${Math.round(val)} bpm`, "HR"]}
-                      labelFormatter={(v) => fmtMmSs(Math.round(Number(v)))}
-                      contentStyle={{ fontSize: 11 }}
-                    />
+            {/* HR + Event Overlay Chart */}
+            {chartData.length > 0 && (
+              <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">HR + Event Overlay</h2>
+                  {zoomDomain && (
+                    <button onClick={() => setZoomDomain(null)} className="flex items-center gap-1 text-[10px] text-primary border border-primary rounded px-2 py-0.5">
+                      <ZoomOut className="w-3 h-3" /> Reset Zoom
+                    </button>
+                  )}
+                  {!zoomDomain && <span className="text-[10px] text-muted-foreground">Drag to zoom</span>}
+                </div>
+                <div className="h-56 cursor-crosshair select-none" onMouseLeave={handleChartMouseUp}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={displayData}
+                      margin={{ top: 8, right: 4, bottom: 0, left: -20 }}
+                      onMouseDown={handleChartMouseDown}
+                      onMouseMove={handleChartMouseMove}
+                      onMouseUp={handleChartMouseUp}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="t" tick={{ fontSize: 9 }} tickFormatter={fmtMmSs} tickCount={8} type="number" domain={xDomain} />
+                      <YAxis tick={{ fontSize: 9 }} domain={["auto", "auto"]} />
+                      <Tooltip
+                        formatter={(val) => [`${Math.round(val)} bpm`, "HR"]}
+                        labelFormatter={(v) => fmtMmSs(Math.round(Number(v)))}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+                      {phaseMarkers.map((pm) => (
+                        <ReferenceLine key={pm.label} x={pm.time_s} stroke={pm.color} strokeWidth={1.5}
+                          strokeDasharray="4 2" label={{ value: pm.label, fontSize: 7, fill: pm.color, position: "top" }} />
+                      ))}
+                      {events.map((ev, i) => {
+                        const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                        return (
+                          <ReferenceLine key={i} x={ev.time_s} stroke={color} strokeWidth={1.5} strokeDasharray="2 3"
+                            strokeOpacity={activeEventIdx === i ? 1 : 0.5}
+                            label={{ value: `E${i + 1}`, fontSize: 7, fill: color, position: "insideTopLeft" }}
+                          />
+                        );
+                      })}
+                      <ReferenceLine x={playbackTime} stroke="hsl(var(--primary))" strokeWidth={2}
+                        label={{ value: fmtMmSs(playbackTime), fontSize: 8, fill: "hsl(var(--primary))", position: "top" }} />
+                      <Line type="monotone" dataKey="hr" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
 
-                    {/* Phase markers */}
-                    {phaseMarkers.map((pm) => (
-                      <ReferenceLine key={pm.label} x={pm.time_s} stroke={pm.color} strokeWidth={1.5}
-                        strokeDasharray="4 2" label={{ value: pm.label, fontSize: 7, fill: pm.color, position: "top" }} />
-                    ))}
-
-                    {/* Event markers */}
-                    {events.map((ev, i) => {
-                      const color = EVENT_COLORS[i % EVENT_COLORS.length];
-                      return (
-                        <ReferenceLine key={i} x={ev.time_s} stroke={color} strokeWidth={1.5} strokeDasharray="2 3"
-                          strokeOpacity={activeEventIdx === i ? 1 : 0.5}
-                          label={{ value: `E${i + 1}`, fontSize: 7, fill: color, position: "insideTopLeft" }}
-                        />
-                      );
-                    })}
-
-                    {/* Playback cursor */}
-                    <ReferenceLine x={playbackTime} stroke="hsl(var(--primary))" strokeWidth={2}
-                      label={{ value: fmtMmSs(playbackTime), fontSize: 8, fill: "hsl(var(--primary))", position: "top" }} />
-
-                    <Line type="monotone" dataKey="hr" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} isAnimationActive={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
+            {/* Playback controls */}
+            <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={handlePlayPause} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium">
+                  {isPlaying ? <><Pause className="w-4 h-4" />Pause</> : <><Play className="w-4 h-4" />Play</>}
+                </button>
+                <button onClick={handleStop} className="p-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground">
+                  <Square className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => { setTtsEnabled((v) => !v); if (ttsEnabled) stopTTS(); }}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${ttsEnabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
+                  title={ttsEnabled ? "Mute TTS audio (sync continues)" : "Unmute TTS audio"}
+                >
+                  {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  {ttsEnabled ? "Mute" : "Unmuted"}
+                </button>
+                <div className="relative">
+                  <button onClick={() => setShowVoicePicker((v) => !v)} className="flex items-center gap-1 px-2 py-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-xs capitalize">
+                    {voice} <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {showVoicePicker && (
+                    <div className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[100px]">
+                      {OAI_VOICES.map((v) => (
+                        <button key={v} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted capitalize ${voice === v ? "text-primary font-medium" : "text-foreground"}`}
+                          onClick={() => { setVoice(v); voiceRef.current = v; localStorage.setItem("tts_oai_voice", v); setShowVoicePicker(false); }}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {currentHR && <span className="font-mono text-sm font-bold text-primary ml-auto">{currentHR} bpm</span>}
+                <span className="font-mono text-sm text-muted-foreground">{fmtMmSs(playbackTime)}</span>
+              </div>
+              <div className="space-y-1">
+                <input type="range" min={0} max={maxTime} step={0.5} value={playbackTime} onChange={handleScrub}
+                  className="w-full h-1.5 cursor-pointer" style={{ accentColor: "hsl(var(--primary))" }} />
+                <div className="relative h-2">
+                  {events.map((ev, i) => {
+                    const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                    return (
+                      <button key={i} onClick={() => handleJump(ev.time_s)}
+                        className="absolute top-0 w-1 h-2 rounded-full transform -translate-x-0.5 opacity-80 hover:opacity-100 hover:scale-150 transition-all"
+                        style={{ left: `${(ev.time_s / maxTime) * 100}%`, background: color }}
+                        title={`${fmtMmSs(ev.time_s)} — ${ev.note}`} />
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between text-[9px] text-muted-foreground">
+                  <span>0:00</span><span>{fmtMmSs(maxTime)}</span>
+                </div>
               </div>
             </div>
-          )}
 
-          {/* Playback controls */}
-          <div className="bg-card rounded-xl border border-border p-4 space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={handlePlayPause}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium"
-              >
-                {isPlaying ? <><Pause className="w-4 h-4" />Pause</> : <><Play className="w-4 h-4" />Play</>}
-              </button>
-              <button onClick={handleStop} className="p-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground">
-                <Square className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => { setTtsEnabled((v) => !v); if (ttsEnabled) stopTTS(); }}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${ttsEnabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
-                title={ttsEnabled ? "Mute TTS audio (sync continues)" : "Unmute TTS audio"}
-              >
-                {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                {ttsEnabled ? "Mute" : "Unmuted"}
-              </button>
-
-              {/* Voice picker */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowVoicePicker((v) => !v)}
-                  className="flex items-center gap-1 px-2 py-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-xs capitalize"
-                >
-                  {voice} <ChevronDown className="w-3 h-3" />
+            {/* Log Event */}
+            <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Log Event at {fmtMmSs(Math.round(playbackTime))}</h2>
+              <div className="flex flex-wrap gap-1.5">
+                {EVENT_CATEGORIES.map((c) => {
+                  const active = newEventCats.includes(c.value);
+                  return (
+                    <button key={c.value} type="button"
+                      onClick={() => setNewEventCats((prev) => prev.includes(c.value) ? prev.filter((v) => v !== c.value) : [...prev, c.value])}
+                      className="text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all"
+                      style={active ? { background: c.color, color: "#fff", borderColor: c.color } : { background: c.color + "18", color: c.color, borderColor: c.color + "44" }}
+                    >{c.label}</button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2 items-end">
+                <textarea
+                  value={newEventNote.replace(/\u200b.*$/, "")}
+                  onChange={(e) => setNewEventNote(e.target.value)}
+                  placeholder="Describe the event… or tap the mic to dictate"
+                  rows={2}
+                  className="flex-1 resize-none text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                {sttSupported && (
+                  <button onClick={toggleListening}
+                    className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors border ${isListening ? "bg-destructive/10 border-destructive text-destructive animate-pulse" : "bg-muted border-border text-muted-foreground hover:text-foreground"}`}
+                    title={isListening ? "Stop dictation" : "Start dictation"}>
+                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                )}
+                <button onClick={handleSaveEvent} disabled={!newEventNote.replace(/\u200b.*$/, "").trim() || savingEvent}
+                  className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors" title="Save event">
+                  {savingEvent ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Plus className="w-4 h-4" />}
                 </button>
-                {showVoicePicker && (
-                  <div className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[100px]">
-                    {OAI_VOICES.map((v) => (
-                      <button key={v} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted capitalize ${voice === v ? "text-primary font-medium" : "text-foreground"}`}
-                        onClick={() => { setVoice(v); voiceRef.current = v; localStorage.setItem("tts_oai_voice", v); setShowVoicePicker(false); }}>
-                        {v}
+              </div>
+              {isListening && (
+                <p className="text-[10px] text-destructive flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-destructive animate-pulse inline-block" />
+                  Listening… speak your event note
+                </p>
+              )}
+            </div>
+
+            {/* AI Narration panels */}
+            {(hasCascade || hasAnalysis) && (
+              <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">AI Narration</h2>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {["events", ...(hasCascade ? ["cascade"] : []), ...(hasAnalysis ? ["analysis"] : [])].map((m) => (
+                      <button key={m} onClick={() => { setTtsMode(m); stopTTS(); }}
+                        className="px-2.5 py-1 rounded-full text-[10px] font-semibold border capitalize transition-colors"
+                        style={ttsMode === m
+                          ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", borderColor: "hsl(var(--primary))" }
+                          : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
+                        {m === "cascade" ? "Cascade Overview" : m === "analysis" ? "Session Analysis" : "Events Only"}
                       </button>
                     ))}
                   </div>
+                </div>
+                {ttsMode === "events" && (
+                  <p className="text-xs text-muted-foreground">TTS reads each event note as playback reaches it. Switch to Cascade or Analysis to read full AI text.</p>
+                )}
+                {ttsMode === "cascade" && hasCascade && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => aiReadingRef.current ? stopTTS() : startAIReading(cascadeParas, 0)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20">
+                        {aiReadingRef.current ? <><Pause className="w-3 h-3" />Pause</> : <><Play className="w-3 h-3" />Read Cascade</>}
+                      </button>
+                      <span className="text-[10px] text-muted-foreground">Tap paragraph to jump</span>
+                    </div>
+                    {cascadeParas.map((text, i) => (
+                      <AIParagraph key={i} text={text} isActive={activePara === i} isBuffering={bufferingPara === i} onClick={() => startAIReading(cascadeParas, i)} />
+                    ))}
+                  </div>
+                )}
+                {ttsMode === "analysis" && hasAnalysis && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => aiReadingRef.current ? stopTTS() : startAIReading(analysisParas, 0)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20">
+                        {aiReadingRef.current ? <><Pause className="w-3 h-3" />Pause</> : <><Play className="w-3 h-3" />Read Analysis</>}
+                      </button>
+                      <span className="text-[10px] text-muted-foreground">Tap paragraph to jump</span>
+                    </div>
+                    {analysisParas.map((text, i) => (
+                      <AIParagraph key={i} text={text} isActive={activePara === i} isBuffering={bufferingPara === i} onClick={() => startAIReading(analysisParas, i)} />
+                    ))}
+                  </div>
                 )}
               </div>
-
-              {currentHR && (
-                <span className="font-mono text-sm font-bold text-primary ml-auto">{currentHR} bpm</span>
-              )}
-              <span className="font-mono text-sm text-muted-foreground">{fmtMmSs(playbackTime)}</span>
-            </div>
-
-            {/* Scrubber */}
-            <div className="space-y-1">
-              <input type="range" min={0} max={maxTime} step={0.5} value={playbackTime} onChange={handleScrub}
-                className="w-full h-1.5 cursor-pointer" style={{ accentColor: "hsl(var(--primary))" }} />
-              {/* Event ticks */}
-              <div className="relative h-2">
-                {events.map((ev, i) => {
-                  const color = EVENT_COLORS[i % EVENT_COLORS.length];
-                  return (
-                    <button key={i} onClick={() => handleJump(ev.time_s)}
-                      className="absolute top-0 w-1 h-2 rounded-full transform -translate-x-0.5 opacity-80 hover:opacity-100 hover:scale-150 transition-all"
-                      style={{ left: `${(ev.time_s / maxTime) * 100}%`, background: color }}
-                      title={`${fmtMmSs(ev.time_s)} — ${ev.note}`} />
-                  );
-                })}
-              </div>
-              <div className="flex justify-between text-[9px] text-muted-foreground">
-                <span>0:00</span><span>{fmtMmSs(maxTime)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Current event navigator */}
-          {events.length > 0 && (
-            <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Current Event</h2>
-
-              {navEv ? (
-                <div className="rounded-lg px-3 py-3" style={{ background: navColor + "18", borderLeft: `3px solid ${navColor}` }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <button onClick={() => handleJump(events[Math.max(0, activeEventIdx - 1)].time_s)} className="p-0.5 rounded hover:bg-black/10">
-                      <ChevronLeft className="w-4 h-4" style={{ color: navColor }} />
-                    </button>
-                    <div className="flex-1 flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-[11px] font-bold" style={{ color: navColor }}>
-                        E{activeEventIdx + 1} / {events.length}
-                      </span>
-                      <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(navEv.time_s)}</span>
-                      <div className="flex flex-wrap gap-1">{getCategories(navEv).map((c) => <CategoryPill key={c} value={c} />)}</div>
-                      {currentHR && <span className="font-mono text-[11px] font-bold text-primary">{currentHR} bpm</span>}
-                    </div>
-                    <button onClick={() => handleJump(events[Math.min(events.length - 1, activeEventIdx + 1)].time_s)} className="p-0.5 rounded hover:bg-black/10">
-                      <ChevronRight className="w-4 h-4" style={{ color: navColor }} />
-                    </button>
-                  </div>
-                  <p className="text-sm text-foreground/90 leading-relaxed">{navEv.note}</p>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No event reached yet. Press Play or tap an event below.</p>
-              )}
-
-              {/* Events list */}
-              <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                {events.map((ev, i) => {
-                  const cats = getCategories(ev);
-                  const color = EVENT_COLORS[i % EVENT_COLORS.length];
-                  const isActive = i === activeEventIdx;
-                  const isPast = i < activeEventIdx;
-                  return (
-                    <button key={i} onClick={() => handleJump(ev.time_s)}
-                      className={`w-full flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-opacity ${isActive ? "" : isPast ? "opacity-40" : "opacity-70"}`}
-                      style={{ background: isActive ? color + "30" : color + "15", borderLeft: `3px solid ${color}`, outline: isActive ? `1px solid ${color}55` : "none" }}>
-                      <span className="font-mono text-[10px] shrink-0 mt-0.5 font-bold" style={{ color }}>
-                        E{i + 1} {fmtMmSs(ev.time_s)}
-                      </span>
-                      <div className="flex-1 flex flex-col gap-0.5">
-                        <div className="flex flex-wrap gap-1">{cats.map((c) => <CategoryPill key={c} value={c} />)}</div>
-                        <span className="text-xs text-foreground/90 leading-snug">{ev.note}</span>
-                      </div>
-                      {(() => { const hr = nearestHR(chartData, ev.time_s); return hr && <span className="font-mono text-[10px] shrink-0 font-bold text-primary/80 mt-0.5">{hr} bpm</span>; })()}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Log Event */}
-          <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Log Event at {fmtMmSs(Math.round(playbackTime))}</h2>
-
-            {/* Category selector */}
-            <div className="flex flex-wrap gap-1.5">
-              {EVENT_CATEGORIES.map((c) => {
-                const active = newEventCats.includes(c.value);
-                return (
-                  <button key={c.value} type="button"
-                    onClick={() => setNewEventCats((prev) =>
-                      prev.includes(c.value) ? prev.filter((v) => v !== c.value) : [...prev, c.value]
-                    )}
-                    className="text-[10px] px-2 py-0.5 rounded-full border font-medium transition-all"
-                    style={active
-                      ? { background: c.color, color: "#fff", borderColor: c.color }
-                      : { background: c.color + "18", color: c.color, borderColor: c.color + "44" }
-                    }
-                  >{c.label}</button>
-                );
-              })}
-            </div>
-
-            {/* Textarea + mic */}
-            <div className="flex gap-2 items-end">
-              <textarea
-                value={newEventNote.replace(/\u200b.*$/, "")}
-                onChange={(e) => setNewEventNote(e.target.value)}
-                placeholder="Describe the event… or tap the mic to dictate"
-                rows={2}
-                className="flex-1 resize-none text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              {sttSupported && (
-                <button
-                  onClick={toggleListening}
-                  className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors border ${
-                    isListening
-                      ? "bg-destructive/10 border-destructive text-destructive animate-pulse"
-                      : "bg-muted border-border text-muted-foreground hover:text-foreground"
-                  }`}
-                  title={isListening ? "Stop dictation" : "Start dictation"}
-                >
-                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                </button>
-              )}
-              <button
-                onClick={handleSaveEvent}
-                disabled={!newEventNote.replace(/\u200b.*$/, "").trim() || savingEvent}
-                className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors"
-                title="Save event"
-              >
-                {savingEvent ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Plus className="w-4 h-4" />}
-              </button>
-            </div>
-
-            {isListening && (
-              <p className="text-[10px] text-destructive flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse inline-block" />
-                Listening… speak your event note
-              </p>
             )}
           </div>
 
-          {/* AI Narration panels */}
-          {(hasCascade || hasAnalysis) && (
-            <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">AI Narration</h2>
-                <div className="flex gap-1.5 flex-wrap">
-                  {["events", ...(hasCascade ? ["cascade"] : []), ...(hasAnalysis ? ["analysis"] : [])].map((m) => (
-                    <button key={m} onClick={() => { setTtsMode(m); stopTTS(); }}
-                      className="px-2.5 py-1 rounded-full text-[10px] font-semibold border capitalize transition-colors"
-                      style={ttsMode === m
-                        ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", borderColor: "hsl(var(--primary))" }
-                        : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
-                      {m === "cascade" ? "Cascade Overview" : m === "analysis" ? "Session Analysis" : "Events Only"}
-                    </button>
-                  ))}
-                </div>
+          {/* ── Right sidebar: current event + events list ── */}
+          {events.length > 0 && (
+            <div className="w-72 shrink-0 space-y-3 sticky top-4 self-start">
+              {/* Current event */}
+              <div className="bg-card rounded-xl border border-border p-3 space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Current Event</h2>
+                {navEv ? (
+                  <div className="rounded-lg px-3 py-2.5" style={{ background: navColor + "18", borderLeft: `3px solid ${navColor}` }}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <button onClick={() => handleJump(events[Math.max(0, activeEventIdx - 1)].time_s)} className="p-0.5 rounded hover:bg-black/10">
+                        <ChevronLeft className="w-4 h-4" style={{ color: navColor }} />
+                      </button>
+                      <span className="font-mono text-[11px] font-bold" style={{ color: navColor }}>E{activeEventIdx + 1}/{events.length}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground">{fmtMmSs(navEv.time_s)}</span>
+                      {currentHR && <span className="font-mono text-[10px] font-bold text-primary ml-auto">{currentHR} bpm</span>}
+                      <button onClick={() => handleJump(events[Math.min(events.length - 1, activeEventIdx + 1)].time_s)} className="p-0.5 rounded hover:bg-black/10">
+                        <ChevronRight className="w-4 h-4" style={{ color: navColor }} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-1">{getCategories(navEv).map((c) => <CategoryPill key={c} value={c} />)}</div>
+                    <p className="text-xs text-foreground/90 leading-relaxed">{navEv.note}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No event reached yet.</p>
+                )}
               </div>
 
-              {ttsMode === "events" && (
-                <p className="text-xs text-muted-foreground">TTS reads each event note as playback reaches it. Switch to Cascade or Analysis to read full AI text.</p>
-              )}
-
-              {ttsMode === "cascade" && hasCascade && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => aiReadingRef.current ? stopTTS() : startAIReading(cascadeParas, 0)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20"
-                    >
-                      {aiReadingRef.current ? <><Pause className="w-3 h-3" />Pause</> : <><Play className="w-3 h-3" />Read Cascade</>}
-                    </button>
-                    <span className="text-[10px] text-muted-foreground">Tap paragraph to jump</span>
-                  </div>
-                  {cascadeParas.map((text, i) => (
-                    <AIParagraph key={i} text={text}
-                      isActive={activePara === i}
-                      isBuffering={bufferingPara === i}
-                      onClick={() => startAIReading(cascadeParas, i)}
-                    />
-                  ))}
+              {/* Events list */}
+              <div className="bg-card rounded-xl border border-border p-3 space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Events ({events.length})</h2>
+                <div className="space-y-1 max-h-[calc(100vh-320px)] overflow-y-auto">
+                  {events.map((ev, i) => {
+                    const cats = getCategories(ev);
+                    const color = EVENT_COLORS[i % EVENT_COLORS.length];
+                    const isActive = i === activeEventIdx;
+                    const isPast = i < activeEventIdx;
+                    return (
+                      <button key={i} onClick={() => handleJump(ev.time_s)}
+                        className={`w-full flex items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-opacity ${isActive ? "" : isPast ? "opacity-40" : "opacity-70"}`}
+                        style={{ background: isActive ? color + "30" : color + "15", borderLeft: `3px solid ${color}`, outline: isActive ? `1px solid ${color}55` : "none" }}>
+                        <span className="font-mono text-[9px] shrink-0 mt-0.5 font-bold" style={{ color }}>
+                          E{i + 1} {fmtMmSs(ev.time_s)}
+                        </span>
+                        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                          <div className="flex flex-wrap gap-0.5">{cats.map((c) => <CategoryPill key={c} value={c} />)}</div>
+                          <span className="text-[10px] text-foreground/90 leading-snug truncate">{ev.note}</span>
+                        </div>
+                        {(() => { const hr = nearestHR(chartData, ev.time_s); return hr && <span className="font-mono text-[9px] shrink-0 font-bold text-primary/80 mt-0.5">{hr}</span>; })()}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
-
-              {ttsMode === "analysis" && hasAnalysis && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => aiReadingRef.current ? stopTTS() : startAIReading(analysisParas, 0)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20"
-                    >
-                      {aiReadingRef.current ? <><Pause className="w-3 h-3" />Pause</> : <><Play className="w-3 h-3" />Read Analysis</>}
-                    </button>
-                    <span className="text-[10px] text-muted-foreground">Tap paragraph to jump</span>
-                  </div>
-                  {analysisParas.map((text, i) => (
-                    <AIParagraph key={i} text={text}
-                      isActive={activePara === i}
-                      isBuffering={bufferingPara === i}
-                      onClick={() => startAIReading(analysisParas, i)}
-                    />
-                  ))}
-                </div>
-              )}
+              </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
