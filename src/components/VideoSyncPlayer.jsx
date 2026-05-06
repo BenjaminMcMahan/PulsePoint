@@ -103,13 +103,14 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
 
   // STT
   const [isListening, setIsListening] = useState(false);
+  const [interimText, setInterimText] = useState("");
   const recognitionRef = useRef(null);
+  const finalTranscriptRef = useRef("");
   const sttSupported = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
   const toggleListening = useCallback(() => {
     if (isListening) {
       recognitionRef.current?.stop();
-      setIsListening(false);
       return;
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -119,30 +120,40 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
     rec.continuous = true;
     rec.interimResults = true;
     recognitionRef.current = rec;
-    let finalTranscript = "";
+    finalTranscriptRef.current = "";
     rec.onresult = (e) => {
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + " ";
-        else interim += e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          finalTranscriptRef.current += e.results[i][0].transcript + " ";
+        } else {
+          interim += e.results[i][0].transcript;
+        }
       }
-      setNewNote((prev) => {
-        const base = prev.replace(/\u200b.*$/, "").trimEnd();
-        return (base ? base + " " : "") + finalTranscript + "\u200b" + interim;
-      });
+      setInterimText(interim);
     };
     rec.onend = () => {
+      const result = finalTranscriptRef.current.trim();
+      if (result) {
+        setNewNote((prev) => {
+          const base = prev.trim();
+          return base ? base + " " + result : result;
+        });
+      }
+      setInterimText("");
       setIsListening(false);
-      setNewNote((prev) => prev.replace(/\u200b.*$/, "").trim());
     };
-    rec.onerror = () => setIsListening(false);
+    rec.onerror = () => {
+      setInterimText("");
+      setIsListening(false);
+    };
     rec.start();
     setIsListening(true);
   }, [isListening]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
-    setIsListening(false);
+    // onend will fire and clean up
   }, []);
 
   const saveEvents = async (updated) => {
@@ -176,7 +187,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
   };
 
   const commitAdd = async () => {
-    const cleanNote = newNote.replace(/\u200b.*$/, "").trim();
+    const cleanNote = newNote.trim();
     if (!cleanNote) return;
     stopListening();
     const m = parseInt(newMin, 10) || 0;
@@ -420,7 +431,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                 <CategorySelector selected={newCats} onChange={setNewCats} />
                 <div className="flex gap-1.5 items-end">
                    <textarea
-                     value={newNote.replace(/\u200b.*$/, "")}
+                     value={newNote}
                      onChange={(e) => setNewNote(e.target.value)}
                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}
                      placeholder="Describe the event… or tap 🎤 to dictate"
@@ -438,7 +449,12 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                      </button>
                    )}
                  </div>
-                 {isListening && <p className="text-[9px] text-destructive flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block" />Listening…</p>}
+                 {isListening && (
+                   <p className="text-[9px] flex items-center gap-1 text-muted-foreground italic">
+                     <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block shrink-0" />
+                     {interimText || "Listening…"}
+                   </p>
+                 )}
                  <div className="flex gap-2">
                    <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
                      <Check className="w-3 h-3" /> Save
@@ -499,7 +515,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                 <CategorySelector selected={newCats} onChange={setNewCats} />
                 <div className="flex gap-1.5 items-end">
                    <textarea
-                     value={newNote.replace(/\u200b.*$/, "")}
+                     value={newNote}
                      onChange={(e) => setNewNote(e.target.value)}
                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}
                      placeholder="Describe the event… or tap 🎤 to dictate"
@@ -517,7 +533,12 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                      </button>
                    )}
                  </div>
-                 {isListening && <p className="text-[9px] text-destructive flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block" />Listening…</p>}
+                 {isListening && (
+                   <p className="text-[9px] flex items-center gap-1 text-muted-foreground italic">
+                     <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block shrink-0" />
+                     {interimText || "Listening…"}
+                   </p>
+                 )}
                  <div className="flex gap-2">
                    <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
                      <Check className="w-3 h-3" /> Save
