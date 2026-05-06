@@ -210,7 +210,7 @@ export default function EventSyncPlayer() {
 
   // Speak a single text (event note)
   const speakText = useCallback(async (text) => {
-    if (!ttsEnabledRef.current) return;
+    if (!ttsEnabledRef.current) { stopTTS(); return; }
     stopTTS();
     const ctx = getCtx();
     if (ctx.state === "suspended") await ctx.resume();
@@ -270,7 +270,7 @@ export default function EventSyncPlayer() {
       for (let i = 0; i < events.length; i++) {
         if (time >= events[i].time_s && !firedEventsRef.current.has(i)) {
           firedEventsRef.current.add(i);
-          speakText(events[i].note);
+          if (ttsEnabledRef.current) speakText(events[i].note);
         }
       }
     }
@@ -480,7 +480,7 @@ export default function EventSyncPlayer() {
   const hasAnalysis = analysisParas.length > 0;
 
   return (
-    <div className="px-3 py-5 pb-28 space-y-4 max-w-2xl mx-auto">
+    <div className="px-3 py-5 pb-28 space-y-4">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Session Playback</h1>
         <p className="text-sm text-muted-foreground mt-0.5">HR timeline + event overlay + AI narration, synced to real-time playback.</p>
@@ -529,7 +529,7 @@ export default function EventSyncPlayer() {
                 <input type="file" accept="video/*" className="hidden" onChange={handleVideoFile} />
               </label>
             ) : (
-              <video ref={videoRef} src={videoSrc} className="w-full rounded-lg max-h-56 bg-black" controls={false} playsInline />
+              <video ref={videoRef} src={videoSrc} className="w-full rounded-lg bg-black" controls={false} playsInline />
             )}
           </div>
 
@@ -609,11 +609,12 @@ export default function EventSyncPlayer() {
               </button>
 
               <button
-                onClick={() => setTtsEnabled((v) => !v)}
+                onClick={() => { setTtsEnabled((v) => !v); if (ttsEnabled) stopTTS(); }}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${ttsEnabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
+                title={ttsEnabled ? "Mute TTS audio (sync continues)" : "Unmute TTS audio"}
               >
                 {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                TTS
+                {ttsEnabled ? "Mute" : "Unmuted"}
               </button>
 
               {/* Voice picker */}
