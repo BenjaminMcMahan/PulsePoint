@@ -19,15 +19,15 @@ function fmtMmSs(s) {
 
 // Keywords in event notes that corroborate a near-climax event
 const NCE_KEYWORDS = [
-  "tension", "tense", "tight", "tighten", "clench", "grip",
-  "foot", "feet", "plant", "planting", "toe", "curl",
-  "throb", "pulse", "pulsing", "twitch", "spasm",
-  "edge", "edg", "near", "almost", "close", "threshold",
-  "pressure", "build", "buildup", "surge", "wave", "rush",
-  "intense", "intensity", "strong", "overwhelming",
-  "breath", "breathing", "gasp", "hold",
-  "shiver", "shak", "tremble",
-];
+"tension", "tense", "tight", "tighten", "clench", "grip",
+"foot", "feet", "plant", "planting", "toe", "curl",
+"throb", "pulse", "pulsing", "twitch", "spasm",
+"edge", "edg", "near", "almost", "close", "threshold",
+"pressure", "build", "buildup", "surge", "wave", "rush",
+"intense", "intensity", "strong", "overwhelming",
+"breath", "breathing", "gasp", "hold",
+"shiver", "shak", "tremble"];
+
 
 function scoreEventNoteCorroboration(eventStartS, eventEndS, sessionEvents) {
   if (!sessionEvents || sessionEvents.length === 0) return 0;
@@ -40,9 +40,9 @@ function scoreEventNoteCorroboration(eventStartS, eventEndS, sessionEvents) {
     const proximityWeight = dist < 15 ? 2 : 1;
     const note = (ev.note || "").toLowerCase();
     const cats = Array.isArray(ev.category) ? ev.category : [ev.category].filter(Boolean);
-    if (cats.some(c => ["physical", "sensation"].includes(c))) score += 1 * proximityWeight;
+    if (cats.some((c) => ["physical", "sensation"].includes(c))) score += 1 * proximityWeight;
     for (const kw of NCE_KEYWORDS) {
-      if (note.includes(kw)) { score += 2 * proximityWeight; break; }
+      if (note.includes(kw)) {score += 2 * proximityWeight;break;}
     }
   }
   return score;
@@ -57,13 +57,13 @@ export function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS, se
     return { t: Number(r.time_offset_s), hr: avg };
   });
 
-  const excludeStart = climaxOffsetS != null
-    ? (preClimaxOffsetS != null
-        ? Math.min(preClimaxOffsetS, climaxOffsetS - 60)
-        : climaxOffsetS - 90)
-    : Infinity;
+  const excludeStart = climaxOffsetS != null ?
+  preClimaxOffsetS != null ?
+  Math.min(preClimaxOffsetS, climaxOffsetS - 60) :
+  climaxOffsetS - 90 :
+  Infinity;
 
-  const allHRs = smoothed.filter(p => p.t < excludeStart).map(p => p.hr);
+  const allHRs = smoothed.filter((p) => p.t < excludeStart).map((p) => p.hr);
   if (allHRs.length < 10) return [];
   const sessionMinHR = Math.min(...allHRs);
   const sessionMaxHR = Math.max(...allHRs);
@@ -88,7 +88,7 @@ export function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS, se
   while (i < smoothed.length - 5) {
     const { t: t0, hr: hr0 } = smoothed[i];
 
-    if (t0 < lastEventEnd + COOLDOWN_S) { i++; continue; }
+    if (t0 < lastEventEnd + COOLDOWN_S) {i++;continue;}
     if (t0 >= excludeStart) break;
 
     let peakIdx = i;
@@ -96,11 +96,11 @@ export function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS, se
     for (let j = i + 1; j < smoothed.length; j++) {
       if (smoothed[j].t - t0 > RISE_WINDOW_S) break;
       if (smoothed[j].t >= excludeStart) break;
-      if (smoothed[j].hr > peakHr) { peakHr = smoothed[j].hr; peakIdx = j; }
+      if (smoothed[j].hr > peakHr) {peakHr = smoothed[j].hr;peakIdx = j;}
     }
 
     const rise = peakHr - hr0;
-    if (rise < MIN_RISE_BPM || rise > MAX_RISE_BPM || peakIdx === i) { i++; continue; }
+    if (rise < MIN_RISE_BPM || rise > MAX_RISE_BPM || peakIdx === i) {i++;continue;}
 
     const peakTime = smoothed[peakIdx].t;
 
@@ -110,25 +110,25 @@ export function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS, se
       if (smoothed[j].hr >= peakHr - SUSTAINED_TOLERANCE) sustainedEndIdx = j;
     }
     const sustainedDuration = smoothed[sustainedEndIdx].t - peakTime;
-    if (sustainedDuration < SUSTAINED_THRESHOLD_S) { i = peakIdx + 1; continue; }
+    if (sustainedDuration < SUSTAINED_THRESHOLD_S) {i = peakIdx + 1;continue;}
 
     let dropIdx = -1;
     for (let j = sustainedEndIdx + 1; j < smoothed.length; j++) {
       if (smoothed[j].t - peakTime > SEARCH_DROP_S) break;
-      if (smoothed[j].hr <= peakHr - DROP_BPM) { dropIdx = j; break; }
+      if (smoothed[j].hr <= peakHr - DROP_BPM) {dropIdx = j;break;}
     }
-    if (dropIdx === -1) { i = peakIdx + 1; continue; }
+    if (dropIdx === -1) {i = peakIdx + 1;continue;}
 
     const eventDuration = smoothed[dropIdx].t - t0;
-    if (eventDuration < MIN_DURATION_S || eventDuration > MAX_DURATION_S) { i++; continue; }
+    if (eventDuration < MIN_DURATION_S || eventDuration > MAX_DURATION_S) {i++;continue;}
 
-    if (peakHr >= sessionMaxHR * 0.96) { i = dropIdx + 1; continue; }
+    if (peakHr >= sessionMaxHR * 0.96) {i = dropIdx + 1;continue;}
 
     const noteScore = scoreEventNoteCorroboration(t0, smoothed[dropIdx].t, sessionEvents);
     const hrConfidence = Math.min(4, Math.floor((rise / MIN_RISE_BPM - 1) * 2) + Math.floor(sustainedDuration / 20));
     const totalConfidence = hrConfidence + noteScore;
 
-    if (totalConfidence < MIN_CONFIDENCE) { i++; continue; }
+    if (totalConfidence < MIN_CONFIDENCE) {i++;continue;}
 
     events.push({
       start_offset_s: t0,
@@ -140,7 +140,7 @@ export function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS, se
       sustained_s: Math.round(sustainedDuration),
       duration_s: Math.round(eventDuration),
       confidence: Math.min(10, totalConfidence),
-      note_corroborated: noteScore > 0,
+      note_corroborated: noteScore > 0
     });
 
     lastEventEnd = smoothed[dropIdx].t;
@@ -154,9 +154,9 @@ export function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS, se
 function sampleHRData(rows, targetPoints = 150) {
   if (!rows.length) return [];
   const step = Math.max(1, Math.floor(rows.length / targetPoints));
-  return rows
-    .filter((_, i) => i % step === 0)
-    .map(r => ({ t: Math.round(Number(r.time_offset_s)), hr: Math.round(Number(r.hr)) }));
+  return rows.
+  filter((_, i) => i % step === 0).
+  map((r) => ({ t: Math.round(Number(r.time_offset_s)), hr: Math.round(Number(r.hr)) }));
 }
 
 export default function NearClimaxEvents({ timelineRows, session, selectedIndex, onSelectIndex, onEventsRefined }) {
@@ -182,26 +182,26 @@ export default function NearClimaxEvents({ timelineRows, session, selectedIndex,
     const algoEvents = algorithmicEvents;
 
     // Build context from any existing AI analysis
-    const existingAnalysis = session.ai_analysis
-      ? [
-          session.ai_analysis.summary,
-          ...(session.ai_analysis.arousal_arc || []),
-          ...(session.ai_analysis.event_analysis || []),
-        ].filter(Boolean).join(" ")
-      : "";
+    const existingAnalysis = session.ai_analysis ?
+    [
+    session.ai_analysis.summary,
+    ...(session.ai_analysis.arousal_arc || []),
+    ...(session.ai_analysis.event_analysis || [])].
+    filter(Boolean).join(" ") :
+    "";
 
-    const cascadeContext = session.ai_cascade
-      ? [
-          session.ai_cascade.summary,
-          ...(session.ai_cascade.build_phase || []),
-          ...(session.ai_cascade.pre_climax_phase || []),
-        ].filter(Boolean).join(" ")
-      : "";
+    const cascadeContext = session.ai_cascade ?
+    [
+    session.ai_cascade.summary,
+    ...(session.ai_cascade.build_phase || []),
+    ...(session.ai_cascade.pre_climax_phase || [])].
+    filter(Boolean).join(" ") :
+    "";
 
-    const userEvents = (session.event_timeline || []).map(e => ({
+    const userEvents = (session.event_timeline || []).map((e) => ({
       t: Math.round(e.time_s),
       note: e.note,
-      category: Array.isArray(e.category) ? e.category : [e.category].filter(Boolean),
+      category: Array.isArray(e.category) ? e.category : [e.category].filter(Boolean)
     }));
 
     const res = await base44.integrations.Core.InvokeLLM({
@@ -221,13 +221,13 @@ ${cascadeContext ? `CASCADE ANALYSIS:
 ${cascadeContext.slice(0, 800)}` : ""}
 
 ${userEvents.length > 0 ? `USER-LOGGED EVENTS:
-${userEvents.map(e => `[${e.t}s] ${e.category.join(",")} — ${e.note}`).join("\n")}` : ""}
+${userEvents.map((e) => `[${e.t}s] ${e.category.join(",")} — ${e.note}`).join("\n")}` : ""}
 
 ALGORITHMICALLY DETECTED EVENTS (use as starting hints, refine or reject based on HR data and context):
 ${algoEvents.length > 0 ? JSON.stringify(algoEvents, null, 2) : "None detected algorithmically."}
 
 HR DATA (time_s → bpm, sampled every ~${Math.max(1, Math.floor(timelineRows.length / 200))}s):
-${hrSample.map(p => `${p.t}:${p.hr}`).join("  ")}
+${hrSample.map((p) => `${p.t}:${p.hr}`).join("  ")}
 
 Instructions:
 1. Analyze the HR trace carefully. Look for rises of 8+ bpm that sustain for 20+ seconds before dropping — these are near-climax candidates.
@@ -256,15 +256,15 @@ Return an array of near-climax events. If none exist, return an empty array.`,
                 confidence: { type: "number" },
                 note_corroborated: { type: "boolean" },
                 ai_label: { type: "string" },
-                ai_interpretation: { type: "string" },
+                ai_interpretation: { type: "string" }
               },
-              required: ["start_offset_s", "peak_offset_s", "end_offset_s", "base_hr", "peak_hr", "rise_bpm", "ai_label", "ai_interpretation"],
-            },
+              required: ["start_offset_s", "peak_offset_s", "end_offset_s", "base_hr", "peak_hr", "rise_bpm", "ai_label", "ai_interpretation"]
+            }
           },
-          summary: { type: "string" },
+          summary: { type: "string" }
         },
-        required: ["events"],
-      },
+        required: ["events"]
+      }
     });
 
     const raw = typeof res === "string" ? JSON.parse(res) : res;
@@ -287,11 +287,11 @@ Return an array of near-climax events. If none exist, return an empty array.`,
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "hsl(var(--chart-3))" }}>
           <Zap className="w-3.5 h-3.5" /> Near-Climax Events
-          {isAIRefined && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-accent/20 text-accent border border-accent/30">
+          {isAIRefined &&
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-accent/20 text-accent border border-accent/30">
               <Sparkles className="w-2.5 h-2.5" /> AI
             </span>
-          )}
+          }
         </h3>
         <Button
           size="sm"
@@ -299,39 +299,39 @@ Return an array of near-climax events. If none exist, return an empty array.`,
           disabled={refining}
           onClick={refineWithAI}
           className="h-6 text-[10px] gap-1 px-2 text-muted-foreground hover:text-accent"
-          title={hasAIAnalysis ? "Re-run AI refinement using session analysis" : "Run AI refinement (run session AI analysis first for best results)"}
-        >
-          {refining ? (
-            <><span className="w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin" />Refining…</>
-          ) : (
-            <><Sparkles className="w-2.5 h-2.5" />{isAIRefined ? "Re-refine" : "Refine with AI"}</>
-          )}
+          title={hasAIAnalysis ? "Re-run AI refinement using session analysis" : "Run AI refinement (run session AI analysis first for best results)"}>
+          
+          {refining ?
+          <><span className="w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin" />Refining…</> :
+
+          <><Sparkles className="w-2.5 h-2.5" />{isAIRefined ? "Re-refine" : "Refine with AI"}</>
+          }
         </Button>
       </div>
 
-      {!hasAIAnalysis && !isAIRefined && (
-        <p className="text-[10px] text-muted-foreground italic">
+      {!hasAIAnalysis && !isAIRefined &&
+      <p className="text-[10px] text-muted-foreground italic">
           Run AI Session Analysis first for more accurate refinement.
         </p>
-      )}
+      }
 
-      {events.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
+      {events.length === 0 ?
+      <p className="text-xs text-muted-foreground">
           No near-climax events detected{isAIRefined ? " (AI-verified)" : " in this session's HR data"}.
-        </p>
-      ) : (
-        <>
+        </p> :
+
+      <>
           <div className="grid grid-cols-3 gap-2">
             {[
-              ["Detected", events.length],
-              ["Total Time", fmtSec(events.reduce((a, e) => a + (e.duration_s || 0), 0))],
-              ["Avg Rise", `+${Math.round(events.reduce((a, e) => a + (e.rise_bpm || 0), 0) / events.length)} bpm`],
-            ].map(([label, val]) => (
-              <div key={label} className="bg-muted/50 rounded-lg p-2 text-center">
+          ["Detected", events.length],
+          ["Total Time", fmtSec(events.reduce((a, e) => a + (e.duration_s || 0), 0))],
+          ["Avg Rise", `+${Math.round(events.reduce((a, e) => a + (e.rise_bpm || 0), 0) / events.length)} bpm`]].
+          map(([label, val]) =>
+          <div key={label} className="bg-muted/50 rounded-lg p-2 text-center">
                 <p className="text-lg font-bold font-mono">{val}</p>
                 <p className="text-[9px] text-muted-foreground">{label}</p>
               </div>
-            ))}
+          )}
           </div>
 
           <p className="text-[10px] text-muted-foreground italic">
@@ -340,18 +340,18 @@ Return an array of near-climax events. If none exist, return an empty array.`,
 
           <div className="space-y-2">
             {events.map((ev, i) => {
-              const isSelected = selectedIndex === i;
-              return (
-                <button
-                  key={i}
-                  onClick={() => handleTap(i)}
-                  className="w-full text-left rounded-lg px-3 py-2.5 space-y-1.5 transition-all"
-                  style={{
-                    background: isSelected ? "hsl(var(--chart-3) / 0.2)" : "hsl(var(--chart-3) / 0.08)",
-                    borderLeft: `3px solid hsl(var(--chart-3) / ${isSelected ? "1" : "0.5"})`,
-                    outline: isSelected ? "1.5px solid hsl(var(--chart-3) / 0.5)" : "none",
-                  }}
-                >
+            const isSelected = selectedIndex === i;
+            return (
+              <button
+                key={i}
+                onClick={() => handleTap(i)}
+                className="w-full text-left rounded-lg px-3 py-2.5 space-y-1.5 transition-all"
+                style={{
+                  background: isSelected ? "hsl(var(--chart-3) / 0.2)" : "hsl(var(--chart-3) / 0.08)",
+                  borderLeft: `3px solid hsl(var(--chart-3) / ${isSelected ? "1" : "0.5"})`,
+                  outline: isSelected ? "1.5px solid hsl(var(--chart-3) / 0.5)" : "none"
+                }}>
+                
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold font-mono" style={{ color: "hsl(var(--chart-3))" }}>
                       {ev.ai_label ? ev.ai_label : `Event ${i + 1}`} — {fmtMmSs(ev.start_offset_s)}
@@ -370,28 +370,28 @@ Return an array of near-climax events. If none exist, return an empty array.`,
                     <span className="text-[10px]" style={{ color: "hsl(var(--chart-3))" }}>
                       ↑ +{ev.rise_bpm} bpm
                     </span>
-                    {ev.sustained_s > 0 && (
-                      <span className="text-[10px] text-muted-foreground">
+                    {ev.sustained_s > 0 &&
+                  <span className="text-[10px] text-muted-foreground">
                         Sustained <strong className="text-foreground font-mono">{fmtSec(ev.sustained_s)}</strong>
                       </span>
-                    )}
-                    {ev.note_corroborated && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "hsl(var(--chart-3) / 0.2)", color: "hsl(var(--chart-3))" }}>
+                  }
+                    {ev.note_corroborated &&
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "hsl(var(--chart-3) / 0.2)", color: "hsl(var(--chart-3))" }}>
                         ✓ corroborated
                       </span>
-                    )}
+                  }
                   </div>
-                  {ev.ai_interpretation && (
-                    <p className="text-[11px] text-muted-foreground leading-snug mt-1 italic">
+                  {ev.ai_interpretation &&
+                <p className="text-[11px] leading-snug mt-1 italic text-[#ffffff]">
                       {ev.ai_interpretation}
                     </p>
-                  )}
-                </button>
-              );
-            })}
+                }
+                </button>);
+
+          })}
           </div>
         </>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
