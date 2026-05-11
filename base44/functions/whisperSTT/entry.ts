@@ -6,7 +6,7 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { audio_base64, mime_type } = await req.json();
+    const { audio_base64, mime_type, prompt } = await req.json();
     if (!audio_base64) return Response.json({ error: 'No audio provided' }, { status: 400 });
 
     // Decode base64 to binary
@@ -20,6 +20,8 @@ Deno.serve(async (req) => {
     whisperForm.append('file', audioBlob, 'audio.webm');
     whisperForm.append('model', 'whisper-1');
     whisperForm.append('language', 'en');
+    // Optional prompt biases Whisper toward correct vocabulary and punctuation
+    if (prompt) whisperForm.append('prompt', prompt);
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',

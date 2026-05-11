@@ -135,12 +135,13 @@ export default function EventSyncPlayer() {
   const timerStartRef = useRef(null);
   const timerOffsetRef = useRef(0);
 
-  // Log event (with STT)
+  // Log event (with STT via Whisper)
   const [newEventNote, setNewEventNote] = useState("");
   const [newEventCats, setNewEventCats] = useState(["stimulation"]);
-  const [isListening, setIsListening] = useState(false);
-  const [sttSupported] = useState(() => !!(window.SpeechRecognition || window.webkitSpeechRecognition));
-  const recognitionRef = useRef(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const [savingEvent, setSavingEvent] = useState(false);
 
   // Video resize
@@ -391,44 +392,45 @@ export default function EventSyncPlayer() {
     videoUrlRef.current = null; setVideoSrc(null); setVideoMode(false); handleStop();
   };
 
-  // ── STT ───────────────────────────────────────────────────────────────────
+  // ── STT via Whisper (push-to-talk) ───────────────────────────────────────
 
-  const toggleListening = useCallback(() => {
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    const rec = new SR();
-    rec.lang = "en-US";
-    rec.continuous = true;
-    rec.interimResults = true;
-    recognitionRef.current = rec;
+  const startRecording = useCallback(async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunksRef.current = [];
+    const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    mediaRecorderRef.current = mr;
+    mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+    mr.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setIsTranscribing(true);
+      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result.split(",")[1];
+        const res = await base44.functions.invoke("whisperSTT", {
+          audio_base64: base64,
+          mime_type: "audio/webm",
+          prompt: "Sexual health session log. Terms may include: glans, glans penis, perineum, frenulum, prostate, scrotum, foreskin, erection, ejaculation, edging, e-stim, TENS, foley, catheter, urethral, lubrication, climax, arousal, pelvic floor.",
+        });
+        const text = res.data?.text || "";
+        if (text) setNewEventNote((prev) => (prev ? prev + " " + text : text));
+        setIsTranscribing(false);
+      };
+      reader.readAsDataURL(blob);
+    };
+    mr.start();
+    setIsRecording(true);
+  }, []);
 
-    let finalTranscript = "";
-    rec.onresult = (e) => {
-      let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + " ";
-        else interim += e.results[i][0].transcript;
-      }
-      setNewEventNote((prev) => {
-        const base = prev.replace(/\u200b.*$/, "").trimEnd();
-        const appended = (base ? base + " " : "") + finalTranscript;
-        return appended + "\u200b" + interim;
-      });
-    };
-    rec.onend = () => {
-      setIsListening(false);
-      // Strip zero-width space sentinel and trailing interim on stop
-      setNewEventNote((prev) => prev.replace(/\u200b.*$/, "").trim());
-    };
-    rec.onerror = () => { setIsListening(false); };
-    rec.start();
-    setIsListening(true);
-  }, [isListening]);
+  const stopRecording = useCallback(() => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  }, []);
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) stopRecording();
+    else startRecording();
+  }, [isRecording, startRecording, stopRecording]);
 
   const handleSaveEvent = async () => {
     const note = newEventNote.replace(/\u200b.*$/, "").trim();
@@ -692,28 +694,35 @@ export default function EventSyncPlayer() {
               </div>
               <div className="flex gap-2 items-end">
                 <textarea
-                  value={newEventNote.replace(/\u200b.*$/, "")}
+                  value={newEventNote}
                   onChange={(e) => setNewEventNote(e.target.value)}
-                  placeholder="Describe the event… or tap the mic to dictate"
+                  placeholder={isTranscribing ? "Transcribing…" : isRecording ? "Recording… tap mic to stop" : "Describe the event… or tap mic to dictate"}
                   rows={2}
-                  className="flex-1 resize-none text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="flex-1 resize-none text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  disabled={isTranscribing}
                 />
-                {sttSupported && (
-                  <button onClick={toggleListening}
-                    className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors border ${isListening ? "bg-destructive/10 border-destructive text-destructive animate-pulse" : "bg-muted border-border text-muted-foreground hover:text-foreground"}`}
-                    title={isListening ? "Stop dictation" : "Start dictation"}>
-                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  </button>
-                )}
-                <button onClick={handleSaveEvent} disabled={!newEventNote.replace(/\u200b.*$/, "").trim() || savingEvent}
+                <button onClick={toggleRecording} disabled={isTranscribing}
+                  className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors border disabled:opacity-40 ${isRecording ? "bg-destructive/10 border-destructive text-destructive animate-pulse" : "bg-muted border-border text-muted-foreground hover:text-foreground"}`}
+                  title={isRecording ? "Stop & transcribe" : "Dictate event note"}>
+                  {isTranscribing
+                    ? <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    : isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+                <button onClick={handleSaveEvent} disabled={!newEventNote.trim() || savingEvent}
                   className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-primary text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors" title="Save event">
                   {savingEvent ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Plus className="w-4 h-4" />}
                 </button>
               </div>
-              {isListening && (
+              {isRecording && (
                 <p className="text-[10px] text-destructive flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-destructive animate-pulse inline-block" />
-                  Listening… speak your event note
+                  Recording… tap mic again to stop and transcribe
+                </p>
+              )}
+              {isTranscribing && (
+                <p className="text-[10px] text-primary flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse inline-block" />
+                  Transcribing with Whisper…
                 </p>
               )}
             </div>
