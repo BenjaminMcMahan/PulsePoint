@@ -316,6 +316,7 @@ Keep language clinical and grounded in the data. Use specific numbers. Write for
         <TTSReader
           sessionId="trends_analysis"
           title="Long-Term Trends"
+          sessionDate={new Date().toISOString()}
           paragraphs={paras}
           renderParagraph={(text, idx, isActive, isBuffering) => {
             const meta = paraMeta[idx];
