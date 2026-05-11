@@ -10,6 +10,7 @@ import { GitCompare } from "lucide-react";
 import CompareAIPanel from "../components/CompareAIPanel";
 import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import CompareCascadePanel from "../components/CompareCascadePanel";
+import SessionTimelineNarrative from "../components/SessionTimelineNarrative";
 import moment from "moment";
 
 function MetricRow({ label, value, max = 10 }) {
@@ -230,6 +231,17 @@ export default function Compare() {
                 <div key={s.id} className="space-y-1">
                   <p className="text-xs text-muted-foreground font-semibold">{moment(s.date).format("MMM D, YYYY")}</p>
                   <CascadeOverviewPanel session={s} timelineRows={timelineMap[s.id] || []} userProfile={userProfile} />
+                </div>
+              ))}
+            </div>
+
+            {/* Per-session timeline & arousal narrative */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Timeline &amp; Arousal Narrative Per Session</h3>
+              {selectedSessions.map((s) => (
+                <div key={s.id} className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-semibold">{moment(s.date).format("MMM D, YYYY")}</p>
+                  <SessionTimelineNarrative session={s} timelineRows={timelineMap[s.id] || []} userProfile={userProfile} />
                 </div>
               ))}
             </div>
