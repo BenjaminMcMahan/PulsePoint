@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Play, Pause, Video, ChevronLeft, ChevronRight, Pencil, Trash2, Plus, Check, X, SkipBack, SkipForward, Mic, MicOff } from "lucide-react";
+import { Play, Pause, Video, ChevronLeft, ChevronRight, Pencil, Trash2, Plus, Check, X, SkipBack, SkipForward, Mic, MicOff, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -141,7 +141,11 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
           let binary = "";
           for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
           const base64Audio = btoa(binary);
-          const res = await base44.functions.invoke("whisperSTT", { audio_base64: base64Audio, mime_type: mimeType });
+          const res = await base44.functions.invoke("whisperSTT", {
+              audio_base64: base64Audio,
+              mime_type: mimeType,
+              prompt: "Sexual health session log. Terms may include: glans, glans penis, perineum, frenulum, prostate, scrotum, foreskin, erection, ejaculation, edging, e-stim, TENS, foley, catheter, urethral, lubrication, climax, arousal, pelvic floor.",
+            });
           const data = res.data;
           if (data.text) {
             setNewNote((prev) => {
@@ -259,6 +263,14 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
     };
   }, [handleTimeUpdate, videoSrc]);
 
+  // Scroll-to-top
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 300);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -290,10 +302,16 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
         setAddingNew(true);
         setTimeout(() => newNoteRef.current?.focus(), 50);
       }
+
+      // A: save event when add-event form is open and note has text
+      if (e.code === "KeyA" && !inInput && addingNew && newNote.trim()) {
+        e.preventDefault();
+        commitAdd();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [addingNew, sttSupported, toggleListening, playheadS, lastUsedCat]);
+  }, [addingNew, sttSupported, toggleListening, playheadS, lastUsedCat, newNote]);
 
   // Click on chart → seek video
   const handleChartClick = useCallback((data) => {
@@ -356,6 +374,15 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-6 right-4 z-50 w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all"
+          title="Scroll to top"
+        >
+          <ArrowUp className="w-4 h-4" />
+        </button>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
@@ -444,7 +471,10 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
             {/* Add event — right below controls */}
             {addingNew ? (
               <div className="rounded-lg px-3 py-2.5 space-y-2 bg-muted/40 border border-primary/30">
-                <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event at {fmtMmSs(playheadS)}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event at {fmtMmSs(playheadS)}</p>
+                  {newNote.trim() && <span className="text-[9px] text-muted-foreground">press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">A</kbd> to save</span>}
+                </div>
                 <div className="flex items-center gap-2">
                   <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
                     placeholder="min" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
@@ -481,7 +511,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                    </p>
                  )}
                  {!isListening && !interimText && sttSupported && (
-                   <p className="text-[9px] text-muted-foreground/60">Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">T</kbd> to start/stop dictation</p>
+                   <p className="text-[9px] text-muted-foreground/60">Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">T</kbd> to start/stop dictation · <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">Enter</kbd> to save</p>
                  )}
                  <div className="flex gap-2">
                    <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
@@ -497,7 +527,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                 onClick={startAddAtPlayhead}
                 className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors border border-primary/20"
               >
-                <Plus className="w-4 h-4" /> Add Event at {fmtMmSs(playheadS)}
+                <Plus className="w-4 h-4" /> Add Event at {fmtMmSs(playheadS)} <span className="text-[9px] font-normal opacity-60 ml-1">(or press Enter)</span>
               </button>
             )}
 
@@ -532,7 +562,10 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
             {/* Add event form - first in sidebar */}
             {addingNew ? (
               <div className="rounded-lg px-3 py-2.5 space-y-2 bg-muted/40 border border-primary/30">
-                <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event at {fmtMmSs(playheadS)}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event at {fmtMmSs(playheadS)}</p>
+                  {newNote.trim() && <span className="text-[9px] text-muted-foreground">press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">A</kbd> to save</span>}
+                </div>
                 <div className="flex items-center gap-2">
                   <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
                     placeholder="min" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
@@ -584,7 +617,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                 onClick={startAddAtPlayhead}
                 className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors border border-primary/20"
               >
-                <Plus className="w-4 h-4" /> Add Event at {fmtMmSs(playheadS)}
+                <Plus className="w-4 h-4" /> Add Event at {fmtMmSs(playheadS)} <span className="text-[9px] font-normal opacity-60 ml-1">(or Enter)</span>
               </button>
             )}
 
