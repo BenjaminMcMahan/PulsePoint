@@ -15,6 +15,7 @@ import HRZoneAnalysis from "../components/HRZoneAnalysis";
 import HREventOverlayChart from "../components/HREventOverlayChart";
 import HRPhysiologicalAnalysis from "../components/HRPhysiologicalAnalysis";
 import NearClimaxEvents, { detectNearClimaxEvents } from "../components/NearClimaxEvents";
+import NearClimaxSessionOverview from "../components/NearClimaxSessionOverview";
 import SessionAIPanel from "../components/SessionAIPanel";
 import SessionExecutiveSummary from "../components/SessionExecutiveSummary";
 import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
@@ -353,6 +354,14 @@ export default function SessionDetail() {
                   selectedIndex={selectedNearClimaxIdx}
                   onSelectIndex={setSelectedNearClimaxIdx}
                   onEventsRefined={(refined) => setSession((prev) => ({ ...prev, ai_near_climax_events: refined }))}
+                  userProfile={userProfile}
+                />
+              )}
+              {timelineRows.length > 0 && !s.no_climax && nearClimaxEvents.length > 0 && (
+                <NearClimaxSessionOverview
+                  session={s}
+                  nearClimaxEvents={nearClimaxEvents}
+                  userProfile={userProfile}
                 />
               )}
               {timelineRows.length > 0 && (

@@ -335,6 +335,10 @@
         }
       }
     },
+    "ai_near_climax_overview": {
+      "type": "object",
+      "description": "Stored AI session-specific near-climax event narrative and analysis"
+    },
     "emg_enabled": {
       "type": "boolean",
       "description": "Whether EMG was recorded this session"

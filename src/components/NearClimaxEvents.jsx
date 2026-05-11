@@ -159,7 +159,7 @@ function sampleHRData(rows, targetPoints = 150) {
   map((r) => ({ t: Math.round(Number(r.time_offset_s)), hr: Math.round(Number(r.hr)) }));
 }
 
-export default function NearClimaxEvents({ timelineRows, session, selectedIndex, onSelectIndex, onEventsRefined }) {
+export default function NearClimaxEvents({ timelineRows, session, selectedIndex, onSelectIndex, onEventsRefined, userProfile }) {
   const algorithmicEvents = useMemo(
     () => detectNearClimaxEvents(timelineRows, session?.climax_offset_s, session?.pre_climax_offset_s, session?.event_timeline || []),
     [timelineRows, session]
@@ -204,37 +204,44 @@ export default function NearClimaxEvents({ timelineRows, session, selectedIndex,
       category: Array.isArray(e.category) ? e.category : [e.category].filter(Boolean)
     }));
 
+    const profileContext = userProfile && (userProfile.arousal_response_style || userProfile.arousal_notes || userProfile.climax_sensitivity)
+      ? `\nUSER AROUSAL PROFILE:\n- Arousal style: ${userProfile.arousal_response_style || "—"}\n- Typical build duration: ${userProfile.typical_build_duration || "—"}\n- Climax sensitivity: ${userProfile.climax_sensitivity || "—"}\n- Preferred stimulation: ${(userProfile.preferred_stimulation || []).join(", ") || "—"}\n- Arousal notes: ${userProfile.arousal_notes || "none"}\n`
+      : "";
+
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are a physiological analyst reviewing heart rate data from a sexual arousal session. Your task is to identify "near-climax events" — periods where HR rises meaningfully (8+ bpm), sustains the elevation for at least 20 seconds, then falls — that represent genuine arousal spikes or edging moments, NOT the actual climax.
+      prompt: `You are a physiological analyst reviewing heart rate data from a sexual arousal session. Your task is to identify and interpret "near-climax events" — sustained HR elevations (8+ bpm rise, held for at least 20 seconds, then resolved) that represent genuine arousal spikes in the build phase.
 
+IMPORTANT LABELING GUIDANCE:
+- Do NOT default to "edging" — edging requires deliberate arousal control, which you cannot infer from HR alone
+- Consider the full range of what these events may represent: arousal plateau, stimulation intensity response, autonomic surge, physical reflex, sustained excitement, or sensory peak
+- Only use "edging" or "near-edge" if user event notes explicitly describe deliberate control behavior
+- Ground labels and interpretations in the HR pattern, timing relative to the session, user events, and the user's arousal profile
+${profileContext}
 SESSION CONTEXT:
 - Duration: ${session.duration_minutes || "?"} minutes
 - Climax marker: ${session.climax_offset_s != null ? Math.round(session.climax_offset_s) + "s" : "none"}
 - Pre-climax marker: ${session.pre_climax_offset_s != null ? Math.round(session.pre_climax_offset_s) + "s" : "none"}
 - Max HR: ${session.max_hr || "?"} bpm | Avg HR: ${session.avg_hr || "?"} bpm
 
-${existingAnalysis ? `AI SESSION ANALYSIS (use this to identify arousal phases):
-${existingAnalysis.slice(0, 1500)}` : ""}
+${existingAnalysis ? `AI SESSION ANALYSIS (use this to identify arousal phases):\n${existingAnalysis.slice(0, 1500)}` : ""}
 
-${cascadeContext ? `CASCADE ANALYSIS:
-${cascadeContext.slice(0, 800)}` : ""}
+${cascadeContext ? `CASCADE ANALYSIS:\n${cascadeContext.slice(0, 800)}` : ""}
 
-${userEvents.length > 0 ? `USER-LOGGED EVENTS:
-${userEvents.map((e) => `[${e.t}s] ${e.category.join(",")} — ${e.note}`).join("\n")}` : ""}
+${userEvents.length > 0 ? `USER-LOGGED EVENTS:\n${userEvents.map((e) => `[${e.t}s] ${e.category.join(",")} — ${e.note}`).join("\n")}` : ""}
 
-ALGORITHMICALLY DETECTED EVENTS (use as starting hints, refine or reject based on HR data and context):
+ALGORITHMICALLY DETECTED EVENTS (starting hints — refine or reject based on HR data and context):
 ${algoEvents.length > 0 ? JSON.stringify(algoEvents, null, 2) : "None detected algorithmically."}
 
 HR DATA (time_s → bpm, sampled every ~${Math.max(1, Math.floor(timelineRows.length / 200))}s):
 ${hrSample.map((p) => `${p.t}:${p.hr}`).join("  ")}
 
 Instructions:
-1. Analyze the HR trace carefully. Look for rises of 8+ bpm that sustain for 20+ seconds before dropping — these are near-climax candidates.
-2. Use the AI analysis, cascade analysis, and user events to confirm or re-label events (e.g., "edging attempt", "stimulation pause response", "arousal plateau").
+1. Analyze the HR trace carefully. Identify rises of 8+ bpm that sustain for 20+ seconds before dropping.
+2. Confirm, adjust, or reject algorithmic hints based on the full context. Add any events the algorithm missed.
 3. Exclude the climax window (${session.pre_climax_offset_s != null ? Math.round(session.pre_climax_offset_s) : session.climax_offset_s != null ? Math.round(session.climax_offset_s) - 90 : "N/A"}s onward).
-4. You may add events the algorithm missed, or remove false positives. Be conservative — only include genuine arousal elevations.
-5. For each event, provide a short label (3-5 words) and a 1-2 sentence interpretation grounded in the session context. Write the interpretation in a conversational, TTS-friendly style — use "you" and "your", spell out all numbers as words (e.g. "twelve beats per minute", "forty seconds"), no abbreviations like "bpm" or "s", no digits at the start of a sentence. Match the warm, direct tone of a cascade phase description.
+4. Be conservative — only include genuine arousal elevations, not noise or minor fluctuations.
+5. For each event: provide a short label (3-5 words, not defaulting to "edging") and a 1-2 sentence interpretation grounded in the session context. Write in a conversational, TTS-friendly style — use "you" and "your", spell out all numbers as words (e.g. "twelve beats per minute", "forty seconds"), no abbreviations, no digits starting a sentence.
 
 Return an array of near-climax events. If none exist, return an empty array.`,
       response_json_schema: {
@@ -381,11 +388,21 @@ Return an array of near-climax events. If none exist, return an empty array.`,
                       </span>
                   }
                   </div>
-                  {ev.ai_interpretation &&
-                <p className="leading-snug mt-1 italic text-foreground/90 text-sm">
-                      {ev.ai_interpretation}
-                    </p>
-                }
+                  {ev.ai_interpretation && (
+                  <p className="leading-snug mt-1 italic text-foreground/90 text-sm">
+                    {ev.ai_interpretation
+                      .replace(/\b(\d+)\s*(?:seconds?|s\b)/gi, (_, n) => {
+                        const v = parseInt(n, 10);
+                        if (v >= 60) { const m = Math.floor(v / 60); const s = v % 60; return s > 0 ? `${m} minutes and ${s} seconds` : `${m} minutes`; }
+                        return `${v} seconds`;
+                      })
+                      .replace(/\b(\d+)\s*(?:minutes?|min\b)/gi, (_, n) => {
+                        const v = parseInt(n, 10);
+                        return `${v} minute${v !== 1 ? "s" : ""}`;
+                      })
+                      .replace(/\b(\d+)\s*(?:bpm\b)/gi, (_, n) => `${n} beats per minute`)}
+                  </p>
+                )}
                 </button>);
 
           })}
