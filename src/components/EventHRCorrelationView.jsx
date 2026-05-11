@@ -140,7 +140,11 @@ export default function EventHRCorrelationView({ sessions = [] }) {
                 <XAxis type="number" tick={{ fontSize: 9 }} />
                 <YAxis dataKey="category" type="category" width={100} tick={{ fontSize: 8 }} />
                 <Tooltip
-                  formatter={(val) => val !== null ? `${typeof val === 'number' ? val.toFixed(1) : val} bpm` : "—"}
+                  formatter={(val) => {
+                    if (typeof val === 'number' && val !== null) return `${val.toFixed(1)} bpm`;
+                    if (val) return `${val}`;
+                    return "—";
+                  }}
                   contentStyle={{ fontSize: 11 }}
                 />
                 <Bar dataKey="avgSpike" fill="hsl(var(--chart-2))" name="Avg Spike" radius={[0, 3, 3, 0]} />
@@ -185,7 +189,10 @@ export default function EventHRCorrelationView({ sessions = [] }) {
                 />
                 <YAxis tick={{ fontSize: 9 }} label={{ value: "HR Change (bpm)", angle: -90, position: "insideLeft" }} />
                 <Tooltip
-                  formatter={(val) => `${val?.toFixed(1) ?? "—"} bpm`}
+                  formatter={(val) => {
+                    if (typeof val === 'number' && val !== null) return `${val.toFixed(1)} bpm`;
+                    return "—";
+                  }}
                   labelFormatter={(v) => {
                     const m = Math.floor(v / 60);
                     const s = v % 60;
