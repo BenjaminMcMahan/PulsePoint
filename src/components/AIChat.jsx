@@ -53,8 +53,8 @@ export default function AIChat({
     const cat = categories.find((c) => c.key === category);
 
     const systemPrompt = mode === "profile"
-      ? `You are an expert physiologist helping someone build a detailed personal arousal and physiological profile. The user has selected the category "${cat?.label}" (${cat?.hint}). Ask a single, highly specific and clinically insightful question focused on this exact category that would help expand or clarify gaps in their profile. Ask only one question. Be direct and conversational.`
-      : `You are an expert physiologist analyzing a specific sexual response session. The user wants to discuss "${cat?.label}" (${cat?.hint}). Ask a single, targeted follow-up question about THIS SPECIFIC SESSION only — not general profile questions. Reference the session data where relevant. Ask only one question. Be direct and conversational.`;
+      ? `You are having a casual, insightful conversation to help someone understand their physiology better. They picked "${cat?.label}". Ask ONE short, natural question on that topic — like a curious friend who knows physiology, not a clinical intake form. Keep it under 20 words if possible. No preamble, no "great choice!", just the question.`
+      : `You are having a natural conversation about a specific session. They want to talk about "${cat?.label}". Ask ONE short, conversational question about something specific from this session's data. Under 20 words. No preamble — just the question.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
       prompt: `${systemPrompt}\n\nContext:\n${context}\n\nPrevious conversation (if any):\n${messages.map(m => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n")}\n\nAsk your focused question now:`,
@@ -85,8 +85,8 @@ export default function AIChat({
     const history = updated.map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n");
 
     const systemPrompt = mode === "profile"
-      ? `You are an expert physiologist helping someone build a detailed personal arousal profile. Respond to their answer briefly (1-2 sentences max) then IMMEDIATELY ask a question about a DIFFERENT aspect of their physiology or arousal profile — do NOT keep drilling into the same topic unless their answer raises a specific, highly clinically relevant detail that absolutely must be clarified. Move forward, cover new ground.`
-      : `You are an expert physiologist analyzing a specific sexual response session. Respond to their answer briefly (1-2 sentences max) then IMMEDIATELY ask a question about a DIFFERENT aspect of THIS SESSION — do NOT keep asking about the same subject unless their answer introduces a new specific anatomical or physiological detail that requires immediate clarification. Stay session-specific, move to new ground.`;
+      ? `You're having a casual, natural conversation about someone's physiology and arousal. Acknowledge their answer in one short sentence (warm but not sycophantic), then ask ONE short follow-up question about a DIFFERENT aspect — keep it conversational and under 20 words. No bullet points, no clinical jargon, no lengthy intros.`
+      : `You're having a natural conversation about a specific session. Briefly acknowledge their answer (one sentence), then ask ONE short follow-up question about a DIFFERENT part of the session. Keep it casual and under 20 words. No preamble, no lists.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
       prompt: `${systemPrompt}\n\nContext:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,
