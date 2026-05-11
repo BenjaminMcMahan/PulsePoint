@@ -219,33 +219,48 @@ Where available, event notes are annotated with heart rate values and their timi
 Session data:
 ${JSON.stringify(summary, null, 2)}
 
-Provide a structured analysis covering:
+Provide a comprehensive, multi-layered analysis covering:
 
-1. CASCADE OVERVIEW: Describe the physiological arc across sessions — how the pre-climax build unfolds, the nature of the climax peak, and the recovery trajectory. Identify what is consistent and what varies. ${avgRecoveryOnset ? `Average recovery onset is approximately ${avgRecoveryOnset >= 60 ? `${Math.floor(avgRecoveryOnset/60)} minute${Math.floor(avgRecoveryOnset/60) !== 1 ? "s" : ""}${avgRecoveryOnset % 60 > 0 ? ` and ${avgRecoveryOnset % 60} seconds` : ""}` : `${avgRecoveryOnset} seconds`} post-climax.` : ""}
+1. CASCADE OVERVIEW: Paint a vivid picture of your physiological arc. How does the pre-climax buildup typically unfold — is it gradual or steep? What is the peak climax like — sharp and explosive, or sustained and rolling? How does recovery typically proceed? What remains consistent across sessions, and where do you see meaningful variation? ${avgRecoveryOnset ? `Average recovery onset is approximately ${avgRecoveryOnset >= 60 ? `${Math.floor(avgRecoveryOnset/60)} minute${Math.floor(avgRecoveryOnset/60) !== 1 ? "s" : ""}${avgRecoveryOnset % 60 > 0 ? ` and ${avgRecoveryOnset % 60} seconds` : ""}` : `${avgRecoveryOnset} seconds`} post-climax.` : ""}
 
-2. EVENT NOTE PATTERNS: Analyze the annotated event notes across sessions. What physiological states are associated with logged events? Do events cluster at specific phases? Do event types correlate with heart rate inflections or cascade shape?
+2. HEART RATE SIGNATURE: Deep analysis of your heart rate curves. Describe the characteristic rate of rise during buildup. What happens at the climax peak — is there a pronounced spike, a plateau, or something more subtle? What is the descent pattern? Are there inflection points or repeated micro-peaks that signal something physiologically meaningful?
 
-3. COMMON SIGNATURES: Recurring physiological patterns across the full cascade arc.
+3. EVENT NOTE PATTERNS: Synthesize all your logged events — what physiological states do they cluster around? Do stimulation changes, sensations, and other events appear more often at specific phases? Do certain event combinations predict a different cascade shape or heart rate trajectory?
 
-4. PREDICTIVE INSIGHTS: Which factors best predict cascade quality — intensity, climax duration, recovery speed?
+4. BUILD PHASE ANALYSIS: Detailed examination of pre-climax buildup. How long does build typically take? What is the characteristic heart rate acceleration? Are there pauses or plateaus during buildup, or is the trajectory smooth? Does buildup quality or intensity affect the rate of rise?
 
-5. ANOMALIES: Sessions with unusual cascade shapes, unexpected heart rate behavior, or atypical event correlations.
+5. CLIMAX DYNAMICS: Intensive analysis of the climax event itself. How pronounced is the peak? What is the typical heart rate at climax relative to average? How does climax duration vary, and what seems to predict longer or shorter climax events? What is the relationship between intensity, satisfaction, and climax signature?
 
-6. PHENOTYPE CLUSTERS: Distinct cascade response profiles visible in this data.
+6. RECOVERY TRAJECTORY: Post-climax physiology. How quickly does heart rate descend after climax? Is recovery smooth or jagged? Do you see rebound patterns? How does recovery onset timing vary, and what contextual factors seem to affect recovery speed?
+
+7. COMMON SIGNATURES: Recurring physiological fingerprints across your full cascade arc — patterns that appear again and again, even when other variables change.
+
+8. CONTEXTUAL CORRELATIONS: How do intensity, mood, hydration, methods, and environment link to cascade shape? Does a "high intensity" session produce a different cascade than a "low intensity" one? Are there mood states that consistently produce different physiological arcs?
+
+9. PREDICTIVE INSIGHTS: Which factors best predict cascade quality, peak heart rate, recovery speed, or satisfaction? Can you predict how a session will unfold based on early buildup dynamics?
+
+10. ANOMALIES: Sessions that deviate from your typical pattern — unusual cascade shapes, unexpected heart rate behavior, or atypical event correlations. What made them different?
+
+11. PHENOTYPE CLUSTERS: Distinct cascade response profiles within your data. Do you have multiple "types" of sessions with meaningfully different arcs?
 
 Be specific and reference actual values — but always written as spoken words, never digits or abbreviations.`,
       response_json_schema: {
         type: "object",
         properties: {
-          summary: { type: "string" },
-          cascade_overview: { type: "array", items: { type: "string" } },
-          event_note_patterns: { type: "array", items: { type: "string" } },
-          common_signatures: { type: "array", items: { type: "string" } },
-          predictive_insights: { type: "array", items: { type: "string" } },
-          anomalies: { type: "array", items: { type: "string" } },
-          phenotype_clusters: { type: "array", items: { type: "string" } }
+          summary: { type: "string", description: "2-3 sentence overview" },
+          cascade_overview: { type: "array", items: { type: "string" }, description: "4-5 detailed paragraphs describing the physiological arc" },
+          heart_rate_signature: { type: "array", items: { type: "string" }, description: "3-4 paragraphs analyzing HR curves, peaks, and patterns" },
+          event_note_patterns: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on event clustering and correlations" },
+          build_phase_analysis: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on pre-climax buildup dynamics" },
+          climax_dynamics: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on climax intensity, duration, and variation" },
+          recovery_trajectory: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on post-climax recovery patterns" },
+          common_signatures: { type: "array", items: { type: "string" }, description: "2-3 paragraphs on recurring physiological signatures" },
+          contextual_correlations: { type: "array", items: { type: "string" }, description: "3-4 paragraphs linking intensity, mood, methods to cascade shape" },
+          predictive_insights: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on what predicts quality" },
+          anomalies: { type: "array", items: { type: "string" }, description: "2-3 paragraphs on unusual sessions" },
+          phenotype_clusters: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on distinct response profiles" }
         },
-        required: ["summary", "cascade_overview", "event_note_patterns", "common_signatures", "predictive_insights", "anomalies", "phenotype_clusters"]
+        required: ["summary", "cascade_overview", "heart_rate_signature", "event_note_patterns", "build_phase_analysis", "climax_dynamics", "recovery_trajectory", "common_signatures", "contextual_correlations", "predictive_insights", "phenotype_clusters"]
       }
     });
 
@@ -290,31 +305,104 @@ Be specific and reference actual values — but always written as spoken words, 
       }
 
       {result && (() => {
-        const paras = [
-          result.summary,
-          ...(result.cascade_overview || []),
-          ...(result.event_note_patterns || []),
-          ...(result.common_signatures || []),
-          ...(result.predictive_insights || []),
-          ...(result.phenotype_clusters || []),
-          ...(result.anomalies || []).map((a) => typeof a === "string" ? a : `${a.session_date}: ${a.finding}`),
-        ].filter(Boolean);
+         const SECTION_ORDER = [
+          { key: "summary", label: null },
+          { key: "cascade_overview", label: "Cascade Overview" },
+          { key: "heart_rate_signature", label: "Heart Rate Signature" },
+          { key: "event_note_patterns", label: "Event Note Patterns" },
+          { key: "build_phase_analysis", label: "Build Phase Analysis" },
+          { key: "climax_dynamics", label: "Climax Dynamics" },
+          { key: "recovery_trajectory", label: "Recovery Trajectory" },
+          { key: "common_signatures", label: "Common Signatures" },
+          { key: "contextual_correlations", label: "Contextual Correlations" },
+          { key: "predictive_insights", label: "Predictive Insights" },
+          { key: "anomalies", label: "Anomalies & Outliers" },
+          { key: "phenotype_clusters", label: "Response Profiles" },
+        ];
+
+        const paras = [];
+        const paraMeta = [];
+
+        if (result.summary) {
+          paras.push(result.summary);
+          paraMeta.push({ type: "summary" });
+        }
+
+        for (const { key, label } of SECTION_ORDER) {
+          if (key === "summary") continue;
+          const items = result[key] || [];
+          if (items.length) {
+            for (let i = 0; i < items.length; i++) {
+              paras.push(items[i]);
+              paraMeta.push({ type: "section", sectionKey: key, label, isFirst: i === 0 });
+            }
+          }
+        }
 
         if (!paras.length) return <p className="text-xs text-muted-foreground italic">Analysis returned no content. Please try again.</p>;
 
-        return (
+        const sectionFirstIdx = {};
+        paraMeta.forEach((m, i) => {
+          if (m.type === "section" && m.isFirst && sectionFirstIdx[m.sectionKey] == null) {
+            sectionFirstIdx[m.sectionKey] = i;
+          }
+        });
+
+        const SECTION_COLORS = {
+          cascade_overview: "hsl(var(--chart-1))",
+          heart_rate_signature: "hsl(var(--destructive))",
+          event_note_patterns: "hsl(var(--accent))",
+          build_phase_analysis: "hsl(var(--chart-3))",
+          climax_dynamics: "hsl(var(--chart-2))",
+          recovery_trajectory: "hsl(var(--chart-4))",
+          common_signatures: "hsl(var(--chart-1))",
+          contextual_correlations: "hsl(var(--accent))",
+          predictive_insights: "hsl(var(--primary))",
+          anomalies: "hsl(var(--destructive))",
+          phenotype_clusters: "hsl(var(--chart-2))",
+        };
+
+         return (
           <TTSReader
             paragraphs={paras}
-            renderParagraph={(text, idx, isActive, isBuffering) => (
-              <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${
-                idx === 0
-                  ? isActive ? "border-primary bg-primary/10 text-foreground font-bold" : "border-primary text-foreground font-medium"
-                  : isActive ? "border-primary bg-primary/10 text-foreground font-medium" : "border-primary/30 text-foreground/80"
-              }`}>
-                {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
-                {text}
-              </p>
-            )}
+            renderParagraph={(text, idx, isActive, isBuffering) => {
+              const meta = paraMeta[idx];
+              if (!meta) return null;
+
+              if (meta.type === "summary") {
+                return (
+                  <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${
+                    isActive ? "border-primary bg-primary/10 text-foreground" : isBuffering ? "border-primary/60 bg-primary/5 text-foreground" : "border-primary/50 text-foreground"
+                  }`}>
+                    {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+                    {text}
+                  </p>
+                );
+              }
+
+              const sectionColor = SECTION_COLORS[meta.sectionKey] || "hsl(var(--primary))";
+              const isFirst = sectionFirstIdx[meta.sectionKey] === idx;
+
+              return (
+                <div>
+                  {isFirst && meta.label && (
+                    <p className="text-xs font-semibold uppercase tracking-wider mt-4 mb-2 pt-2 border-t border-border" style={{ color: sectionColor }}>
+                      {meta.label}
+                    </p>
+                  )}
+                  <p className={`text-sm leading-relaxed pl-3 border-l-2 py-1.5 transition-all duration-200 rounded-r-md flex items-start gap-2 ${
+                    isActive ? "font-medium" : "text-foreground/80"
+                  }`}
+                  style={{
+                    borderColor: isActive ? sectionColor : isBuffering ? sectionColor + "99" : sectionColor + "44",
+                    background: isActive ? sectionColor + "18" : isBuffering ? sectionColor + "0a" : "transparent",
+                  }}>
+                    {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mt-1" />}
+                    {text}
+                  </p>
+                </div>
+              );
+            }}
           />
         );
       })()}
