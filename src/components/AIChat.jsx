@@ -110,10 +110,10 @@ export default function AIChat({
     const cat = categories.find((c) => c.key === category);
 
     const systemPrompt = mode === "profile"
-      ? `You are having a casual, insightful conversation to help someone understand their physiology better. They picked "${cat?.label}". Ask ONE short, natural question on that topic — like a curious friend who knows physiology, not a clinical intake form. Keep it under 20 words if possible. No preamble, no "great choice!", just the question.`
-      : `You are having a natural conversation about THIS SPECIFIC session. The session context below contains real data — HR numbers, timestamps, methods, events, ratings, notes. They want to explore "${cat?.label}". 
-Ask ONE short, hyper-specific question that references a CONCRETE detail from this session's data (e.g. a specific HR value, a logged event, a rating, a method used, a noted sensation). Do NOT ask generic questions that could apply to any session. Under 25 words. No preamble — just the question.
-If there are event notes or unusual sensations logged, prioritize asking about those.`;
+      ? `You're having a genuine, curious conversation with someone about their physiology and arousal — like a knowledgeable friend, not a clinician. They picked "${cat?.label}". Ask ONE relaxed, specific question on that topic. Make it feel personal and thoughtful, not like a survey item. 2–3 sentences max, no preamble, no "great choice!". Just ask the question naturally.`
+      : `You're having a relaxed, curious conversation with someone about a specific session they just had. The data below is real — use it. They want to explore "${cat?.label}".
+Ask ONE question that feels like it comes from genuinely noticing something interesting in their data — a specific HR pattern, a logged event, a rating, a method, a sensation. Reference the actual detail directly. Sound curious and human, not like a form. 2–3 sentences max, no preamble, just the question.
+If there are event notes or unusual sensations logged, weave those in.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
       prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nPrevious conversation (if any):\n${messages.map(m => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n")}\n\nAsk your hyper-specific question now:`,
@@ -149,8 +149,8 @@ If there are event notes or unusual sensations logged, prioritize asking about t
     const activeCatMeta = activeCategory ? categories.find((c) => c.key === activeCategory) : null;
 
     const systemPrompt = mode === "profile"
-      ? `You're having a casual, natural conversation about someone's physiology and arousal, specifically about "${activeCatMeta?.label ?? "their physiology"}". Acknowledge their answer in one short sentence (warm but not sycophantic), then ask ONE short follow-up question that stays on this SAME topic ("${activeCatMeta?.label ?? ""}"). Keep it conversational and under 20 words. No bullet points, no clinical jargon, no lengthy intros.`
-      : `You're having a natural conversation about THIS SPECIFIC session, focused on the topic "${activeCatMeta?.label ?? "the session"}". The session data has real numbers — HR values, event timestamps, ratings, notes. Briefly acknowledge their answer (one sentence, warm but not sycophantic), then ask ONE short follow-up that digs deeper into the SAME topic ("${activeCatMeta?.label ?? ""}") using a concrete detail from this session. Under 25 words for the follow-up. No lists, no preamble.`;
+      ? `You're having a warm, genuinely curious conversation about someone's physiology and arousal, specifically staying on the topic "${activeCatMeta?.label ?? "their physiology"}". Acknowledge what they said briefly and naturally (one sentence — not overly enthusiastic), then ask ONE follow-up question that goes a bit deeper on the same topic. Feel like a curious, knowledgeable friend. Keep it relaxed and specific. No bullet points, no clinical jargon.`
+      : `You're having a relaxed, curious conversation about this specific session, staying focused on "${activeCatMeta?.label ?? "the session"}". The session data has real numbers — use them to ask something specific. Briefly react to what they said (one natural sentence), then ask ONE follow-up that digs a bit deeper on the same topic using something concrete from their data or their answer. Sound human and curious, not like a questionnaire.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
       prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,
