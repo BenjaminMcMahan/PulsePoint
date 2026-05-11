@@ -341,7 +341,9 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
                 <span className="font-mono text-[11px] font-bold flex items-center gap-1" style={{ color: NC_COLOR_HEX }}>
                   <Zap className="w-3 h-3" /> NC {ncIdx + 1} / {nearClimaxEvents.length}
                 </span>
-                <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(nce.start_offset_s)} – {fmtMmSs(nce.end_offset_s)}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {fmtMmSs(nce.start_offset_s)} → {fmtMmSs(nce.end_offset_s)}
+                </span>
                 {nce.rise_bpm != null && <span className="text-[11px] font-semibold" style={{ color: NC_COLOR_HEX }}>↑ +{nce.rise_bpm} bpm</span>}
                 {peakHR != null && <span className="font-mono text-[11px] font-bold text-primary">peak {peakHR} bpm</span>}
                 {nce.duration_s != null && <span className="text-[10px] text-muted-foreground">{fmtSec(nce.duration_s)}</span>}
@@ -351,7 +353,15 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
               </button>
             </div>
             {nce.ai_label && <p className="text-[10px] font-semibold mb-0.5" style={{ color: NC_COLOR_HEX }}>{nce.ai_label}</p>}
-            {nce.ai_interpretation && <p className="text-sm text-foreground/90 leading-relaxed italic">{nce.ai_interpretation}</p>}
+            {nce.ai_interpretation && (
+              <p className="text-sm text-foreground/90 leading-relaxed italic">
+                {nce.ai_interpretation.replace(/\b(\d+)\s*(?:seconds?|s\b)/gi, (_, n) => {
+                  const v = parseInt(n, 10);
+                  if (v >= 60) { const m = Math.floor(v / 60); const s = v % 60; return s > 0 ? `${m}m ${s}s` : `${m} min`; }
+                  return `${v}s`;
+                })}
+              </p>
+            )}
           </div>
         );
       })()}
