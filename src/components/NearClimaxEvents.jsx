@@ -234,7 +234,7 @@ Instructions:
 2. Use the AI analysis, cascade analysis, and user events to confirm or re-label events (e.g., "edging attempt", "stimulation pause response", "arousal plateau").
 3. Exclude the climax window (${session.pre_climax_offset_s != null ? Math.round(session.pre_climax_offset_s) : session.climax_offset_s != null ? Math.round(session.climax_offset_s) - 90 : "N/A"}s onward).
 4. You may add events the algorithm missed, or remove false positives. Be conservative — only include genuine arousal elevations.
-5. For each event, provide a short label (3-5 words) and a 1-sentence interpretation grounded in the session context.
+5. For each event, provide a short label (3-5 words) and a 1-2 sentence interpretation grounded in the session context. Write the interpretation in a conversational, TTS-friendly style — use "you" and "your", spell out all numbers as words (e.g. "twelve beats per minute", "forty seconds"), no abbreviations like "bpm" or "s", no digits at the start of a sentence. Match the warm, direct tone of a cascade phase description.
 
 Return an array of near-climax events. If none exist, return an empty array.`,
       response_json_schema: {
@@ -382,7 +382,7 @@ Return an array of near-climax events. If none exist, return an empty array.`,
                   }
                   </div>
                   {ev.ai_interpretation &&
-                <p className="leading-snug mt-1 italic text-[#ffffff] text-sm">
+                <p className="leading-snug mt-1 italic text-foreground/90 text-sm">
                       {ev.ai_interpretation}
                     </p>
                 }
