@@ -101,16 +101,34 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
   const [newMin, setNewMin] = useState("");
   const [newSec, setNewSec] = useState("");
 
-  // STT — Whisper via MediaRecorder
+  // STT — Whisper via MediaRecorder with incremental chunked transcription
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState("");
   const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
+  const audioChunksRef = useRef([]);      // rolling buffer for current chunk
+  const sttAbortRef = useRef(false);       // signals stop to chunk loop
+  const sttTranscriptRef = useRef("");     // running transcript used as Whisper prompt
   const sttSupported = !!navigator.mediaDevices?.getUserMedia;
-
   const newNoteRef = useRef(null);
 
+  // Base Whisper prompt — rich priming transcript Whisper uses as context
+  const WHISPER_BASE_PROMPT =
+    "Glans, glans penis, perineum, frenulum, prostate, scrotum, foreskin, erection, ejaculation, " +
+    "edging, e-stim, TENS unit, foley, foley catheter, urethral, urethral sound, lubrication, " +
+    "climax, orgasm, arousal, pelvic floor, contraction, stimulation, paused stimulation, " +
+    "resumed stimulation, sensation, discomfort, pressure, intensity, buildup, plateau, " +
+    "refractory, involuntary, tightening, spasm.";
+
+  const blobToBase64 = async (blob) => {
+    const ab = await blob.arrayBuffer();
+    const bytes = new Uint8Array(ab);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  };
+
   const stopListening = useCallback(() => {
+    sttAbortRef.current = true;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
@@ -121,44 +139,73 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
       stopListening();
       return;
     }
+    sttAbortRef.current = false;
+    sttTranscriptRef.current = "";
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+
+      const transcribeChunk = async (chunks) => {
+        if (!chunks.length) return;
+        const blob = new Blob(chunks, { type: mimeType });
+        if (blob.size < 1000) return; // skip silence/tiny chunks
+        try {
+          const base64Audio = await blobToBase64(blob);
+          // Compose prompt: base vocab + everything transcribed so far (gives Whisper context across pauses)
+          const prompt = sttTranscriptRef.current
+            ? sttTranscriptRef.current.slice(-200) // last 200 chars of transcript as rolling context
+            : WHISPER_BASE_PROMPT;
+          const res = await base44.functions.invoke("whisperSTT", {
+            audio_base64: base64Audio,
+            mime_type: mimeType,
+            prompt,
+          });
+          const text = res.data?.text?.trim();
+          if (text && !sttAbortRef.current) {
+            sttTranscriptRef.current = (sttTranscriptRef.current + " " + text).trim();
+            setNewNote((prev) => {
+              const base = prev.trim();
+              return base ? base + " " + text : text;
+            });
+            setInterimText(""); // clear "recording…" indicator, text is already in field
+          }
+        } catch (err) {
+          console.error("Whisper chunk error:", err);
+        }
+      };
+
+      // Use timesliced recording: collect a chunk every 4s, transcribe it immediately
       const recorder = new MediaRecorder(stream, { mimeType });
       audioChunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+
+      recorder.ondataavailable = async (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+          // Transcribe accumulated chunk (we keep growing it so Whisper has full audio context)
+          // Only transcribe when we have new data and recorder is still active
+          if (!sttAbortRef.current) {
+            setInterimText("…");
+            await transcribeChunk([...audioChunksRef.current]);
+          }
+        }
       };
+
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         setIsListening(false);
-        setInterimText("Transcribing…");
-        try {
-          const blob = new Blob(audioChunksRef.current, { type: mimeType });
-          // Convert blob to base64 to send via SDK
-          const arrayBuffer = await blob.arrayBuffer();
-          const uint8 = new Uint8Array(arrayBuffer);
-          let binary = "";
-          for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
-          const base64Audio = btoa(binary);
-          const res = await base44.functions.invoke("whisperSTT", {
-              audio_base64: base64Audio,
-              mime_type: mimeType,
-              prompt: "Sexual health session log. Terms may include: glans, glans penis, perineum, frenulum, prostate, scrotum, foreskin, erection, ejaculation, edging, e-stim, TENS, foley, catheter, urethral, lubrication, climax, arousal, pelvic floor.",
-            });
-          const data = res.data;
-          if (data.text) {
-            setNewNote((prev) => {
-              const base = prev.trim();
-              return base ? base + " " + data.text.trim() : data.text.trim();
-            });
-          }
-        } catch (err) {
-          console.error("Whisper STT error:", err);
+        // Final pass on any remaining audio
+        if (audioChunksRef.current.length && !sttAbortRef.current) {
+          setInterimText("Finalising…");
+          await transcribeChunk([...audioChunksRef.current]);
         }
         setInterimText("");
+        audioChunksRef.current = [];
       };
-      recorder.start();
+
+      // Request a data chunk every 4 seconds
+      recorder.start(4000);
       mediaRecorderRef.current = recorder;
       setIsListening(true);
     } catch (err) {
@@ -524,10 +571,16 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                      </button>
                    )}
                  </div>
-                 {(isListening || interimText) && (
-                   <p className="text-[9px] flex items-center gap-1 text-muted-foreground italic">
-                     <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${interimText === "Transcribing…" ? "bg-primary animate-pulse" : "bg-destructive animate-pulse"}`} />
-                     {interimText || "Recording… press T or tap mic to stop"}
+                 {isListening && (
+                   <p className="text-[9px] flex items-center gap-1.5 text-destructive">
+                     <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block shrink-0" />
+                     {interimText === "…" ? "Transcribing chunk…" : "Listening — speak naturally, pauses are fine"}
+                   </p>
+                 )}
+                 {!isListening && interimText === "Finalising…" && (
+                   <p className="text-[9px] flex items-center gap-1.5 text-primary">
+                     <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin inline-block shrink-0" />
+                     Finalising transcription…
                    </p>
                  )}
                  {!isListening && !interimText && sttSupported && (
@@ -614,10 +667,16 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                      </button>
                    )}
                  </div>
-                 {(isListening || interimText) && (
-                   <p className="text-[9px] flex items-center gap-1 text-muted-foreground italic">
-                     <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${interimText === "Transcribing…" ? "bg-primary animate-pulse" : "bg-destructive animate-pulse"}`} />
-                     {interimText || "Recording… press T or tap mic to stop"}
+                 {isListening && (
+                   <p className="text-[9px] flex items-center gap-1.5 text-destructive">
+                     <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse inline-block shrink-0" />
+                     {interimText === "…" ? "Transcribing chunk…" : "Listening — speak naturally, pauses are fine"}
+                   </p>
+                 )}
+                 {!isListening && interimText === "Finalising…" && (
+                   <p className="text-[9px] flex items-center gap-1.5 text-primary">
+                     <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin inline-block shrink-0" />
+                     Finalising transcription…
                    </p>
                  )}
                  {!isListening && !interimText && sttSupported && (
