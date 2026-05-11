@@ -432,6 +432,21 @@ export default function EventSyncPlayer() {
     else startRecording();
   }, [isRecording, startRecording, stopRecording]);
 
+  // Global "A" key shortcut to save event when note is present
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "a" && e.key !== "A") return;
+      // Don't fire if user is typing in an input/textarea
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (!newEventNote.trim() || !selectedSession || savingEvent) return;
+      handleSaveEvent();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newEventNote, selectedSession, savingEvent]);
+
   const handleSaveEvent = async () => {
     const note = newEventNote.replace(/\u200b.*$/, "").trim();
     if (!note || !selectedSession) return;
@@ -695,7 +710,10 @@ export default function EventSyncPlayer() {
 
             {/* Log Event */}
             <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Log Event at {fmtMmSs(Math.round(playbackTime))}</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2">
+                Log Event at {fmtMmSs(Math.round(playbackTime))}
+                {newEventNote.trim() && <span className="text-[9px] font-normal text-muted-foreground normal-case tracking-normal">press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">A</kbd> to save</span>}
+              </h2>
               <div className="flex flex-wrap gap-1.5">
                 {EVENT_CATEGORIES.map((c) => {
                   const active = newEventCats.includes(c.value);
