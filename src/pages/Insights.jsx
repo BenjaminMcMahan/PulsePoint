@@ -6,6 +6,7 @@ import { Trophy, Heart, TrendingUp, TrendingDown, AlertTriangle, Star, Layers, B
 import moment from "moment";
 import { Link } from "react-router-dom";
 import BestSessionPanel from "../components/BestSessionPanel";
+import HRSatisfactionCorrelationChart from "../components/HRSatisfactionCorrelationChart";
 
 function InsightCard({ icon: Icon, color, title, description, sessionId }) {
   const content = (
@@ -341,6 +342,8 @@ export default function Insights() {
         </div>
 
         <BestSessionPanel sessions={sessions} />
+
+        <HRSatisfactionCorrelationChart sessions={sessions} />
 
         {insights.map((insight, i) => <InsightCard key={i} {...insight} />)}
 
