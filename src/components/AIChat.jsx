@@ -145,9 +145,12 @@ If there are event notes or unusual sensations logged, prioritize asking about t
 
     const history = updated.map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n");
 
+    const activeCategory = [...messages].reverse().find((m) => m.role === "assistant" && m.category)?.category ?? null;
+    const activeCatMeta = activeCategory ? categories.find((c) => c.key === activeCategory) : null;
+
     const systemPrompt = mode === "profile"
-      ? `You're having a casual, natural conversation about someone's physiology and arousal. Acknowledge their answer in one short sentence (warm but not sycophantic), then ask ONE short follow-up question about a DIFFERENT aspect — keep it conversational and under 20 words. No bullet points, no clinical jargon, no lengthy intros.`
-      : `You're having a natural conversation about THIS SPECIFIC session. The session data below has real numbers — HR values, event timestamps, ratings, logged notes. Briefly acknowledge their answer (one sentence, warm but not sycophantic), then ask ONE short follow-up that digs into a DIFFERENT concrete detail from this session's data. Reference specific values or events when possible. Under 25 words for the follow-up. No lists, no preamble.`;
+      ? `You're having a casual, natural conversation about someone's physiology and arousal, specifically about "${activeCatMeta?.label ?? "their physiology"}". Acknowledge their answer in one short sentence (warm but not sycophantic), then ask ONE short follow-up question that stays on this SAME topic ("${activeCatMeta?.label ?? ""}"). Keep it conversational and under 20 words. No bullet points, no clinical jargon, no lengthy intros.`
+      : `You're having a natural conversation about THIS SPECIFIC session, focused on the topic "${activeCatMeta?.label ?? "the session"}". The session data has real numbers — HR values, event timestamps, ratings, notes. Briefly acknowledge their answer (one sentence, warm but not sycophantic), then ask ONE short follow-up that digs deeper into the SAME topic ("${activeCatMeta?.label ?? ""}") using a concrete detail from this session. Under 25 words for the follow-up. No lists, no preamble.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
       prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,
