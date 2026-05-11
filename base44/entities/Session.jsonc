@@ -284,6 +284,10 @@
       "type": "object",
       "description": "Stored AI analysis for no-climax sessions"
     },
+    "ai_timeline_narrative": {
+      "type": "object",
+      "description": "Stored AI timeline and arousal narrative result"
+    },
     "ai_near_climax_events": {
       "type": "array",
       "description": "AI-refined near-climax events detected from HR data + session analysis context",

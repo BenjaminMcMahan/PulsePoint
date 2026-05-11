@@ -21,6 +21,7 @@ import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import ArousalEventChart from "../components/ArousalEventChart";
 import UnifiedSessionTimeline from "../components/UnifiedSessionTimeline";
 import NoClimaxAIPanel from "../components/NoClimaxAIPanel";
+import SessionTimelineNarrative from "../components/SessionTimelineNarrative";
 import { EVENT_CATEGORIES } from "../components/session-form/EventTimelineSection";
 
 function getCategoryMeta(value) {
@@ -589,6 +590,9 @@ export default function SessionDetail() {
         {/* Cascade + AI — only for climax sessions */}
         {!s.no_climax && <CascadeOverviewPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
         {!s.no_climax && <SessionAIPanel session={s} timelineRows={timelineRows} emgRows={emgRows} userProfile={userProfile} />}
+
+        {/* Timeline & Arousal Narrative */}
+        {!s.no_climax && <SessionTimelineNarrative session={s} timelineRows={timelineRows} userProfile={userProfile} />}
 
         {/* No-Climax AI Analysis */}
         {s.no_climax && <NoClimaxAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
