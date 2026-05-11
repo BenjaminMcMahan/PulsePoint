@@ -111,10 +111,12 @@ export default function AIChat({
 
     const systemPrompt = mode === "profile"
       ? `You are having a casual, insightful conversation to help someone understand their physiology better. They picked "${cat?.label}". Ask ONE short, natural question on that topic — like a curious friend who knows physiology, not a clinical intake form. Keep it under 20 words if possible. No preamble, no "great choice!", just the question.`
-      : `You are having a natural conversation about a specific session. They want to talk about "${cat?.label}". Ask ONE short, conversational question about something specific from this session's data. Under 20 words. No preamble — just the question.`;
+      : `You are having a natural conversation about THIS SPECIFIC session. The session context below contains real data — HR numbers, timestamps, methods, events, ratings, notes. They want to explore "${cat?.label}". 
+Ask ONE short, hyper-specific question that references a CONCRETE detail from this session's data (e.g. a specific HR value, a logged event, a rating, a method used, a noted sensation). Do NOT ask generic questions that could apply to any session. Under 25 words. No preamble — just the question.
+If there are event notes or unusual sensations logged, prioritize asking about those.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `${systemPrompt}\n\nContext:\n${context}\n\nPrevious conversation (if any):\n${messages.map(m => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n")}\n\nAsk your focused question now:`,
+      prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nPrevious conversation (if any):\n${messages.map(m => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n")}\n\nAsk your hyper-specific question now:`,
     });
     const question = typeof res === "string" ? res.trim() : res?.response?.trim() ?? "";
     const msg = { role: "assistant", text: question, category };
@@ -145,10 +147,10 @@ export default function AIChat({
 
     const systemPrompt = mode === "profile"
       ? `You're having a casual, natural conversation about someone's physiology and arousal. Acknowledge their answer in one short sentence (warm but not sycophantic), then ask ONE short follow-up question about a DIFFERENT aspect — keep it conversational and under 20 words. No bullet points, no clinical jargon, no lengthy intros.`
-      : `You're having a natural conversation about a specific session. Briefly acknowledge their answer (one sentence), then ask ONE short follow-up question about a DIFFERENT part of the session. Keep it casual and under 20 words. No preamble, no lists.`;
+      : `You're having a natural conversation about THIS SPECIFIC session. The session data below has real numbers — HR values, event timestamps, ratings, logged notes. Briefly acknowledge their answer (one sentence, warm but not sycophantic), then ask ONE short follow-up that digs into a DIFFERENT concrete detail from this session's data. Reference specific values or events when possible. Under 25 words for the follow-up. No lists, no preamble.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `${systemPrompt}\n\nContext:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,
+      prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,
     });
 
     const reply = typeof res === "string" ? res.trim() : res?.response?.trim() ?? "";
