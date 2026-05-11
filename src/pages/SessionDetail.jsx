@@ -328,7 +328,7 @@ export default function SessionDetail() {
           {elevatedTime != null && elevatedTime > 0 && (
             <div className="flex items-center justify-between rounded-lg bg-chart-3/10 px-3 py-2">
               <span className="text-xs text-muted-foreground">Elevated Time <span className="text-[10px]">(Δ &gt; 8)</span></span>
-              <span className="text-sm font-mono font-bold text-chart-3">{Math.round(elevatedTime)}s</span>
+              <span className="text-sm font-mono font-bold text-chart-3">{Math.floor(elevatedTime / 60) > 0 ? `${Math.floor(elevatedTime / 60)}m ${Math.round(elevatedTime % 60)}s` : `${Math.round(elevatedTime)}s`}</span>
             </div>
           )}
           <div className="space-y-3">
