@@ -270,8 +270,8 @@ Keep language clinical and grounded in the data. Use specific numbers. Write for
     setLoading(false);
   };
 
-  const buildParas = () => {
-    if (!result) return { paras: [], paraMeta: [] };
+  const { paras, paraMeta, sectionFirstIdx } = useMemo(() => {
+    if (!result) return { paras: [], paraMeta: [], sectionFirstIdx: {} };
     const paras = [];
     const paraMeta = [];
     if (result.summary) { paras.push(result.summary); paraMeta.push({ type: "summary" }); }
@@ -281,14 +281,12 @@ Keep language clinical and grounded in the data. Use specific numbers. Write for
         paraMeta.push({ type: "section", sec });
       }
     }
-    return { paras, paraMeta };
-  };
-
-  const { paras, paraMeta } = buildParas();
-  const sectionFirstIdx = {};
-  paraMeta.forEach((m, i) => {
-    if (m.type === "section" && sectionFirstIdx[m.sec.key] == null) sectionFirstIdx[m.sec.key] = i;
-  });
+    const sectionFirstIdx = {};
+    paraMeta.forEach((m, i) => {
+      if (m.type === "section" && sectionFirstIdx[m.sec.key] == null) sectionFirstIdx[m.sec.key] = i;
+    });
+    return { paras, paraMeta, sectionFirstIdx };
+  }, [result]);
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">
