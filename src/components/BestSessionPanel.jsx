@@ -106,6 +106,15 @@ Consider ALL factors holistically:
 Return the session ID of the best session, and a thorough, specific explanation referencing actual data values.
 IMPORTANT: In the runner_up field, refer to sessions by their date (e.g. "April 5, 2025"), NOT by their ID.
 
+CRITICAL — TEXT-TO-SPEECH FORMATTING:
+All output fields will be read aloud. You MUST follow these rules in every string:
+- Spell out ALL numbers as words: "eight out of ten" not "8/10", "one hundred and twenty beats per minute" not "120 bpm", "forty-five seconds" not "45s"
+- Never use abbreviations: write "beats per minute" not "bpm", "minutes" not "min", "seconds" not "s"
+- Never use bullet symbols (•, -, *) — write in flowing prose sentences only
+- Never start a sentence with a digit — restructure if needed
+- Use natural spoken language with commas for cadence
+- Each array item should be a full, self-contained prose sentence or two
+
 Sessions data:
 ${JSON.stringify(summaries, null, 2)}`,
         response_json_schema: {
