@@ -90,7 +90,7 @@ const WINDOWS = [
 const MARKING_PHASES = ["pre_climax", "climax", "recovery"];
 const PHASE_LABELS = { pre_climax: "Pre-Climax", climax: "Climax", recovery: "Recovery" };
 
-export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChange, highlightRange = null }) {
+export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChange, highlightRange = null, noClimax = false }) {
   const maxOffsetS = useMemo(() => Math.max(...rows.map((r) => Number(r.time_offset_s) || 0)), [rows]);
   const durationMins = maxOffsetS / 60;
 
@@ -309,58 +309,62 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
         </Button>
       </div>
 
-      {/* Marking mode controls */}
-      <div className="flex gap-1 mb-2 flex-wrap items-center">
-        {MARKING_PHASES.map((phase) => (
-          <Button
-            key={phase}
-            size="sm"
-            variant={markingPhase === phase ? "default" : localMarkers[phase] != null ? "secondary" : "outline"}
-            className="h-6 text-[10px] px-2"
-            style={markingPhase === phase ? { background: PHASE_COLORS[phase] } : localMarkers[phase] != null ? { borderColor: PHASE_COLORS[phase], color: PHASE_COLORS[phase] } : {}}
-            onClick={() => setMarkingPhase(markingPhase === phase ? null : phase)}
-          >
-            {PHASE_LABELS[phase]}{localMarkers[phase] != null ? ` ✓` : ""}
-          </Button>
-        ))}
-        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-primary border-primary" onClick={autoDetectMarkers}>Auto-detect</Button>
-        {(localMarkers.pre_climax != null || localMarkers.climax != null || localMarkers.recovery != null) && (
-          <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-destructive" onClick={clearMarkers}>Clear</Button>
-        )}
-      </div>
+      {/* Marking mode controls — hidden for no-climax sessions */}
+      {!noClimax && (
+        <>
+          <div className="flex gap-1 mb-2 flex-wrap items-center">
+            {MARKING_PHASES.map((phase) => (
+              <Button
+                key={phase}
+                size="sm"
+                variant={markingPhase === phase ? "default" : localMarkers[phase] != null ? "secondary" : "outline"}
+                className="h-6 text-[10px] px-2"
+                style={markingPhase === phase ? { background: PHASE_COLORS[phase] } : localMarkers[phase] != null ? { borderColor: PHASE_COLORS[phase], color: PHASE_COLORS[phase] } : {}}
+                onClick={() => setMarkingPhase(markingPhase === phase ? null : phase)}
+              >
+                {PHASE_LABELS[phase]}{localMarkers[phase] != null ? ` ✓` : ""}
+              </Button>
+            ))}
+            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-primary border-primary" onClick={autoDetectMarkers}>Auto-detect</Button>
+            {(localMarkers.pre_climax != null || localMarkers.climax != null || localMarkers.recovery != null) && (
+              <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-destructive" onClick={clearMarkers}>Clear</Button>
+            )}
+          </div>
 
-      {markingPhase && (
-        <p className="text-[10px] text-muted-foreground mb-1 italic">
-          Click the chart <span className="font-semibold">or enter time below</span> to mark <span style={{ color: PHASE_COLORS[markingPhase] }} className="font-semibold">{PHASE_LABELS[markingPhase]}</span>
-        </p>
+          {markingPhase && (
+            <p className="text-[10px] text-muted-foreground mb-1 italic">
+              Click the chart <span className="font-semibold">or enter time below</span> to mark <span style={{ color: PHASE_COLORS[markingPhase] }} className="font-semibold">{PHASE_LABELS[markingPhase]}</span>
+            </p>
+          )}
+
+          {/* Manual time inputs */}
+          <div className="flex flex-col sm:flex-row gap-2 mb-2">
+            {MARKING_PHASES.map((phase) => (
+              <ManualTimeInput
+                key={phase}
+                phase={phase}
+                color={PHASE_COLORS[phase]}
+                label={PHASE_LABELS[phase]}
+                currentOffset={localMarkers[phase]}
+                maxOffset={maxOffsetS}
+                onSet={(offset) => {
+                  const updated = { ...localMarkers, [phase]: offset };
+                  setLocalMarkers(updated);
+                  if (onMarkersChange) {
+                    const extra = calcHRMetrics(updated);
+                    onMarkersChange({
+                      pre_climax_offset_s: updated.pre_climax,
+                      climax_offset_s: updated.climax,
+                      recovery_offset_s: updated.recovery,
+                      ...extra,
+                    });
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </>
       )}
-
-      {/* Manual time inputs */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-2">
-        {MARKING_PHASES.map((phase) => (
-          <ManualTimeInput
-            key={phase}
-            phase={phase}
-            color={PHASE_COLORS[phase]}
-            label={PHASE_LABELS[phase]}
-            currentOffset={localMarkers[phase]}
-            maxOffset={maxOffsetS}
-            onSet={(offset) => {
-              const updated = { ...localMarkers, [phase]: offset };
-              setLocalMarkers(updated);
-              if (onMarkersChange) {
-                const extra = calcHRMetrics(updated);
-                onMarkersChange({
-                  pre_climax_offset_s: updated.pre_climax,
-                  climax_offset_s: updated.climax,
-                  recovery_offset_s: updated.recovery,
-                  ...extra,
-                });
-              }
-            }}
-          />
-        ))}
-      </div>
 
       <div className={`h-64 cursor-crosshair`} {...wrapperProps}>
         <ResponsiveContainer width="100%" height="100%">
@@ -428,8 +432,8 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
               />
             ))}
 
-            {/* Manual phase markers */}
-            {MARKING_PHASES.map((phase) =>
+            {/* Manual phase markers — only for climax sessions */}
+            {!noClimax && MARKING_PHASES.map((phase) =>
               localMarkers[phase] != null ? (
                 <ReferenceLine
                   key={`phase-${phase}`}
@@ -454,8 +458,8 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
         </ResponsiveContainer>
       </div>
 
-      {/* Phase timing summary */}
-      {(preToClimax != null || climaxToRecovery != null) && (
+      {/* Phase timing summary — only for climax sessions */}
+      {!noClimax && (preToClimax != null || climaxToRecovery != null) && (
         <div className="flex gap-3 mt-2 flex-wrap">
           {preToClimax != null && (
             <div className="bg-muted rounded-lg px-3 py-1.5 text-center">
@@ -497,7 +501,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
           </button>
         )}
         {showBuild && <span className="text-[10px] text-muted-foreground flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: MARKER_COLORS.build }} />build</span>}
-        {Object.entries(PHASE_COLORS).map(([k, v]) => (
+        {!noClimax && Object.entries(PHASE_COLORS).map(([k, v]) => (
           <span key={k} className="text-[10px] text-muted-foreground flex items-center gap-1">
             <span className="w-2 h-2 rounded-full inline-block" style={{ background: v }} />{PHASE_LABELS[k]}
           </span>

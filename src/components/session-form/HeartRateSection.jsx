@@ -242,6 +242,7 @@ export default function HeartRateSection({ data, onChange }) {
             <HRTimelineChart
               rows={csvRows}
               onMarkersChange={(markers) => update(markers)}
+              noClimax={!!data.no_climax}
             />
           </div>
 

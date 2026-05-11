@@ -345,6 +345,7 @@ export default function SessionDetail() {
                     setSession((prev) => ({ ...prev, ...markers }));
                   }}
                   highlightRange={highlightRange}
+                  noClimax={!!s.no_climax}
                 />
               )}
               {timelineRows.length > 0 && !s.no_climax && (
