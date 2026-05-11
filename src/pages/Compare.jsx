@@ -8,6 +8,7 @@ import CompareHRTimelineChart from "../components/CompareHRTimelineChart";
 import CompareStats from "../components/CompareStats";
 import { GitCompare } from "lucide-react";
 import CompareAIPanel from "../components/CompareAIPanel";
+import CombinedArousalTimeline from "../components/CombinedArousalTimeline";
 import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import CompareCascadePanel from "../components/CompareCascadePanel";
 import SessionTimelineNarrative from "../components/SessionTimelineNarrative";
@@ -215,7 +216,10 @@ export default function Compare() {
                 <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : timelines.length > 0 ? (
-              <CompareHRTimelineChart timelines={timelines} sessions={selectedSessions} />
+              <>
+                <CompareHRTimelineChart timelines={timelines} sessions={selectedSessions} />
+                <CombinedArousalTimeline timelines={timelines} sessions={selectedSessions} />
+              </>
             ) : null}
             <CompareStats sessions={selectedSessions} />
             <CompareAIPanel sessions={selectedSessions} userProfile={userProfile} />
