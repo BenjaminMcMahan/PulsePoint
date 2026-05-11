@@ -366,6 +366,7 @@ export default function SessionDetail() {
                   timelineRows={timelineRows}
                   events={s.event_timeline}
                   session={s}
+                  nearClimaxEvents={nearClimaxEvents}
                 />
               )}
               {timelineRows.length === 0 && s.hr_timeline?.length > 0 && (

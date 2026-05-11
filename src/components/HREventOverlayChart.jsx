@@ -4,7 +4,7 @@ import {
   Tooltip, CartesianGrid, ReferenceLine, ReferenceArea,
 } from "recharts";
 
-import { ZoomOut, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { ZoomOut, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Zap } from "lucide-react";
 import { useChartZoom } from "@/hooks/useChartZoom";
 import { EVENT_CATEGORIES } from "@/components/session-form/EventTimelineSection";
 
@@ -70,11 +70,21 @@ function getAllUsedCategories(events) {
   return EVENT_CATEGORIES.filter((ec) => seen.has(ec.value));
 }
 
-export default function HREventOverlayChart({ timelineRows, events = [], session }) {
+const NC_COLOR = "hsl(var(--chart-3))";
+const NC_COLOR_HEX = "#f97316"; // chart-3 approximate for ReferenceArea fill
+
+function fmtSec(s) {
+  if (!s) return "—";
+  const v = Math.round(s);
+  return v >= 60 ? `${Math.floor(v / 60)}m ${v % 60}s` : `${v}s`;
+}
+
+export default function HREventOverlayChart({ timelineRows, events = [], session, nearClimaxEvents = [] }) {
   const [collapsed, setCollapsed] = useState(true);
   const [isolatedEvent, setIsolatedEvent] = useState(null);
   const [focusedFilteredIdx, setFocusedFilteredIdx] = useState(0);
   const [eventsCollapsed, setEventsCollapsed] = useState(false);
+  const [ncIdx, setNcIdx] = useState(0); // near-climax navigator index
 
   // Active category filters — null means "all"
   const usedCategories = useMemo(() => getAllUsedCategories(events), [events]);
@@ -219,6 +229,23 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
               contentStyle={{ fontSize: 11 }}
             />
 
+            {/* Near-climax event highlight bands */}
+            {nearClimaxEvents.map((nce, i) => {
+              const isActive = i === ncIdx;
+              return (
+                <ReferenceArea
+                  key={`nc-${i}`}
+                  x1={nce.start_offset_s}
+                  x2={nce.end_offset_s}
+                  fill={NC_COLOR_HEX}
+                  fillOpacity={isActive ? 0.22 : 0.09}
+                  stroke={NC_COLOR_HEX}
+                  strokeOpacity={isActive ? 0.7 : 0.25}
+                  strokeWidth={isActive ? 1.5 : 1}
+                />
+              );
+            })}
+
             {/* Phase markers */}
             {phaseMarkers.map((pm) => (
               <ReferenceLine
@@ -298,6 +325,36 @@ export default function HREventOverlayChart({ timelineRows, events = [], session
           <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">{navEv.note}</p>
         </div>
       )}
+
+      {/* Near-climax event navigator */}
+      {!collapsed && nearClimaxEvents.length > 0 && (() => {
+        const nce = nearClimaxEvents[ncIdx];
+        if (!nce) return null;
+        const peakHR = nce.peak_hr ?? nearestHR(chartData, nce.peak_offset_s ?? nce.start_offset_s);
+        return (
+          <div className="rounded-lg px-3 py-2.5" style={{ background: NC_COLOR_HEX + "18", borderLeft: `3px solid ${NC_COLOR_HEX}` }}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <button onClick={() => setNcIdx((p) => (p - 1 + nearClimaxEvents.length) % nearClimaxEvents.length)} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+                <ChevronLeft className="w-4 h-4" style={{ color: NC_COLOR_HEX }} />
+              </button>
+              <div className="flex-1 flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-[11px] font-bold flex items-center gap-1" style={{ color: NC_COLOR_HEX }}>
+                  <Zap className="w-3 h-3" /> NC {ncIdx + 1} / {nearClimaxEvents.length}
+                </span>
+                <span className="font-mono text-[11px] text-muted-foreground">{fmtMmSs(nce.start_offset_s)} – {fmtMmSs(nce.end_offset_s)}</span>
+                {nce.rise_bpm != null && <span className="text-[11px] font-semibold" style={{ color: NC_COLOR_HEX }}>↑ +{nce.rise_bpm} bpm</span>}
+                {peakHR != null && <span className="font-mono text-[11px] font-bold text-primary">peak {peakHR} bpm</span>}
+                {nce.duration_s != null && <span className="text-[10px] text-muted-foreground">{fmtSec(nce.duration_s)}</span>}
+              </div>
+              <button onClick={() => setNcIdx((p) => (p + 1) % nearClimaxEvents.length)} className="p-0.5 rounded hover:bg-black/10 shrink-0">
+                <ChevronRight className="w-4 h-4" style={{ color: NC_COLOR_HEX }} />
+              </button>
+            </div>
+            {nce.ai_label && <p className="text-[10px] font-semibold mb-0.5" style={{ color: NC_COLOR_HEX }}>{nce.ai_label}</p>}
+            {nce.ai_interpretation && <p className="text-sm text-foreground/90 leading-relaxed italic">{nce.ai_interpretation}</p>}
+          </div>
+        );
+      })()}
 
       {/* Category filter chips + legend */}
       {!collapsed && events.length > 0 && (
