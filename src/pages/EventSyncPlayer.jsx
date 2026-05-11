@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { Play, Pause, Square, Upload, Volume2, VolumeX, ChevronDown, ChevronLeft, ChevronRight, ZoomOut, Mic, MicOff, Plus } from "lucide-react";
+import { Play, Pause, Square, Upload, Volume2, VolumeX, ChevronDown, ChevronLeft, ChevronRight, ZoomOut, Mic, MicOff, Plus, ArrowUp } from "lucide-react";
 import { EVENT_CATEGORIES } from "@/components/session-form/EventTimelineSection";
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis,
@@ -503,8 +503,24 @@ export default function EventSyncPlayer() {
   const hasCascade = cascadeParas.length > 0;
   const hasAnalysis = analysisParas.length > 0;
 
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 300);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
     <div className="px-3 py-5 pb-28 space-y-4">
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-6 right-4 z-50 w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all"
+          title="Scroll to top"
+        >
+          <ArrowUp className="w-4 h-4" />
+        </button>
+      )}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Session Playback</h1>
         <p className="text-sm text-muted-foreground mt-0.5">HR timeline + event overlay + AI narration, synced to real-time playback.</p>
