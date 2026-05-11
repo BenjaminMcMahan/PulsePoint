@@ -292,26 +292,46 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
         toggleListening();
       }
 
-      // Enter: pause video and open add-event form at current timestamp
-      if (e.code === "Enter" && !inInput && !addingNew) {
+      // Enter: toggle form + STT. First press opens form & starts recording; second press saves & resumes video.
+      if (e.code === "Enter" && !inInput) {
         e.preventDefault();
-        if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
-        setNewMin(String(Math.floor(playheadS / 60)));
-        setNewSec(String(Math.round(playheadS % 60)));
-        setNewCats([lastUsedCat]);
-        setAddingNew(true);
-        setTimeout(() => newNoteRef.current?.focus(), 50);
+        if (!addingNew) {
+          // Open form, pause video, start recording
+          if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
+          setNewMin(String(Math.floor(playheadS / 60)));
+          setNewSec(String(Math.round(playheadS % 60)));
+          setNewCats([lastUsedCat]);
+          setAddingNew(true);
+          if (sttSupported) setTimeout(() => toggleListening(), 50);
+        } else {
+          // Close form: stop recording if active, save if note exists, resume video
+          if (isListening) stopListening();
+          // Give Whisper a moment to transcribe before saving — commitAdd checks newNote
+          const doSave = async () => {
+            // Wait briefly for transcription to finish if it was mid-flight
+            let waited = 0;
+            while (interimText === "Transcribing…" && waited < 4000) {
+              await new Promise((r) => setTimeout(r, 100));
+              waited += 100;
+            }
+            if (newNote.trim()) await commitAdd();
+            else { setAddingNew(false); setNewNote(""); setNewMin(""); setNewSec(""); setNewCats([lastUsedCat]); }
+            if (videoRef.current) videoRef.current.play();
+          };
+          doSave();
+        }
       }
 
       // A: save event when add-event form is open and note has text
       if (e.code === "KeyA" && !inInput && addingNew && newNote.trim()) {
         e.preventDefault();
         commitAdd();
+        if (videoRef.current) videoRef.current.play();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [addingNew, sttSupported, toggleListening, playheadS, lastUsedCat, newNote]);
+  }, [addingNew, sttSupported, toggleListening, stopListening, playheadS, lastUsedCat, newNote, isListening, interimText, commitAdd]);
 
   // Click on chart → seek video
   const handleChartClick = useCallback((data) => {
@@ -511,7 +531,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                    </p>
                  )}
                  {!isListening && !interimText && sttSupported && (
-                   <p className="text-[9px] text-muted-foreground/60">Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">T</kbd> to start/stop dictation · <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">Enter</kbd> to save</p>
+                   <p className="text-[9px] text-muted-foreground/60">Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">Enter</kbd> to save &amp; resume · <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">T</kbd> to toggle mic</p>
                  )}
                  <div className="flex gap-2">
                    <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
@@ -601,7 +621,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                    </p>
                  )}
                  {!isListening && !interimText && sttSupported && (
-                   <p className="text-[9px] text-muted-foreground/60">Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">T</kbd> to start/stop dictation</p>
+                   <p className="text-[9px] text-muted-foreground/60">Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">Enter</kbd> to save &amp; resume · <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">T</kbd> to toggle mic</p>
                  )}
                  <div className="flex gap-2">
                    <button onClick={commitAdd} className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-lg bg-primary text-primary-foreground font-medium">
