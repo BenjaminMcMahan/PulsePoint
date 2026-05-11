@@ -107,11 +107,22 @@ export default function NoClimaxAIPanel({ session, timelineRows, userProfile }) 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
-      prompt: `You are an expert sexual arousal physiologist. Analyze this INCOMPLETE session — it did NOT result in climax. Provide a full-depth analysis as if this were a complete session, replacing climax metrics with arousal arc and near-threshold assessments. Do NOT treat this as a failed session — it is a rich physiological dataset. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
+      prompt: `You are an expert sexual arousal physiologist and narrative writer. Analyze this INCOMPLETE session — it did NOT result in climax. Write a rich, story-driven analysis as if narrating a fascinating physiological journey. Do NOT treat this as a failed session — it is a valuable dataset. Write directly to the person using "you" and "your" throughout, like a knowledgeable friend reviewing their experience.
+
+STYLE — CRITICAL (this output is read aloud via text-to-speech):
+- Write in long-form, flowing narrative sentences — paragraphs, not bullet fragments
+- Each array item should be 2-4 full sentences that flow naturally when spoken aloud
+- Spell out ALL numbers and measurements as words: "one hundred and five beats per minute" not "105 bpm", "six out of ten" not "6/10", "thirty-nine minutes" not "39 min"
+- Never use abbreviations: write "beats per minute" not "bpm", "heart rate" not "HR"
+- Never use timestamp notation like "4:30" — write "four minutes and thirty seconds in" or "around the four-minute mark"
+- Never start a sentence with a digit — always spell it out
+- Avoid clinical bullet-point phrasing; write as if telling a story
+- Keep the tone curious, warm, and analytically engaged — like a thoughtful expert who finds this data genuinely interesting
+
 ${arousalProfile}
-${estimScreenshots.length > 0 ? `\nE-STIM SCREENSHOTS ATTACHED (${estimScreenshots.length}): Analyze waveform types, frequencies, pulse widths, and channel configurations. Interpret how these settings shaped the arousal experience and whether they were approaching climax-sufficient intensity.` : ""}
-${hrPeaks.length > 0 ? `\nDETECTED HR PEAK EVENTS (potential near-threshold moments):\n${hrPeaks.map(p => `- ${Math.floor(p.time_s/60)}:${String(Math.round(p.time_s%60)).padStart(2,'0')} — HR spike to ${p.hr} bpm`).join('\n')}` : ""}
-${eventTimeline.length > 0 ? `\nSESSION EVENT TIMELINE:\n${eventTimeline.join('\n')}\nFor each event: what does it reveal about arousal state, stimulation dynamics, and physiological response at that moment? Identify the narrative arc.` : ""}
+${estimScreenshots.length > 0 ? `\nE-STIM SCREENSHOTS ATTACHED (${estimScreenshots.length}): Analyze waveform types, frequencies, pulse widths, and channel configurations. Describe how these settings shaped the arousal experience and whether they were approaching climax-sufficient intensity — in narrative form.` : ""}
+${hrPeaks.length > 0 ? `\nDETECTED HEART RATE PEAK EVENTS (potential near-threshold moments):\n${hrPeaks.map(p => `- Around the ${Math.floor(p.time_s/60)}-minute mark — heart rate spike to ${p.hr} beats per minute`).join('\n')}` : ""}
+${eventTimeline.length > 0 ? `\nSESSION EVENT TIMELINE:\n${eventTimeline.join('\n')}\nNarrate each event: what does it reveal about arousal state, stimulation dynamics, and physiological response at that moment? Tell the story of how the arc unfolded.` : ""}
 
 Session data:
 ${JSON.stringify({
@@ -140,13 +151,13 @@ ${JSON.stringify({
       response_json_schema: {
         type: "object",
         properties: {
-          summary:                 { type: "string" },
-          arousal_assessment:      { type: "array", items: { type: "string" } },
-          event_analysis:          { type: "array", items: { type: "string" } },
-          near_climax_estimate:    { type: "array", items: { type: "string" }, description: "How many near-threshold events occurred, with specific reasoning per moment" },
-          physiological_findings:  { type: "array", items: { type: "string" } },
-          discomfort_analysis:     { type: "array", items: { type: "string" } },
-          recommendations:         { type: "array", items: { type: "string" } },
+          summary:                 { type: "string",  description: "2-3 sentence narrative overview of the session arc and context — spoken naturally, all numbers spelled out" },
+          arousal_assessment:      { type: "array",   items: { type: "string" }, description: "3-5 narrative paragraphs describing how arousal built, plateaued, or stalled — use heart rate as the primary lens, spell out all numbers" },
+          event_analysis:          { type: "array",   items: { type: "string" }, description: "One narrative paragraph per key event, contextualizing what was happening physiologically at that moment — no timestamps as digits" },
+          near_climax_estimate:    { type: "array",   items: { type: "string" }, description: "2-4 narrative paragraphs estimating how close threshold was reached and at which moments — story-driven, numbers as words" },
+          physiological_findings:  { type: "array",   items: { type: "string" }, description: "3-5 narrative observations about autonomic, muscular, or cardiovascular patterns — accessible language, no clinical jargon without explanation" },
+          discomfort_analysis:     { type: "array",   items: { type: "string" }, description: "Narrative paragraphs about any discomfort entries — only include this section if discomfort was logged" },
+          recommendations:         { type: "array",   items: { type: "string" }, description: "3-5 specific, actionable narrative recommendations for future sessions — warm and direct tone" },
         },
         required: ["summary", "arousal_assessment", "event_analysis", "near_climax_estimate", "physiological_findings", "recommendations"],
       },
