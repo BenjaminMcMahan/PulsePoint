@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { Brain, TrendingUp, Activity, Lightbulb, Zap, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Brain, TrendingUp, Activity, Lightbulb, Zap, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import TTSButton from "../components/TTSButton";
+import TTSReader from "../components/TTSReader";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip,
   CartesianGrid, Legend,
@@ -191,14 +191,22 @@ function buildAggregate(sessions) {
 
 // ─── AI Panel ────────────────────────────────────────────────────────────────
 
+const SECTION_DEFS = [
+  { key: "trend_analysis",    label: "Trend Analysis",     color: "hsl(var(--chart-1))", icon: <TrendingUp className="w-3.5 h-3.5" /> },
+  { key: "method_insights",   label: "Method Insights",    color: "hsl(var(--chart-2))", icon: <Zap className="w-3.5 h-3.5" /> },
+  { key: "correlations",      label: "Correlations",       color: "hsl(var(--chart-4))", icon: <Activity className="w-3.5 h-3.5" /> },
+  { key: "recommendations",   label: "Recommendations",    color: "hsl(var(--accent))", icon: <Lightbulb className="w-3.5 h-3.5" /> },
+  { key: "watch_points",      label: "Watch Points",       color: "hsl(var(--destructive))", icon: <Brain className="w-3.5 h-3.5" /> },
+];
+
 function AITrendsPanel({ sessions }) {
+  const [collapsed, setCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [savedId, setSavedId] = useState(null);
 
   useEffect(() => {
     base44.entities.CascadeAnalysisResult.filter({}, "-updated_date", 1).then((rows) => {
-      // Reuse CascadeAnalysisResult entity but under a distinct key stored in session_count=-999 as sentinel
       const row = rows.find((r) => r.session_count === -9999);
       if (row) { setResult(row.result); setSavedId(row.id); }
     });
@@ -209,40 +217,43 @@ function AITrendsPanel({ sessions }) {
     const agg = buildAggregate(sessions);
 
     const res = await base44.integrations.Core.InvokeLLM({
-      model: "gpt_5",
-      prompt: `You are a longitudinal physiological data analyst. You are analyzing a personal biometric tracking dataset with ${agg.total_records} recorded sessions spanning ${agg.observation_period.start} to ${agg.observation_period.end}.
+      model: "claude_sonnet_4_6",
+      prompt: `You are an expert longitudinal physiological analyst. You are reviewing a personal session dataset with ${agg.total_records} records spanning ${agg.observation_period.start} to ${agg.observation_period.end}.
 
-This is a personal health and biometric monitoring application. The dataset tracks:
-- Cardiac rate metrics (average and peak BPM per session)
-- Stimulation protocol types and configurations used
-- Subjective response quality scores (1-10 scale)
-- Physiological buildup curve quality scores (1-10 scale)  
-- Contextual variables: mood state, hydration level, environment type
-- Peak autonomic response duration (short/medium/long)
+This dataset captures:
+- Cardiac metrics (average and peak BPM per session)
+- Subjective response quality (1-10 scale)
+- Physiological buildup quality (1-10 scale)
+- Stimulation methods used
+- Contextual factors: mood, hydration, environment
 
 DATASET:
 ${JSON.stringify(agg, null, 2)}
 
-Analyze this longitudinal biometric data and provide:
-1. Week-over-week trends in cardiac and subjective response metrics — what is improving, plateauing, or declining
-2. Which stimulation protocol combinations consistently yield the highest response quality and buildup scores
-3. Correlations between contextual variables (mood, hydration) and outcome scores
-4. Personalized optimization recommendations based on demonstrated patterns in this individual's data
-5. Metrics with high variance or concerning trajectories that need monitoring
-6. Specific actionable suggestions for the coming weeks based on observed progression
+Provide a deep longitudinal analysis:
 
-Cite actual numbers from the data. Be analytical and specific.`,
+1. **Trend Analysis** — Week-over-week trends in cardiac and subjective metrics. What is improving, plateauing, declining? Cite actual numbers.
+
+2. **Method Insights** — Which method combinations consistently yield highest response quality and buildup? Any standout correlations?
+
+3. **Correlations** — How do contextual variables (mood, hydration, environment) correlate with outcome quality? What patterns emerge?
+
+4. **Recommendations** — Based on demonstrated personal patterns, what specific adjustments or experiments would optimize future sessions?
+
+5. **Watch Points** — Are there metrics with concerning variance or declining trajectories? Any alerts worth monitoring?
+
+Keep language clinical and grounded in the data. Use specific numbers. Write for a single reader reviewing their own longitudinal self-monitoring.`,
       response_json_schema: {
         type: "object",
         properties: {
-          executive_summary: { type: "string" },
-          trend_analysis: { type: "array", items: { type: "string" } },
-          method_insights: { type: "array", items: { type: "string" } },
-          correlations: { type: "array", items: { type: "string" } },
-          recommendations: { type: "array", items: { type: "string" } },
-          watch_points: { type: "array", items: { type: "string" } },
+          summary: { type: "string", description: "1-2 sentence overview of key findings" },
+          trend_analysis: { type: "array", items: { type: "string" }, description: "3-4 specific trend observations with numbers" },
+          method_insights: { type: "array", items: { type: "string" }, description: "2-3 method/protocol insights based on data" },
+          correlations: { type: "array", items: { type: "string" }, description: "2-3 contextual correlations (mood, hydration, etc.)" },
+          recommendations: { type: "array", items: { type: "string" }, description: "3-4 concrete, actionable next steps" },
+          watch_points: { type: "array", items: { type: "string" }, description: "1-2 metrics or patterns to monitor" },
         },
-        required: ["executive_summary", "trend_analysis", "method_insights", "correlations", "recommendations"],
+        required: ["summary", "trend_analysis", "method_insights", "correlations", "recommendations"],
       },
     });
 
@@ -259,58 +270,91 @@ Cite actual numbers from the data. Be analytical and specific.`,
     setLoading(false);
   };
 
-  const ttsText = result ? [
-    result.executive_summary,
-    ...(result.trend_analysis || []),
-    ...(result.method_insights || []),
-    ...(result.correlations || []),
-    ...(result.recommendations || []),
-    ...(result.watch_points || []),
-  ].filter(Boolean).join(". ") : "";
+  const buildParas = () => {
+    if (!result) return { paras: [], paraMeta: [] };
+    const paras = [];
+    const paraMeta = [];
+    if (result.summary) { paras.push(result.summary); paraMeta.push({ type: "summary" }); }
+    for (const sec of SECTION_DEFS) {
+      for (const item of (result[sec.key] || [])) {
+        paras.push(item);
+        paraMeta.push({ type: "section", sec });
+      }
+    }
+    return { paras, paraMeta };
+  };
+
+  const { paras, paraMeta } = buildParas();
+  const sectionFirstIdx = {};
+  paraMeta.forEach((m, i) => {
+    if (m.type === "section" && sectionFirstIdx[m.sec.key] == null) sectionFirstIdx[m.sec.key] = i;
+  });
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
-          <Brain className="w-4 h-4" /> AI Long-Term Analysis
-        </h3>
-        <div className="flex items-center gap-2">
-          {result && <TTSButton getText={() => ttsText} />}
-          <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5">
-            {loading
-              ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
-              : result
-                ? <><RefreshCw className="w-3 h-3" />Re-analyze</>
-                : <><Brain className="w-3 h-3" />Analyze</>}
-          </Button>
-        </div>
+        <button className="flex items-center gap-1.5 flex-1 text-left" onClick={() => setCollapsed((v) => !v)}>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+            <Brain className="w-4 h-4" /> Long-Term Trends Analysis
+          </h3>
+          {collapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" /> : <ChevronUp className="w-4 h-4 text-muted-foreground ml-1" />}
+        </button>
+        <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5">
+          {loading
+            ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
+            : <><Brain className="w-3 h-3" />{result ? "Re-analyze" : "Analyze"}</>}
+        </Button>
       </div>
 
-      {!result && !loading && (
+      {!collapsed && !result && !loading && (
         <p className="text-xs text-muted-foreground">
-          Run an AI analysis of your full session history to uncover long-term physiological trends, method correlations, and personalized recommendations. Uses Claude Sonnet.
+          Deep AI analysis of your long-term patterns across {sessions.length} sessions. Identifies trends, method correlations, and personalized optimizations. Uses Claude Sonnet.
         </p>
       )}
 
-      {loading && !result && (
-        <p className="text-xs text-muted-foreground animate-pulse">Analyzing {sessions.length} sessions for long-term patterns…</p>
-      )}
+      {!collapsed && result && (
+        <TTSReader
+          sessionId="trends_analysis"
+          title="Long-Term Trends"
+          paragraphs={paras}
+          renderParagraph={(text, idx, isActive, isBuffering) => {
+            const meta = paraMeta[idx];
+            if (!meta) return null;
 
-      {result && (
-        <div className="space-y-3">
-          {result.executive_summary && (
-            <p className="text-sm text-foreground font-medium leading-relaxed border-l-2 border-primary pl-3">
-              {result.executive_summary}
-            </p>
-          )}
-          <SectionCard icon={<TrendingUp className="w-3.5 h-3.5" />} title="Trend Analysis" color="hsl(var(--chart-1))" items={result.trend_analysis} />
-          <SectionCard icon={<Zap className="w-3.5 h-3.5" />} title="Method Insights" color="hsl(var(--chart-2))" items={result.method_insights} />
-          <SectionCard icon={<Activity className="w-3.5 h-3.5" />} title="Correlations" color="hsl(var(--chart-4))" items={result.correlations} />
-          <SectionCard icon={<Lightbulb className="w-3.5 h-3.5" />} title="Recommendations" color="hsl(var(--accent))" items={result.recommendations} />
-          {result.watch_points?.length > 0 && (
-            <SectionCard icon={<Brain className="w-3.5 h-3.5" />} title="Watch Points" color="hsl(var(--destructive))" items={result.watch_points} />
-          )}
-        </div>
+            if (meta.type === "summary") {
+              return (
+                <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${isActive ? "border-primary bg-primary/8 text-foreground" : isBuffering ? "border-primary/60 bg-primary/5 text-foreground" : "border-primary/50 text-foreground"}`}>
+                  {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+                  {text}
+                </p>
+              );
+            }
+
+            const { sec } = meta;
+            const isFirst = sectionFirstIdx[sec.key] === idx;
+
+            return (
+              <div>
+                {isFirst && (
+                  <p className="text-xs font-semibold flex items-center gap-1.5 mt-4 mb-1.5 pt-2 border-t border-border" style={{ color: sec.color }}>
+                    {sec.icon}{sec.label}
+                  </p>
+                )}
+                <li
+                  className="text-base leading-relaxed pl-3 border-l-2 py-1.5 list-none transition-all duration-200 rounded-r-md flex items-start gap-2"
+                  style={{
+                    borderColor: isActive ? sec.color : isBuffering ? sec.color + "99" : sec.color + "44",
+                    background: isActive ? sec.color + "18" : isBuffering ? sec.color + "0a" : "transparent",
+                    color: "hsl(var(--foreground))",
+                  }}
+                >
+                  {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mt-1" />}
+                  {text}
+                </li>
+              </div>
+            );
+          }}
+        />
       )}
     </div>
   );
