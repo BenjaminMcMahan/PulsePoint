@@ -218,31 +218,34 @@ function AITrendsPanel({ sessions }) {
 
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
-      prompt: `You are an expert longitudinal physiological analyst. You are reviewing a personal session dataset with ${agg.total_records} records spanning ${agg.observation_period.start} to ${agg.observation_period.end}.
+      prompt: `You are an expert longitudinal physiological analyst providing natural, flowing audio commentary. You are reviewing a personal session dataset with ${agg.total_records} records spanning ${agg.observation_period.start} to ${agg.observation_period.end}.
 
-This dataset captures:
-- Cardiac metrics (average and peak BPM per session)
-- Subjective response quality (1-10 scale)
-- Physiological buildup quality (1-10 scale)
-- Stimulation methods used
-- Contextual factors: mood, hydration, environment
+IMPORTANT — This will be read aloud, so:
+- SPELL OUT all numbers as words (e.g., "eight point eight out of ten" not "8.8/10")
+- Use natural pacing with flowing sentences, not lists or bullets
+- Replace abbreviations with full words: "beats per minute" not "bpm", "sessions" not "sessions"
+- Write like you're speaking to someone: conversational, warm, but analytical
+- Use phrases like "looking at", "we can see", "notably", "interestingly" for natural flow
+- Long, connected thoughts separated by periods, avoiding fragmented bullet points
+
+This dataset captures cardiac metrics, subjective response quality on a one to ten scale, physiological buildup quality, stimulation methods used, and contextual factors like mood and hydration.
 
 DATASET:
 ${JSON.stringify(agg, null, 2)}
 
-Provide a deep longitudinal analysis:
+Provide a deep longitudinal analysis in five flowing sections:
 
-1. **Trend Analysis** — Week-over-week trends in cardiac and subjective metrics. What is improving, plateauing, declining? Cite actual numbers.
+**Trend Analysis** — Describe week-over-week trends in cardiac and subjective metrics. What is improving, plateauing, declining? Paint a picture of how your response patterns are evolving. Weave in actual numbers naturally.
 
-2. **Method Insights** — Which method combinations consistently yield highest response quality and buildup? Any standout correlations?
+**Method Insights** — Which method combinations consistently yield the highest response quality and buildup? What standout patterns emerge from your data? Which approaches seem to resonate most with your physiology?
 
-3. **Correlations** — How do contextual variables (mood, hydration, environment) correlate with outcome quality? What patterns emerge?
+**Correlations** — How do contextual variables like mood, hydration, and environment correlate with outcome quality? What patterns emerge? Are there surprising connections you should be aware of?
 
-4. **Recommendations** — Based on demonstrated personal patterns, what specific adjustments or experiments would optimize future sessions?
+**Recommendations** — Based on your demonstrated personal patterns, what specific adjustments or experiments would optimize future sessions? Be concrete and actionable.
 
-5. **Watch Points** — Are there metrics with concerning variance or declining trajectories? Any alerts worth monitoring?
+**Watch Points** — Are there metrics with concerning variance or declining trajectories? Any patterns worth monitoring going forward? What should you pay attention to?
 
-Keep language clinical and grounded in the data. Use specific numbers. Write for a single reader reviewing their own longitudinal self-monitoring.`,
+Write as one reader reviewing their own longitudinal self-monitoring. Every number spelled out. Natural rhythm. Spoken, not written.`,
       response_json_schema: {
         type: "object",
         properties: {
