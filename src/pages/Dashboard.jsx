@@ -8,6 +8,7 @@ import moment from "moment";
 import { TrendingUp, Heart, Zap, Star, Activity, BarChart2, Timer, MessageSquare } from "lucide-react";
 import EventSummaryCard from "../components/EventSummaryCard";
 import HRPerformanceMetrics from "../components/HRPerformanceMetrics";
+import EventHRCorrelationView from "../components/EventHRCorrelationView";
 
 function StatCard({ label, value, sub, icon: Icon, color = "primary" }) {
   return (
@@ -390,6 +391,9 @@ export default function Dashboard() {
 
       {/* Event Log Summary */}
       <EventSummaryCard sessions={sessions} />
+
+      {/* Event-HR Correlation View */}
+      <EventHRCorrelationView sessions={sessions} />
 
       {/* Intensity vs Satisfaction Scatter */}
       {scatterData.length > 2 && (
