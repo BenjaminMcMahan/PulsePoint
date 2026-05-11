@@ -621,11 +621,11 @@ export default function SessionDetail() {
             `Climax duration: ${s.climax_duration ?? "?"}`,
             `Mood: ${s.mood}, Hydration: ${s.hydration}`,
             s.avg_hr ? `HR: avg ${s.avg_hr}, max ${s.max_hr}, at climax ${s.hr_at_climax ?? "?"}` : null,
-            s.pre_climax_offset_s != null ? `Phase markers: pre-climax ${Math.round(s.pre_climax_offset_s)}s, climax ${Math.round(s.climax_offset_s)}s, recovery ${s.recovery_offset_s != null ? Math.round(s.recovery_offset_s) + "s" : "?"}` : null,
+            s.pre_climax_offset_s != null ? (() => { const fmt = (v) => { if (v == null) return "?"; const m = Math.floor(v/60); const sec = Math.round(v%60); return `${m}:${sec.toString().padStart(2,"0")}`; }; return `Phase markers: pre-climax ${fmt(s.pre_climax_offset_s)}, climax ${fmt(s.climax_offset_s)}, recovery ${fmt(s.recovery_offset_s)}`; })() : null,
             s.ejaculate_volume ? `Ejaculate: ${s.ejaculate_volume}` : null,
             s.unusual_sensations ? `Unusual sensations: ${s.unusual_sensations}` : null,
             (s.discomfort_entries || []).length ? `Discomfort: ${s.discomfort_entries.map(e => `sev ${e.severity}/10 — ${e.note}`).join("; ")}` : null,
-            (s.event_timeline || []).length ? `Events: ${s.event_timeline.map(e => `[${e.time_s}s] ${e.note}`).join(" | ")}` : null,
+            (s.event_timeline || []).length ? `Events: ${s.event_timeline.map(e => { const m = Math.floor(e.time_s / 60); const sec = Math.round(e.time_s % 60); return `[${m}:${sec.toString().padStart(2,"0")}] ${e.note}`; }).join(" | ")}` : null,
             s.notes ? `Session notes: ${s.notes}` : null,
           ].filter(Boolean).join("\n")}
           savedMessages={chatMessages}

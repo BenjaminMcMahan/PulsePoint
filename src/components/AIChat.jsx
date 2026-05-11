@@ -110,10 +110,12 @@ export default function AIChat({
     const cat = categories.find((c) => c.key === category);
 
     const systemPrompt = mode === "profile"
-      ? `You're having a genuine, curious conversation with someone about their physiology and arousal — like a knowledgeable friend, not a clinician. They picked "${cat?.label}". Ask ONE relaxed, specific question on that topic. Make it feel personal and thoughtful, not like a survey item. 2–3 sentences max, no preamble, no "great choice!". Just ask the question naturally.`
-      : `You're having a relaxed, curious conversation with someone about a specific session they just had. The data below is real — use it. They want to explore "${cat?.label}".
-Ask ONE question that feels like it comes from genuinely noticing something interesting in their data — a specific HR pattern, a logged event, a rating, a method, a sensation. Reference the actual detail directly. Sound curious and human, not like a form. 2–3 sentences max, no preamble, just the question.
-If there are event notes or unusual sensations logged, weave those in.`;
+      ? `You're having a genuine, immersive conversation with someone about their physiology and arousal — like a knowledgeable, fascinated friend who has studied their data closely. They picked "${cat?.label}". Ask ONE rich, specific question on that topic. Make it feel personal, curious, and grounded in real human experience. 2–3 sentences is ideal — enough to give real context and show you're genuinely engaged. No preamble, no "great choice!". Just dive in naturally.`
+      : `You're having an immersive, genuinely curious conversation with someone about a specific session. The data below is real — treat it like a fascinating story you want to understand more deeply. They want to explore "${cat?.label}".
+
+CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. You MUST convert every timestamp to minutes:seconds format (e.g. 674 seconds → "11:14", 784 seconds → "13:04") before using them in your question. NEVER say "674 seconds" or "at 784 seconds" — always say "around the 11-minute mark" or "just after 13 minutes in" or "at 11:14".
+
+Ask ONE question that feels like it comes from genuinely noticing something fascinating in their data. Set up the observation first (what you noticed in the data), then ask them about it. Sound deeply curious and present — like someone who actually read their session carefully. 3–4 sentences total.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
       prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nPrevious conversation (if any):\n${messages.map(m => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n")}\n\nAsk your hyper-specific question now:`,
@@ -149,8 +151,10 @@ If there are event notes or unusual sensations logged, weave those in.`;
     const activeCatMeta = activeCategory ? categories.find((c) => c.key === activeCategory) : null;
 
     const systemPrompt = mode === "profile"
-      ? `You're having a warm, genuinely curious conversation about someone's physiology and arousal, specifically staying on the topic "${activeCatMeta?.label ?? "their physiology"}". Acknowledge what they said briefly and naturally (one sentence — not overly enthusiastic), then ask ONE follow-up question that goes a bit deeper on the same topic. Feel like a curious, knowledgeable friend. Keep it relaxed and specific. No bullet points, no clinical jargon.`
-      : `You're having a relaxed, curious conversation about this specific session, staying focused on "${activeCatMeta?.label ?? "the session"}". The session data has real numbers — use them to ask something specific. Briefly react to what they said (one natural sentence), then ask ONE follow-up that digs a bit deeper on the same topic using something concrete from their data or their answer. Sound human and curious, not like a questionnaire.`;
+      ? `You're having a warm, immersive conversation about someone's physiology and arousal, staying on the topic "${activeCatMeta?.label ?? "their physiology"}". Respond to what they just said with a brief, genuine reaction (one sentence — not over the top), then ask ONE follow-up that pulls a thread from their answer and goes deeper. Be curious, specific, and engaged — like you genuinely find their physiology fascinating. 2–3 sentences total. No bullet points, no clinical jargon.`
+      : `You're having an immersive, curious conversation about this specific session, staying on the topic "${activeCatMeta?.label ?? "the session"}". React to what they said naturally (one sentence), then ask ONE follow-up that connects their answer to something specific in their session data — a detail that adds depth or reveals something interesting.
+
+CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. Convert every timestamp to minutes:seconds before using it (e.g. 674s → "11:14", 784s → "13:04"). NEVER say "X seconds" in your response — always say "around the 11-minute mark" or "at 13:04" or "just before 8 minutes in". Sound genuinely fascinated and present. 3–4 sentences total.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
       prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,
