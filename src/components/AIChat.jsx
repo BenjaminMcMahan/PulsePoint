@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, Send, ChevronDown, ChevronUp, Sparkles, Save, RefreshCw } from "lucide-react";
+import { MessageCircle, Send, ChevronDown, ChevronUp, Sparkles, Save, RefreshCw, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 
@@ -37,14 +37,71 @@ export default function AIChat({
   const [savingFindings, setSavingFindings] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [speakingIdx, setSpeakingIdx] = useState(null);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const audioRef = useRef(null);
 
   const categories = mode === "profile" ? PROFILE_CATEGORIES : SESSION_CATEGORIES;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const speakText = async (text, idx) => {
+    if (!ttsEnabled) return;
+    setSpeakingIdx(idx);
+    const res = await base44.functions.invoke("openaiTTS", { text, voice: "nova", speed: 1.0 });
+    const audio = res.data?.audio;
+    if (!audio) { setSpeakingIdx(null); return; }
+    const src = `data:audio/mpeg;base64,${audio}`;
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    const el = new Audio(src);
+    audioRef.current = el;
+    el.onended = () => setSpeakingIdx(null);
+    el.onerror = () => setSpeakingIdx(null);
+    el.play();
+  };
+
+  const stopSpeaking = () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    setSpeakingIdx(null);
+  };
+
+  const startRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunksRef.current = [];
+    const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    mediaRecorderRef.current = mr;
+    mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+    mr.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setTranscribing(true);
+      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result.split(",")[1];
+        const res = await base44.functions.invoke("whisperSTT", { audio_base64: base64, mime_type: "audio/webm" });
+        const text = res.data?.text || "";
+        if (text) setInput((prev) => (prev ? prev + " " + text : text));
+        setTranscribing(false);
+        setTimeout(() => inputRef.current?.focus(), 100);
+      };
+      reader.readAsDataURL(blob);
+    };
+    mr.start();
+    setRecording(true);
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  };
 
   const generateQuestion = async (category) => {
     setGenerating(true);
@@ -65,6 +122,8 @@ export default function AIChat({
     setMessages(updated);
     onSaveMessages?.(updated);
     setGenerating(false);
+    const newIdx = updated.length - 1;
+    if (ttsEnabled) speakText(question, newIdx);
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
@@ -98,6 +157,8 @@ export default function AIChat({
     setMessages(finalMessages);
     onSaveMessages?.(finalMessages);
     setLoading(false);
+    const newIdx = finalMessages.length - 1;
+    if (ttsEnabled) speakText(reply, newIdx);
   };
 
   const saveFindings = async () => {
@@ -132,6 +193,17 @@ export default function AIChat({
         </span>
         {hasMessages && (
           <span className="text-[10px] text-muted-foreground">{messages.length} msg{messages.length !== 1 ? "s" : ""}</span>
+        )}
+        {open && (
+          <button
+            onClick={(e) => { e.stopPropagation(); if (ttsEnabled) stopSpeaking(); setTtsEnabled((v) => !v); }}
+            title={ttsEnabled ? "Read questions aloud (on)" : "Read questions aloud (off)"}
+            className="p-1 rounded-md transition-colors hover:bg-black/10"
+          >
+            {ttsEnabled
+              ? <Volume2 className="w-4 h-4 text-accent" />
+              : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+          </button>
         )}
         {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
@@ -185,8 +257,10 @@ export default function AIChat({
                     className={`rounded-xl px-3 py-2 text-sm leading-relaxed max-w-[85%] ${
                       msg.role === "user"
                         ? "bg-primary text-primary-foreground rounded-tr-sm"
-                        : "bg-muted/70 text-foreground rounded-tl-sm"
+                        : "bg-muted/70 text-foreground rounded-tl-sm cursor-pointer"
                     }`}
+                    onClick={msg.role === "assistant" ? () => speakingIdx === i ? stopSpeaking() : speakText(msg.text, i) : undefined}
+                    title={msg.role === "assistant" ? (speakingIdx === i ? "Tap to stop" : "Tap to hear") : undefined}
                   >
                     {msg.role === "assistant" && msg.category && (
                       <span className="block text-[9px] font-semibold uppercase tracking-wider mb-1 opacity-60">
@@ -194,6 +268,13 @@ export default function AIChat({
                       </span>
                     )}
                     {msg.text}
+                    {msg.role === "assistant" && speakingIdx === i && (
+                      <span className="ml-2 inline-flex items-center gap-0.5">
+                        <span className="w-1 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1 h-3 bg-accent rounded-full animate-bounce" style={{ animationDelay: "100ms" }} />
+                        <span className="w-1 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: "200ms" }} />
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -220,10 +301,21 @@ export default function AIChat({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                placeholder="Type your answer…"
-                disabled={loading || generating}
+                placeholder={transcribing ? "Transcribing…" : recording ? "Recording… tap mic to stop" : "Type or speak your answer…"}
+                disabled={loading || generating || transcribing}
                 className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
               />
+              {/* Mic button */}
+              <button
+                onClick={recording ? stopRecording : startRecording}
+                disabled={loading || generating || transcribing}
+                title={recording ? "Stop recording" : "Speak your answer"}
+                className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 transition-all disabled:opacity-40 ${recording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+              >
+                {transcribing
+                  ? <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  : recording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
               <button
                 onClick={sendMessage}
                 disabled={!input.trim() || loading || generating}
