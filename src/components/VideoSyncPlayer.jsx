@@ -108,6 +108,8 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
   const audioChunksRef = useRef([]);
   const sttSupported = !!navigator.mediaDevices?.getUserMedia;
 
+  const newNoteRef = useRef(null);
+
   const stopListening = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
@@ -277,10 +279,21 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
         e.preventDefault();
         toggleListening();
       }
+
+      // Enter: pause video and open add-event form at current timestamp
+      if (e.code === "Enter" && !inInput && !addingNew) {
+        e.preventDefault();
+        if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
+        setNewMin(String(Math.floor(playheadS / 60)));
+        setNewSec(String(Math.round(playheadS % 60)));
+        setNewCats([lastUsedCat]);
+        setAddingNew(true);
+        setTimeout(() => newNoteRef.current?.focus(), 50);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [addingNew, sttSupported, toggleListening]);
+  }, [addingNew, sttSupported, toggleListening, playheadS, lastUsedCat]);
 
   // Click on chart → seek video
   const handleChartClick = useCallback((data) => {
@@ -442,6 +455,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                 <CategorySelector selected={newCats} onChange={setNewCats} />
                 <div className="flex gap-1.5 items-end">
                    <textarea
+                     ref={newNoteRef}
                      value={newNote}
                      onChange={(e) => setNewNote(e.target.value)}
                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}

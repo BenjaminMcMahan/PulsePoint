@@ -143,7 +143,6 @@ export default function EventSyncPlayer() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const [savingEvent, setSavingEvent] = useState(false);
-  const eventNoteRef = useRef(null);
 
   // Video resize
   const [videoHeight, setVideoHeight] = useState(320);
@@ -432,34 +431,6 @@ export default function EventSyncPlayer() {
     if (isRecording) stopRecording();
     else startRecording();
   }, [isRecording, startRecording, stopRecording]);
-
-  // Enter key: pause playback and focus the event note textarea
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key !== "Enter") return;
-      const tag = document.activeElement?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (!isPlaying) return;
-      // Pause
-      if (videoMode && videoRef.current) {
-        videoRef.current.pause();
-        stopTTS();
-        setIsPlaying(false);
-      } else {
-        stopTimer();
-        stopTTS();
-        setIsPlaying(false);
-        timerOffsetRef.current = playbackTime;
-      }
-      // Scroll to and focus the textarea
-      setTimeout(() => {
-        eventNoteRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        eventNoteRef.current?.focus();
-      }, 50);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isPlaying, videoMode, stopTTS, stopTimer, playbackTime]);
 
   // Global "A" key shortcut to save event when note is present
   useEffect(() => {
@@ -757,7 +728,6 @@ export default function EventSyncPlayer() {
               </div>
               <div className="flex gap-2 items-end">
                 <textarea
-                  ref={eventNoteRef}
                   value={newEventNote}
                   onChange={(e) => setNewEventNote(e.target.value)}
                   placeholder={isTranscribing ? "Transcribing…" : isRecording ? "Recording… tap mic to stop" : "Describe the event… or tap mic to dictate"}
