@@ -119,15 +119,23 @@ export default function AIChat({
 
     const history = updated.map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n");
 
+    const shouldPivot = messages.length > 4 && Math.random() < 0.4; // 40% chance to pivot after some msgs
+
     const systemPrompt = messages.length === 1 // First message from user — start fresh conversation
       ? mode === "profile"
         ? `You're having a genuine, immersive conversation with someone about their physiology and arousal — like a knowledgeable, fascinated friend who has studied their data closely. They've just shared something. Respond naturally, ask ONE follow-up question that goes deeper into what they said. Sound curious, specific, and engaged. 2–3 sentences total. No bullet points, no clinical jargon.`
         : `You're having an immersive, curious conversation with someone about a specific session. They've just shared something about their experience. Respond naturally, then ask ONE follow-up question that connects to their observation or something specific in the session data.
 
   CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. Convert every timestamp to minutes:seconds (e.g. 674s → "11:14", 784s → "13:04"). NEVER say "X seconds" — always say "around the 11-minute mark" or "at 13:04". Sound genuinely fascinated. 2–3 sentences total.`
-      : mode === "profile"
-        ? `You're having a warm, immersive conversation about someone's physiology and arousal. They just responded to your previous question or observation. Continue the conversation naturally — ask ONE follow-up that pulls another thread from what they said and goes deeper. Be curious, specific, and engaged — like you genuinely find their physiology fascinating. No affirmations like "great!" or "thanks for sharing!" — just natural flow. 2–3 sentences total.`
-        : `You're having an immersive, curious conversation about this specific session. They just responded. Continue naturally with ONE follow-up question that connects to what they said or something specific in the session data.
+      : shouldPivot
+        ? mode === "profile"
+          ? `You're having a warm, immersive conversation about someone's physiology and arousal. They just responded. Now pivot to explore a DIFFERENT aspect of their physiology that hasn't been covered yet — look at the session data for untapped areas. Ask ONE curious follow-up about something new. Be natural, specific, engaged. No affirmations. 2–3 sentences total.`
+          : `You're having an immersive, curious conversation about this specific session. They just responded. Now pivot to explore a DIFFERENT aspect of the session data — look for untapped threads (different phase, different metric, different moment). Ask ONE follow-up about something fresh and specific. Naturally curious tone.
+
+  CRITICAL — TIME FORMATTING: Convert all seconds to minutes:seconds (e.g. 674s → "11:14"). No affirmations. 2–3 sentences total.`
+        : mode === "profile"
+          ? `You're having a warm, immersive conversation about someone's physiology and arousal. They just responded to your previous question or observation. Continue the conversation naturally — ask ONE follow-up that pulls another thread from what they said and goes deeper. Be curious, specific, and engaged — like you genuinely find their physiology fascinating. No affirmations like "great!" or "thanks for sharing!" — just natural flow. 2–3 sentences total.`
+          : `You're having an immersive, curious conversation about this specific session. They just responded. Continue naturally with ONE follow-up question that connects to what they said or something specific in the session data.
 
   CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. Convert every timestamp to minutes:seconds (e.g. 674s → "11:14", 784s → "13:04"). NEVER say "X seconds" — always say "around the 11-minute mark" or "at 13:04". No affirmations or pleasantries — just natural, curious follow-up. 2–3 sentences total.`;
 
