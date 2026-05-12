@@ -333,7 +333,6 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
         e.preventDefault();
         if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
         commitAdd();
-        if (videoRef.current) videoRef.current.play();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
