@@ -33,10 +33,8 @@ export default function AIChat({
   const [messages, setMessages] = useState(savedMessages || []);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [savingFindings, setSavingFindings] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
@@ -103,33 +101,7 @@ export default function AIChat({
     setRecording(false);
   };
 
-  const generateQuestion = async (category) => {
-    setGenerating(true);
-    setSelectedCategory(category);
 
-    const cat = categories.find((c) => c.key === category);
-
-    const systemPrompt = mode === "profile"
-      ? `You're having a genuine, immersive conversation with someone about their physiology and arousal — like a knowledgeable, fascinated friend who has studied their data closely. They picked "${cat?.label}". Ask ONE rich, specific question on that topic. Make it feel personal, curious, and grounded in real human experience. 2–3 sentences is ideal — enough to give real context and show you're genuinely engaged. No preamble, no "great choice!". Just dive in naturally.`
-      : `You're having an immersive, genuinely curious conversation with someone about a specific session. The data below is real — treat it like a fascinating story you want to understand more deeply. They want to explore "${cat?.label}".
-
-CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. You MUST convert every timestamp to minutes:seconds format (e.g. 674 seconds → "11:14", 784 seconds → "13:04") before using them in your question. NEVER say "674 seconds" or "at 784 seconds" — always say "around the 11-minute mark" or "just after 13 minutes in" or "at 11:14".
-
-Ask ONE question that feels like it comes from genuinely noticing something fascinating in their data. Set up the observation first (what you noticed in the data), then ask them about it. Sound deeply curious and present — like someone who actually read their session carefully. 3–4 sentences total.`;
-
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nPrevious conversation (if any):\n${messages.map(m => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n")}\n\nAsk your hyper-specific question now:`,
-    });
-    const question = typeof res === "string" ? res.trim() : res?.response?.trim() ?? "";
-    const msg = { role: "assistant", text: question, category };
-    const updated = [...messages, msg];
-    setMessages(updated);
-    onSaveMessages?.(updated);
-    setGenerating(false);
-    const newIdx = updated.length - 1;
-    if (ttsEnabled) speakText(question, newIdx);
-    setTimeout(() => inputRef.current?.focus(), 100);
-  };
 
   const handleOpen = () => {
     setOpen(true);
@@ -147,14 +119,17 @@ Ask ONE question that feels like it comes from genuinely noticing something fasc
 
     const history = updated.map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n");
 
-    const activeCategory = [...messages].reverse().find((m) => m.role === "assistant" && m.category)?.category ?? null;
-    const activeCatMeta = activeCategory ? categories.find((c) => c.key === activeCategory) : null;
+    const systemPrompt = messages.length === 1 // First message from user — start fresh conversation
+      ? mode === "profile"
+        ? `You're having a genuine, immersive conversation with someone about their physiology and arousal — like a knowledgeable, fascinated friend who has studied their data closely. They've just shared something. Respond naturally, ask ONE follow-up question that goes deeper into what they said. Sound curious, specific, and engaged. 2–3 sentences total. No bullet points, no clinical jargon.`
+        : `You're having an immersive, curious conversation with someone about a specific session. They've just shared something about their experience. Respond naturally, then ask ONE follow-up question that connects to their observation or something specific in the session data.
 
-    const systemPrompt = mode === "profile"
-      ? `You're having a warm, immersive conversation about someone's physiology and arousal, staying on the topic "${activeCatMeta?.label ?? "their physiology"}". Respond to what they just said with a brief, genuine reaction (one sentence — not over the top), then ask ONE follow-up that pulls a thread from their answer and goes deeper. Be curious, specific, and engaged — like you genuinely find their physiology fascinating. 2–3 sentences total. No bullet points, no clinical jargon.`
-      : `You're having an immersive, curious conversation about this specific session, staying on the topic "${activeCatMeta?.label ?? "the session"}". React to what they said naturally (one sentence), then ask ONE follow-up that connects their answer to something specific in their session data — a detail that adds depth or reveals something interesting.
+  CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. Convert every timestamp to minutes:seconds (e.g. 674s → "11:14", 784s → "13:04"). NEVER say "X seconds" — always say "around the 11-minute mark" or "at 13:04". Sound genuinely fascinated. 2–3 sentences total.`
+      : mode === "profile"
+        ? `You're having a warm, immersive conversation about someone's physiology and arousal. They just responded to your previous question or observation. Continue the conversation naturally — ask ONE follow-up that pulls another thread from what they said and goes deeper. Be curious, specific, and engaged — like you genuinely find their physiology fascinating. No affirmations like "great!" or "thanks for sharing!" — just natural flow. 2–3 sentences total.`
+        : `You're having an immersive, curious conversation about this specific session. They just responded. Continue naturally with ONE follow-up question that connects to what they said or something specific in the session data.
 
-CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. Convert every timestamp to minutes:seconds before using it (e.g. 674s → "11:14", 784s → "13:04"). NEVER say "X seconds" in your response — always say "around the 11-minute mark" or "at 13:04" or "just before 8 minutes in". Sound genuinely fascinated and present. 3–4 sentences total.`;
+  CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. Convert every timestamp to minutes:seconds (e.g. 674s → "11:14", 784s → "13:04"). NEVER say "X seconds" — always say "around the 11-minute mark" or "at 13:04". No affirmations or pleasantries — just natural, curious follow-up. 2–3 sentences total.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
       prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,
@@ -221,42 +196,43 @@ CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds.
         <div className="p-3 space-y-3">
           <p className="text-[11px] text-muted-foreground">
             {mode === "profile"
-              ? "Pick a category and the AI will ask a targeted question to deepen your profile. Findings are saved to your arousal notes."
-              : "Pick a topic and the AI will ask a focused question about this specific session. Findings are saved to session notes."}
+              ? "Start a conversation about your physiology and arousal. Findings are saved to your arousal notes."
+              : "Ask anything about this session or share observations. Findings are saved to session notes."}
           </p>
 
-          {/* Category chips */}
-          <div className="flex flex-wrap gap-1.5">
-            {categories.map((cat) => (
+          {/* Message thread or input prompt */}
+          {messages.length === 0 ? (
+            <div className="flex gap-2 items-end">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
+                placeholder={transcribing ? "Transcribing…" : recording ? "Recording… tap mic to stop" : `Tell the AI something about your ${mode === "profile" ? "physiology" : "session"}…`}
+                disabled={loading || transcribing}
+                rows={3}
+                className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-none"
+              />
               <button
-                key={cat.key}
-                onClick={() => generateQuestion(cat.key)}
-                disabled={generating}
-                title={cat.hint}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors disabled:opacity-50"
-                style={selectedCategory === cat.key
-                  ? { background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))", borderColor: "hsl(var(--accent))" }
-                  : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
-                }
+                onClick={recording ? stopRecording : startRecording}
+                disabled={loading || transcribing}
+                title={recording ? "Stop recording" : "Speak your message"}
+                className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 transition-all disabled:opacity-40 ${recording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-muted text-muted-foreground hover:text-foreground"}`}
               >
-                <span>{cat.emoji}</span> {cat.label}
+                {transcribing
+                  ? <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  : recording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               </button>
-            ))}
-          </div>
-
-          {/* Message thread */}
-          {(hasMessages || generating) && (
+              <button
+                onClick={sendMessage}
+                disabled={!input.trim() || loading}
+                className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 shrink-0 transition-opacity"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1 border-t border-border pt-2">
-              {generating && (
-                <div className="flex gap-2 items-start">
-                  <Sparkles className="w-3.5 h-3.5 text-accent shrink-0 mt-0.5" />
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="w-3 h-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-                    Generating question…
-                  </div>
-                </div>
-              )}
-
               {messages.map((msg, i) => (
                 <div key={i} className={`flex gap-2 items-start ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                   {msg.role === "assistant" && (
@@ -271,11 +247,6 @@ CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds.
                     onClick={msg.role === "assistant" ? () => speakingIdx === i ? stopSpeaking() : speakText(msg.text, i) : undefined}
                     title={msg.role === "assistant" ? (speakingIdx === i ? "Tap to stop" : "Tap to hear") : undefined}
                   >
-                    {msg.role === "assistant" && msg.category && (
-                      <span className="block text-[9px] font-semibold uppercase tracking-wider mb-1 opacity-60">
-                        {categories.find(c => c.key === msg.category)?.emoji} {categories.find(c => c.key === msg.category)?.label}
-                      </span>
-                    )}
                     {msg.text}
                     {msg.role === "assistant" && speakingIdx === i && (
                       <span className="ml-2 inline-flex items-center gap-0.5">
@@ -299,46 +270,43 @@ CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds.
                 </div>
               )}
               <div ref={bottomRef} />
-            </div>
-          )}
 
-          {/* Input — only shown once a question has been asked */}
-          {hasMessages && (
-            <div className="flex gap-2 items-end">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
-                placeholder={transcribing ? "Transcribing…" : recording ? "Recording… tap mic to stop" : "Type or speak your answer…"}
-                disabled={loading || generating || transcribing}
-                rows={3}
-                className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-none"
-              />
-              {/* Mic button */}
-              <button
-                onClick={recording ? stopRecording : startRecording}
-                disabled={loading || generating || transcribing}
-                title={recording ? "Stop recording" : "Speak your answer"}
-                className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 transition-all disabled:opacity-40 ${recording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-muted text-muted-foreground hover:text-foreground"}`}
-              >
-                {transcribing
-                  ? <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  : recording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={sendMessage}
-                disabled={!input.trim() || loading || generating}
-                className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 shrink-0 transition-opacity"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+              {/* Input — shown after messages start */}
+              <div className="flex gap-2 items-end sticky bottom-0 bg-white dark:bg-slate-900 pt-2">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
+                  placeholder={transcribing ? "Transcribing…" : recording ? "Recording… tap mic to stop" : "Type or speak your response…"}
+                  disabled={loading || transcribing}
+                  rows={2}
+                  className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-none"
+                />
+                <button
+                  onClick={recording ? stopRecording : startRecording}
+                  disabled={loading || transcribing}
+                  title={recording ? "Stop recording" : "Speak your response"}
+                  className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 transition-all disabled:opacity-40 ${recording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                >
+                  {transcribing
+                    ? <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    : recording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || loading}
+                  className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 shrink-0 transition-opacity"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+              </div>
+              )}
 
           {/* Actions */}
           {hasUserReplied && (
-            <div className="flex items-center gap-2 pt-1 border-t border-border flex-wrap">
+            <div className="flex items-center gap-2 pt-2 border-t border-border flex-wrap">
               <Button
                 size="sm"
                 variant="outline"
@@ -353,7 +321,7 @@ CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds.
                   : <><Save className="w-3 h-3" />Save Findings</>}
               </Button>
               <button
-                onClick={() => { setMessages([]); onSaveMessages?.([]); setSelectedCategory(null); }}
+                onClick={() => { setMessages([]); onSaveMessages?.([]); }}
                 className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors ml-auto"
               >
                 <RefreshCw className="w-3 h-3" /> Clear chat
