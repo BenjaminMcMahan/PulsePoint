@@ -120,12 +120,14 @@ export default function SessionDetail() {
       setUserProfile(me);
       setChatMessages(s?.ai_analysis?._chat_messages || []);
       setSessionNotes(s?.notes || "");
-      const [rows, emgData] = await Promise.all([
-        base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000),
-        base44.entities.EMGTimeline.filter({ session: id }, "time_s", 2000000),
-      ]);
+      const rows = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
       setTimelineRows(rows);
-      setEmgRows(emgData);
+
+      // Fetch all EMG rows via backend (handles large 30k+ datasets via pagination)
+      const emgRes = await base44.functions.invoke("saveTimelineData", {
+        session_id: id, entity: "EMGTimeline", action: "fetch",
+      });
+      setEmgRows(emgRes.data?.rows || []);
 
       // Auto-detect phase markers if not already set
       if (rows.length > 10 && s && !s.climax_offset_s) {

@@ -45,6 +45,20 @@ Deno.serve(async (req) => {
     const filterKey = entity === 'EMGTimeline' ? 'time_s' : 'time_offset_s';
     const db = base44.asServiceRole.entities[entity];
 
+    // action=fetch: read all rows for this session (handles large datasets via pagination)
+    if (action === 'fetch') {
+      let allRows = [];
+      let skip = 0;
+      const PAGE = 10000;
+      while (true) {
+        const page = await withRetry(() => db.filter({ session: session_id }, filterKey, PAGE, skip));
+        allRows = allRows.concat(page);
+        if (page.length < PAGE) break;
+        skip += PAGE;
+      }
+      return Response.json({ ok: true, rows: allRows, count: allRows.length });
+    }
+
     // action=clear: just delete all existing rows for this session, no insert
     if (action === 'clear') {
       let deleted = 0;
