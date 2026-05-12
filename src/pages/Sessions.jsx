@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PageHeader from "../components/PageHeader";
 import SessionCard from "../components/SessionCard";
-import { PlusCircle, Search, SlidersHorizontal, Download, Brain, Clock } from "lucide-react";
+import { PlusCircle, Search, SlidersHorizontal, Download, Brain, Clock, Zap } from "lucide-react";
 import RoutinePatternAnalysis from "../components/RoutinePatternAnalysis";
+import { computeAISessionScore } from "@/utils/sessionScore";
 
 const ALL_METHODS = ["Manual", "Silicone Sleeve", "Coyote E-Stim", "TENS", "Foley Catheter"];
 const BUILD_TYPES = ["Gradual", "Stepwise", "Spike", "Plateau-heavy", "Erratic", "Other"];
@@ -29,6 +30,8 @@ export default function Sessions() {
   const [filterBQMax, setFilterBQMax] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [grading, setGrading] = useState(false);
+  const [gradeProgress, setGradeProgress] = useState(0);
 
   useEffect(() => {
     loadSessions();
@@ -89,6 +92,25 @@ ${s.notes ? `- Notes: ${s.notes.slice(0, 200)}` : ""}`,
       setSessions((prev) => prev.map((p) => p.id === s.id ? { ...p, ai_analysis: { ...(p.ai_analysis || {}), summary } } : p));
     }));
     setAnalyzing(false);
+  };
+
+  const gradeAllSessions = async () => {
+    const toGrade = sessions.filter((s) => !s.ai_analysis?.ai_score);
+    if (!toGrade.length) return;
+    setGrading(true);
+    setGradeProgress(0);
+    let done = 0;
+    await Promise.all(toGrade.map(async (s) => {
+      const score = await computeAISessionScore(s, []);
+      if (score != null) {
+        const updated = { ...(s.ai_analysis || {}), ai_score: score };
+        await base44.entities.Session.update(s.id, { ai_analysis: updated });
+        setSessions((prev) => prev.map((p) => p.id === s.id ? { ...p, ai_analysis: updated } : p));
+      }
+      done++;
+      setGradeProgress(Math.round((done / toGrade.length) * 100));
+    }));
+    setGrading(false);
   };
 
   const backfillStartTimes = async () => {
@@ -183,6 +205,18 @@ ${s.notes ? `- Notes: ${s.notes.slice(0, 200)}` : ""}`,
               {backfilling
                 ? <><span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />{backfillProgress.done}/{backfillProgress.total}</>
                 : <><Clock className="w-4 h-4" />Times</>}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={gradeAllSessions}
+              disabled={grading || sessions.every((s) => s.ai_analysis?.ai_score)}
+              className="gap-1.5 h-9"
+            >
+              {grading
+                ? <><span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />{gradeProgress}%</>
+                : <><Zap className="w-4 h-4" />Grade</>
+              }
             </Button>
             <Button
               variant="outline"

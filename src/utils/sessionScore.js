@@ -1,4 +1,5 @@
 // Shared session score computation (mirrors SessionExecutiveSummary logic)
+import { base44 } from "@/api/base44Client";
 
 function calcHRVariability(rows) {
   if (!rows || rows.length < 5) return null;
@@ -91,6 +92,25 @@ export function computeSessionScore(session, timelineRows = []) {
   const totalScore = factors.reduce((a, f) => a + f.score, 0);
   if (totalMax === 0) return null;
   return Math.round(Math.max(0, Math.min(100, (totalScore / totalMax) * 100)));
+}
+
+export async function computeAISessionScore(session, timelineRows = []) {
+  if (!session) return null;
+  const eventCount = (session.event_timeline || []).length;
+  const hrData = timelineRows.length > 0
+    ? `Avg HR: ${session.avg_hr || "—"} bpm, Max: ${session.max_hr || "—"}, Recovery time: ${session.recovery_offset_s != null && session.climax_offset_s != null ? Math.round((session.recovery_offset_s - session.climax_offset_s) / 60) + "s" : "—"}`
+    : "No HR data";
+  const arousal = `Intensity: ${session.intensity || "—"}/10, Build: ${session.build_quality || "—"}/10, Satisfaction: ${session.satisfaction || "—"}/10`;
+  const climax = !session.no_climax ? `Climax duration: ${session.climax_duration || "—"}, HR at climax: ${session.hr_at_climax || "—"}` : "No climax";
+  const prompt = `Grade this session 0-100 based on arousal quality, physiological response, and satisfaction. Return only a number.\nArousal: ${arousal}\nClimax: ${climax}\nHR: ${hrData}\nMethods: ${(session.methods || []).join(", ") || "none"}\nBuild: ${session.build_type || "unknown"}\nEvents: ${eventCount}\nGrade:`.substring(0, 500);
+  try {
+    const res = await base44.integrations.Core.InvokeLLM({ prompt });
+    const scoreStr = (typeof res === "string" ? res : res?.response || "").trim();
+    const score = parseInt(scoreStr, 10);
+    return !isNaN(score) && score >= 0 && score <= 100 ? score : null;
+  } catch (err) {
+    return null;
+  }
 }
 
 export function gradeFromPct(pct) {
