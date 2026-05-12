@@ -24,9 +24,11 @@ export default function MultiSelect({ selected = [], onChange, options = DEFAULT
     });
   }, []);
 
+  // Include any selected items not yet in the saved list (legacy session-only customs)
   const allOptions = [
     ...options,
     ...savedCustomMethods.map((m) => m.name).filter((n) => !options.includes(n)),
+    ...selected.filter((s) => !options.includes(s) && !savedCustomMethods.find((m) => m.name === s)),
   ];
 
   const toggle = (item) => {
