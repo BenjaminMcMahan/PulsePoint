@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function withRetry(fn, maxRetries = 5, baseDelay = 1000) {
+async function withRetry(fn, maxRetries = 8, baseDelay = 2000) {
   let delay = baseDelay;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -11,7 +11,7 @@ async function withRetry(fn, maxRetries = 5, baseDelay = 1000) {
       const is429 = err?.message?.includes('Rate limit') || String(err).includes('429');
       if (attempt === maxRetries || !is429) throw err;
       await sleep(delay);
-      delay = Math.min(delay * 2, 10000);
+      delay = Math.min(delay * 1.5, 30000);
     }
   }
 }
@@ -86,9 +86,9 @@ Deno.serve(async (req) => {
     }
 
     const tagged = finalRows.map((r) => ({ ...r, session: session_id }));
-    // Use larger chunks for EMG (less overhead per call), smaller for HR
-    const CHUNK = entity === 'EMGTimeline' ? 2000 : 500;
-    const DELAY = entity === 'EMGTimeline' ? 100 : 300;
+    // Use smaller chunks with longer delays to avoid rate limits on large datasets
+    const CHUNK = entity === 'EMGTimeline' ? 1000 : 300;
+    const DELAY = entity === 'EMGTimeline' ? 1000 : 800;
     for (let i = 0; i < tagged.length; i += CHUNK) {
       await withRetry(() => db.bulkCreate(tagged.slice(i, i + CHUNK)));
       if (i + CHUNK < tagged.length) await sleep(DELAY);
