@@ -20,7 +20,6 @@ import HROverlay from './pages/HROverlay';
 import LongTermTrends from './pages/LongTermTrends';
 import Profile from './pages/Profile';
 import CorrelationMatrix from './pages/CorrelationMatrix';
-import EventCorrelations from './pages/EventCorrelations';
 import VideoPlayer from './pages/VideoPlayer';
 import Library from './pages/Library';
 import EventSyncPlayer from './pages/EventSyncPlayer';
@@ -66,7 +65,6 @@ const AuthenticatedApp = () => {
         <Route path="/trends" element={<LongTermTrends />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/correlations" element={<CorrelationMatrix />} />
-        <Route path="/event-correlations" element={<EventCorrelations />} />
         <Route path="/video" element={<VideoPlayer />} />
         <Route path="/library" element={<Library />} />
         <Route path="/sync-player" element={<EventSyncPlayer />} />
