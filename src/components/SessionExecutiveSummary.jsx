@@ -142,26 +142,28 @@ function fmtSec(s) {
 
 export default function SessionExecutiveSummary({ session, timelineRows, onScoreComputed }) {
   const [collapsed, setCollapsed] = useState(true);
+  
+  // Always compute for factors; prefer persisted score for display
   const result = useMemo(() => computeScore(session, timelineRows), [session, timelineRows]);
-
-  // Notify parent of computed score so it can be cached/stored
+  const scorePct = session.ai_analysis?.ai_score ?? result?.pct;
+  
+  // Notify parent if using computed score
   useEffect(() => {
-    if (result && onScoreComputed) onScoreComputed(result.pct);
-  }, [result?.pct]);
+    if (result && !session.ai_analysis?.ai_score && onScoreComputed) {
+      onScoreComputed(result.pct);
+    }
+  }, [result?.pct, session.ai_analysis?.ai_score, onScoreComputed]);
+  
+  if (!scorePct) return null;
 
-  if (!result) return null;
-
-  const { pct, factors } = result;
-  const { grade, label, color } = gradeInfo(pct);
+  const factors = result?.factors || [];
+  const { grade, label, color } = gradeInfo(scorePct);
 
   const recoveryS = calcRecoveryTime(session);
   const hrVar = calcHRVariability(timelineRows);
   const hrRise = calcHRRise(session);
   const discomfortPenalty = calcDiscomfortPenalty(session);
   const pauseS = calcPauseTime(session);
-
-  // Determine trend icon vs previous score — just show neutral for now (no historical compare here)
-  const scorePct = pct;
 
   const highlights = [
     hrVar != null && {
