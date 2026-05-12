@@ -100,6 +100,11 @@ export default function SessionCard({ session, selectable, selected, onSelect })
         {methods.length > 3 && (
           <Badge variant="secondary" className="text-[10px] py-0">+{methods.length - 3}</Badge>
         )}
+        {session.foley_size && (
+          <Badge variant="secondary" className="text-[10px] py-0">
+            Foley {session.foley_size}{session.foley_type ? ` (${session.foley_type})` : ""}
+          </Badge>
+        )}
         {(session.tags || []).slice(0, 2).map((t) => (
           <Badge key={t} variant="outline" className="text-[10px] py-0">{t}</Badge>
         ))}
