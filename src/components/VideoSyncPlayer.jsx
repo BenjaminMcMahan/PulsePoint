@@ -328,9 +328,10 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
         }
       }
 
-      // A: save event when add-event form is open and note has text
-      if (e.code === "KeyA" && !inInput && addingNew && newNote.trim()) {
+      // S: pause video + save event when add-event form is open and note has text
+      if (e.code === "KeyS" && !inInput && addingNew && newNote.trim()) {
         e.preventDefault();
+        if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
         commitAdd();
         if (videoRef.current) videoRef.current.play();
       }
@@ -499,19 +500,19 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
               <div className="rounded-lg px-3 py-2.5 space-y-2 bg-muted/40 border border-primary/30">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event at {fmtMmSs(playheadS)}</p>
-                  {newNote.trim() && <span className="text-[9px] text-muted-foreground">press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">A</kbd> to save</span>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
-                    placeholder="min" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
-                  <span className="text-muted-foreground font-bold">:</span>
-                  <input type="number" min={0} max={59} value={newSec} onChange={(e) => setNewSec(e.target.value)}
-                    placeholder="sec" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
-                </div>
-                <CategorySelector selected={newCats} onChange={setNewCats} />
-                <div className="flex gap-1.5 items-end">
-                   <textarea
-                     ref={newNoteRef}
+                  {newNote.trim() && <span className="text-[9px] text-muted-foreground">press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">S</kbd> to save</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                   <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
+                     placeholder="min" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+                   <span className="text-muted-foreground font-bold">:</span>
+                   <input type="number" min={0} max={59} value={newSec} onChange={(e) => setNewSec(e.target.value)}
+                     placeholder="sec" className="w-14 text-xs font-mono text-center bg-background border border-border rounded px-2 py-1" />
+                  </div>
+                  <CategorySelector selected={newCats} onChange={setNewCats} />
+                  <div className="flex gap-1.5 items-end">
+                    <textarea
+                      ref={newNoteRef}
                      value={newNote}
                      onChange={(e) => setNewNote(e.target.value)}
                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } }}
@@ -596,7 +597,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
               <div className="rounded-lg px-3 py-2.5 space-y-2 bg-muted/40 border border-primary/30">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">New Event at {fmtMmSs(playheadS)}</p>
-                  {newNote.trim() && <span className="text-[9px] text-muted-foreground">press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">A</kbd> to save</span>}
+                  {newNote.trim() && <span className="text-[9px] text-muted-foreground">press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono text-[8px]">S</kbd> to save</span>}
                 </div>
                 <div className="flex items-center gap-2">
                   <input type="number" min={0} value={newMin} onChange={(e) => setNewMin(e.target.value)}
