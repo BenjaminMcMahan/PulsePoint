@@ -343,8 +343,12 @@ Return an array of near-climax events. If none exist, return an empty array.`,
           )}
           </div>
 
-          {/* Event Navigator Bar */}
-          {events.length > 0 && (() => {
+          <p className="text-[10px] text-muted-foreground italic">
+            Tap an event to highlight it on the chart above
+          </p>
+
+          {/* Event Navigator Bar — sits just above the event cards */}
+          {(() => {
             const idx = selectedIndex ?? 0;
             const ev = events[idx];
             return (
@@ -359,15 +363,16 @@ Return an array of near-climax events. If none exist, return an empty array.`,
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-xs font-bold font-mono truncate" style={{ color: "hsl(var(--chart-3))" }}>
-                      {ev.ai_label ? ev.ai_label : `Event ${idx + 1}`} — {fmtMmSs(ev.start_offset_s)}
+                      {ev.ai_label ? ev.ai_label : `Event ${idx + 1}`}
                     </span>
                     <span className="text-[9px] text-muted-foreground shrink-0">{idx + 1} / {events.length}</span>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-1">
-                    <span className="text-[10px] text-muted-foreground">Base <strong className="text-foreground font-mono">{ev.base_hr}</strong> bpm</span>
-                    <span className="text-[10px] text-muted-foreground">Peak <strong className="text-foreground font-mono">{ev.peak_hr}</strong> bpm</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">{fmtMmSs(ev.start_offset_s)} – {fmtMmSs(ev.end_offset_s)}</span>
+                    <span className="text-[10px] text-muted-foreground">· <strong className="text-foreground font-mono">{fmtSec(ev.duration_s)}</strong></span>
+                    <span className="text-[10px] text-muted-foreground">Base <strong className="text-foreground font-mono">{ev.base_hr}</strong></span>
+                    <span className="text-[10px] text-muted-foreground">Peak <strong className="text-foreground font-mono">{ev.peak_hr}</strong></span>
                     <span className="text-[10px] font-semibold" style={{ color: "hsl(var(--chart-3))" }}>↑ +{ev.rise_bpm} bpm</span>
-                    {ev.sustained_s > 0 && <span className="text-[10px] text-muted-foreground">Sustained <strong className="text-foreground font-mono">{fmtSec(ev.sustained_s)}</strong></span>}
                     {ev.note_corroborated && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "hsl(var(--chart-3) / 0.2)", color: "hsl(var(--chart-3))" }}>✓ corroborated</span>}
                   </div>
                 </div>
@@ -381,10 +386,6 @@ Return an array of near-climax events. If none exist, return an empty array.`,
               </div>
             );
           })()}
-
-          <p className="text-[10px] text-muted-foreground italic">
-            Tap an event to highlight it on the chart above
-          </p>
 
           <div className="space-y-2">
             {events.map((ev, i) => {
