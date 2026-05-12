@@ -432,20 +432,26 @@ export default function EventSyncPlayer() {
     else startRecording();
   }, [isRecording, startRecording, stopRecording]);
 
-  // Global "A" key shortcut to save event when note is present
+  // Global "S" key shortcut to pause video + save event when note is present (when NOT focused on textarea)
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== "a" && e.key !== "A") return;
+      if (e.key !== "s" && e.key !== "S") return;
       // Don't fire if user is typing in an input/textarea
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      // Pause playback
+      if (isPlaying) {
+        if (videoMode && videoRef.current) { videoRef.current.pause(); stopTTS(); }
+        else { stopTimer(); stopTTS(); timerOffsetRef.current = playbackTime; }
+        setIsPlaying(false);
+      }
       if (!newEventNote.trim() || !selectedSession || savingEvent) return;
       handleSaveEvent();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newEventNote, selectedSession, savingEvent]);
+  }, [newEventNote, selectedSession, savingEvent, isPlaying, videoMode, playbackTime]);
 
   const handleSaveEvent = async () => {
     const note = newEventNote.replace(/\u200b.*$/, "").trim();
@@ -712,7 +718,7 @@ export default function EventSyncPlayer() {
             <div className="bg-card rounded-xl border border-border p-4 space-y-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2">
                 Log Event at {fmtMmSs(Math.round(playbackTime))}
-                {newEventNote.trim() && <span className="text-[9px] font-normal text-muted-foreground normal-case tracking-normal">press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">A</kbd> to save</span>}
+                {newEventNote.trim() && <span className="text-[9px] font-normal text-muted-foreground normal-case tracking-normal">press <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">Enter</kbd> or <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">S</kbd> to save</span>}
               </h2>
               <div className="flex flex-wrap gap-1.5">
                 {EVENT_CATEGORIES.map((c) => {
@@ -730,6 +736,7 @@ export default function EventSyncPlayer() {
                 <textarea
                   value={newEventNote}
                   onChange={(e) => setNewEventNote(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (newEventNote.trim() && selectedSession && !savingEvent) handleSaveEvent(); } }}
                   placeholder={isTranscribing ? "Transcribing…" : isRecording ? "Recording… tap mic to stop" : "Describe the event… or tap mic to dictate"}
                   rows={2}
                   className="flex-1 resize-none text-sm bg-background border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
