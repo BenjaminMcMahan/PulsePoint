@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Brain, TrendingUp, Award } from "lucide-react";
+import { Brain, TrendingUp, Award, Lightbulb, Activity, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
@@ -106,23 +106,62 @@ export default function RoutinePatternAnalysis({ sessions }) {
   const runAI = async () => {
     setAiLoading(true);
     try {
+      // Build richer context from sessions
+      const recentSessions = sessions.slice(0, 30);
+      const overallAvgSat = avg(sessions.map(s => s.satisfaction));
+      const overallAvgBQ = avg(sessions.map(s => s.build_quality));
+      const totalSessions = sessions.length;
+
       const res = await base44.integrations.Core.InvokeLLM({
-        prompt: `You are a physiological research assistant. Analyze the following session routine statistics to identify which method combinations and build types consistently produce higher satisfaction and build quality scores.
+        model: "claude_sonnet_4_6",
+        prompt: `You are an expert physiological data analyst. Analyze these personal session statistics to provide deep, specific, actionable insights.
 
-Method combination stats (sorted by composite score):
-${JSON.stringify(stats.methods.map(m => ({ routine: m.key, sessions: m.count, avg_satisfaction: m.avgSatisfaction?.toFixed(1), avg_build_quality: m.avgBuildQuality?.toFixed(1) })), null, 2)}
+DATASET OVERVIEW:
+- Total sessions: ${totalSessions}
+- Overall avg satisfaction: ${overallAvgSat?.toFixed(2)}/10
+- Overall avg build quality: ${overallAvgBQ?.toFixed(2)}/10
 
-Build type stats (sorted by composite score):
-${JSON.stringify(stats.buildTypes.map(b => ({ build_type: b.key, sessions: b.count, avg_satisfaction: b.avgSatisfaction?.toFixed(1), avg_build_quality: b.avgBuildQuality?.toFixed(1) })), null, 2)}
+METHOD COMBINATION STATS (sorted by composite score):
+${JSON.stringify(stats.methods.map(m => ({
+  routine: m.key,
+  sessions: m.count,
+  avg_satisfaction: m.avgSatisfaction?.toFixed(2),
+  avg_build_quality: m.avgBuildQuality?.toFixed(2),
+  avg_intensity: m.avgIntensity?.toFixed(2),
+  vs_overall_satisfaction: m.avgSatisfaction != null && overallAvgSat != null ? (m.avgSatisfaction - overallAvgSat).toFixed(2) : null,
+})), null, 2)}
 
-Provide 3–5 concise, actionable insights about which routines perform best and why. Focus on statistically meaningful differences (avoid speculation where data is thin). Be direct and specific.`,
+BUILD TYPE STATS (sorted by composite score):
+${JSON.stringify(stats.buildTypes.map(b => ({
+  build_type: b.key,
+  sessions: b.count,
+  avg_satisfaction: b.avgSatisfaction?.toFixed(2),
+  avg_build_quality: b.avgBuildQuality?.toFixed(2),
+  vs_overall_satisfaction: b.avgSatisfaction != null && overallAvgSat != null ? (b.avgSatisfaction - overallAvgSat).toFixed(2) : null,
+})), null, 2)}
+
+RECENT SESSION CONTEXT (last ${recentSessions.length} sessions — mood, hydration, methods used):
+${recentSessions.map(s => `  ${s.date?.slice(0,10)} | methods: ${(s.methods||[]).join('+')||'?'} | build: ${s.build_type||'?'} | sat: ${s.satisfaction??'?'} | bq: ${s.build_quality??'?'} | mood: ${s.mood||'?'} | hydration: ${s.hydration||'?'}`).join('\n')}
+
+Provide a thorough, data-driven analysis covering:
+1. The single best-performing routine and WHY it outperforms (cite exact numbers)
+2. Key pattern insights comparing top vs bottom performers
+3. Build type impact analysis — which build type correlates with the best outcomes
+4. Contextual factors (mood, hydration) — any correlations you can infer from the recent session log
+5. 2–3 specific, actionable recommendations to optimize future sessions
+
+Be direct, specific, and cite numbers. Flag if sample sizes are too small to draw conclusions.`,
         response_json_schema: {
           type: "object",
           properties: {
-            top_routine: { type: "string" },
-            insights: { type: "array", items: { type: "string" } },
+            top_routine: { type: "string", description: "Name of the top performing routine with its key metrics" },
+            top_routine_reason: { type: "string", description: "1-2 sentence explanation of why this routine leads" },
+            pattern_insights: { type: "array", items: { type: "string" }, description: "3-5 data-driven observations comparing routines" },
+            build_type_analysis: { type: "array", items: { type: "string" }, description: "2-3 insights about how build type affects outcomes" },
+            contextual_factors: { type: "array", items: { type: "string" }, description: "1-3 observations about mood/hydration/context correlations" },
+            recommendations: { type: "array", items: { type: "string" }, description: "2-3 concrete, actionable next steps" },
           },
-          required: ["top_routine", "insights"],
+          required: ["top_routine", "top_routine_reason", "pattern_insights", "build_type_analysis", "recommendations"],
         },
       });
       const raw = typeof res === "string" ? JSON.parse(res) : res;
@@ -193,20 +232,79 @@ Provide 3–5 concise, actionable insights about which routines perform best and
               </Button>
             </div>
             {aiResult && (
-              <div className="space-y-2">
+              <div className="space-y-4">
+                {/* Top Routine */}
                 {aiResult.top_routine && (
-                  <p className="text-sm font-semibold text-primary border-l-2 border-primary pl-2">{aiResult.top_routine}</p>
-                )}
-                {aiResult.insights?.map((ins, i) => (
-                  <div key={i} className="flex gap-2 text-sm text-foreground/90">
-                    <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-chart-1" />
-                    <span className="leading-relaxed">{ins}</span>
+                  <div className="bg-primary/10 rounded-lg p-3 space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-primary flex items-center gap-1">
+                      <Award className="w-3 h-3" /> Top Performing Routine
+                    </p>
+                    <p className="text-sm font-bold text-primary">{aiResult.top_routine}</p>
+                    {aiResult.top_routine_reason && (
+                      <p className="text-xs text-foreground/80 leading-relaxed">{aiResult.top_routine_reason}</p>
+                    )}
                   </div>
-                ))}
+                )}
+
+                {/* Pattern Insights */}
+                {aiResult.pattern_insights?.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-chart-1 flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3" /> Pattern Insights
+                    </p>
+                    {aiResult.pattern_insights.map((ins, i) => (
+                      <div key={i} className="flex gap-2 text-sm text-foreground/90 pl-1 border-l-2 border-chart-1/40 py-0.5">
+                        <span className="leading-relaxed">{ins}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Build Type Analysis */}
+                {aiResult.build_type_analysis?.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-chart-2 flex items-center gap-1">
+                      <Activity className="w-3 h-3" /> Build Type Analysis
+                    </p>
+                    {aiResult.build_type_analysis.map((ins, i) => (
+                      <div key={i} className="flex gap-2 text-sm text-foreground/90 pl-1 border-l-2 border-chart-2/40 py-0.5">
+                        <span className="leading-relaxed">{ins}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Contextual Factors */}
+                {aiResult.contextual_factors?.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-chart-4 flex items-center gap-1">
+                      <Zap className="w-3 h-3" /> Contextual Factors
+                    </p>
+                    {aiResult.contextual_factors.map((ins, i) => (
+                      <div key={i} className="flex gap-2 text-sm text-foreground/90 pl-1 border-l-2 border-chart-4/40 py-0.5">
+                        <span className="leading-relaxed">{ins}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {aiResult.recommendations?.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-accent flex items-center gap-1">
+                      <Lightbulb className="w-3 h-3" /> Recommendations
+                    </p>
+                    {aiResult.recommendations.map((rec, i) => (
+                      <div key={i} className="flex gap-2 text-sm text-foreground/90 pl-1 border-l-2 border-accent/40 py-0.5">
+                        <span className="leading-relaxed">{rec}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {!aiResult && !aiLoading && (
-              <p className="text-xs text-muted-foreground">Click Analyze to get AI-powered insights on which routines produce the best outcomes.</p>
+              <p className="text-xs text-muted-foreground">Click Analyze for deep AI-powered insights on patterns, build types, contextual factors, and personalized recommendations. Uses Claude Sonnet.</p>
             )}
           </div>
         </div>
