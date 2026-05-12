@@ -41,7 +41,7 @@ export default function EditSession() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false); // false | true | string (progress label)
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(new Set(["info", "subjective", "methods"]));
   const [data, setData] = useState(null);
@@ -81,6 +81,7 @@ export default function EditSession() {
     }
     setSaving(true);
     try {
+
       const duration = calcDuration(data.start_time, data.end_time);
       // Exclude internal/computed fields that shouldn't be re-saved
       const { _csv_rows, _emg_rows, _emg_channel_mode, ai_analysis, ai_cascade, ...sessionData } = data;
@@ -107,11 +108,26 @@ export default function EditSession() {
         if (res.data?.error) throw new Error(res.data.error);
       }
       if (_emg_rows && _emg_rows.length > 0) {
-        const res = await base44.functions.invoke("saveTimelineData", {
-          session_id: id, entity: "EMGTimeline", rows: _emg_rows,
+        // Clear existing EMG rows first
+        const clearRes = await base44.functions.invoke("saveTimelineData", {
+          session_id: id, entity: "EMGTimeline", action: "clear",
         });
-        if (res.data?.error) throw new Error(res.data.error);
+        if (clearRes.data?.error) throw new Error(clearRes.data.error);
+
+        // Send EMG in chunks of 5000 rows to avoid HTTP timeouts
+        const EMG_CHUNK = 5000;
+        for (let i = 0; i < _emg_rows.length; i += EMG_CHUNK) {
+          const chunk = _emg_rows.slice(i, i + EMG_CHUNK);
+          const res = await base44.functions.invoke("saveTimelineData", {
+            session_id: id, entity: "EMGTimeline", action: "append", rows: chunk,
+          });
+          if (res.data?.error) throw new Error(res.data.error);
+          // Update saving label with progress
+          const pct = Math.min(100, Math.round(((i + chunk.length) / _emg_rows.length) * 100));
+          setSaving(`Saving EMG… ${pct}%`);
+        }
       }
+      setSaving(false);
       toast({ title: "Session updated!", duration: 2000 });
       navigate(`/sessions/${id}`);
     } catch (err) {
@@ -204,7 +220,7 @@ export default function EditSession() {
           className="w-full h-14 text-base font-semibold gap-2 mt-4"
         >
           <Save className="w-5 h-5" />
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? (typeof saving === "string" ? saving : "Saving...") : "Save Changes"}
         </Button>
       </div>
     </div>

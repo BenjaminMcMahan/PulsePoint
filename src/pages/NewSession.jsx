@@ -41,7 +41,7 @@ function calcDuration(start, end) {
 export default function NewSession() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false); // false | true | string
   const [expanded, setExpanded] = useState(new Set(["info", "subjective", "methods"]));
   const [data, setData] = useState({
     date: new Date().toISOString(),
@@ -76,20 +76,32 @@ export default function NewSession() {
       ...sessionData,
       duration_minutes: duration || data.duration_minutes,
     });
-    // Import HeartRateTimeline rows
+    // Import HeartRateTimeline rows via backend function
     if (_csv_rows && _csv_rows.length > 0) {
-      const existing = await base44.entities.HeartRateTimeline.filter({ session: session.id }, "time_offset_s", 10000);
-      await Promise.all(existing.map((r) => base44.entities.HeartRateTimeline.delete(r.id)));
-      const rows = _csv_rows.map((r) => ({ ...r, session: session.id }));
-      await base44.entities.HeartRateTimeline.bulkCreate(rows);
+      const res = await base44.functions.invoke("saveTimelineData", {
+        session_id: session.id, entity: "HeartRateTimeline", rows: _csv_rows,
+      });
+      if (res.data?.error) throw new Error(res.data.error);
     }
-    // Import EMGTimeline rows
+    // Import EMGTimeline rows in chunks to avoid timeouts
     if (_emg_rows && _emg_rows.length > 0) {
-      const existing = await base44.entities.EMGTimeline.filter({ session: session.id }, "time_s", 10000);
-      await Promise.all(existing.map((r) => base44.entities.EMGTimeline.delete(r.id)));
-      const rows = _emg_rows.map((r) => ({ ...r, session: session.id }));
-      await base44.entities.EMGTimeline.bulkCreate(rows);
+      const clearRes = await base44.functions.invoke("saveTimelineData", {
+        session_id: session.id, entity: "EMGTimeline", action: "clear",
+      });
+      if (clearRes.data?.error) throw new Error(clearRes.data.error);
+
+      const EMG_CHUNK = 5000;
+      for (let i = 0; i < _emg_rows.length; i += EMG_CHUNK) {
+        const chunk = _emg_rows.slice(i, i + EMG_CHUNK);
+        const res = await base44.functions.invoke("saveTimelineData", {
+          session_id: session.id, entity: "EMGTimeline", action: "append", rows: chunk,
+        });
+        if (res.data?.error) throw new Error(res.data.error);
+        const pct = Math.min(100, Math.round(((i + chunk.length) / _emg_rows.length) * 100));
+        setSaving(`Saving EMG… ${pct}%`);
+      }
     }
+    setSaving(false);
     toast({ title: "Session saved!", duration: 2000 });
     navigate("/sessions");
   };
@@ -168,7 +180,7 @@ export default function NewSession() {
           className="w-full h-14 text-base font-semibold gap-2 mt-4"
         >
           <Save className="w-5 h-5" />
-          {saving ? "Saving..." : "Save Session"}
+          {saving ? (typeof saving === "string" ? saving : "Saving...") : "Save Session"}
         </Button>
       </div>
     </div>
