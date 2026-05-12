@@ -41,7 +41,8 @@ export default function EditSession() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [saving, setSaving] = useState(false); // false | true | string (progress label)
+  const [saving, setSaving] = useState(false); // false | "Saving session…" | { label: string, pct: number }
+
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(new Set(["info", "subjective", "methods"]));
   const [data, setData] = useState(null);
@@ -79,7 +80,7 @@ export default function EditSession() {
       toast({ title: "Please select at least one method", variant: "destructive" });
       return;
     }
-    setSaving(true);
+    setSaving({ label: "Saving session…", pct: 0 });
     try {
 
       const duration = calcDuration(data.start_time, data.end_time);
@@ -102,12 +103,14 @@ export default function EditSession() {
         duration_minutes: duration || data.duration_minutes,
       });
       if (_csv_rows && _csv_rows.length > 0) {
+        setSaving({ label: "Saving heart rate data…", pct: 10 });
         const res = await base44.functions.invoke("saveTimelineData", {
           session_id: id, entity: "HeartRateTimeline", rows: _csv_rows,
         });
         if (res.data?.error) throw new Error(res.data.error);
       }
       if (_emg_rows && _emg_rows.length > 0) {
+        setSaving({ label: `Clearing old EMG data…`, pct: 5 });
         // Clear existing EMG rows first
         const clearRes = await base44.functions.invoke("saveTimelineData", {
           session_id: id, entity: "EMGTimeline", action: "clear",
@@ -116,16 +119,22 @@ export default function EditSession() {
 
         // Send EMG in chunks of 5000 rows to avoid HTTP timeouts
         const EMG_CHUNK = 5000;
+        const totalChunks = Math.ceil(_emg_rows.length / EMG_CHUNK);
         for (let i = 0; i < _emg_rows.length; i += EMG_CHUNK) {
           const chunk = _emg_rows.slice(i, i + EMG_CHUNK);
+          const chunkNum = Math.floor(i / EMG_CHUNK) + 1;
+          const rowsUploaded = i + chunk.length;
+          const pct = Math.round((rowsUploaded / _emg_rows.length) * 100);
+          setSaving({
+            label: `Uploading EMG chunk ${chunkNum} of ${totalChunks} (${rowsUploaded.toLocaleString()} / ${_emg_rows.length.toLocaleString()} rows)`,
+            pct,
+          });
           const res = await base44.functions.invoke("saveTimelineData", {
             session_id: id, entity: "EMGTimeline", action: "append", rows: chunk,
           });
           if (res.data?.error) throw new Error(res.data.error);
-          // Update saving label with progress
-          const pct = Math.min(100, Math.round(((i + chunk.length) / _emg_rows.length) * 100));
-          setSaving(`Saving EMG… ${pct}%`);
         }
+        setSaving({ label: "Finishing…", pct: 100 });
       }
       setSaving(false);
       toast({ title: "Session updated!", duration: 2000 });
@@ -214,13 +223,27 @@ export default function EditSession() {
           </div>
         ))}
 
+        {saving && typeof saving === "object" && (
+          <div className="mt-4 bg-card border border-border rounded-xl p-4 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-foreground font-medium">{saving.label}</span>
+              <span className="font-mono text-primary font-bold">{saving.pct}%</span>
+            </div>
+            <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-300"
+                style={{ width: `${saving.pct}%` }}
+              />
+            </div>
+          </div>
+        )}
         <Button
           onClick={handleSave}
-          disabled={saving}
+          disabled={!!saving}
           className="w-full h-14 text-base font-semibold gap-2 mt-4"
         >
           <Save className="w-5 h-5" />
-          {saving ? (typeof saving === "string" ? saving : "Saving...") : "Save Changes"}
+          {saving ? (typeof saving === "object" ? "Saving…" : saving) : "Save Changes"}
         </Button>
       </div>
     </div>
