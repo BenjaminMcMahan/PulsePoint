@@ -212,7 +212,7 @@ ${s.notes ? `- Notes: ${s.notes.slice(0, 200)}` : ""}`,
               variant="outline"
               size="sm"
               onClick={gradeAllSessions}
-              disabled={grading || sessions.every((s) => s.ai_analysis?.ai_score)}
+              disabled={grading}
               className="gap-1.5 h-9"
             >
               {grading
