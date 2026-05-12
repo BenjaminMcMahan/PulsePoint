@@ -281,7 +281,17 @@ export default function SessionDetail() {
 
       <div className="px-2 md:px-4 py-4 space-y-4 pb-8">
         {/* Executive Summary */}
-        <SessionExecutiveSummary session={s} timelineRows={timelineRows} />
+        <SessionExecutiveSummary
+          session={s}
+          timelineRows={timelineRows}
+          onScoreComputed={async (pct) => {
+            if (pct != null && s.ai_analysis?.score !== pct) {
+              const updated = { ...(s.ai_analysis || {}), score: pct };
+              await base44.entities.Session.update(id, { ai_analysis: updated });
+              setSession((prev) => ({ ...prev, ai_analysis: updated }));
+            }
+          }}
+        />
 
         {/* Subjective Metrics */}
         <div className="bg-card rounded-xl border border-border p-4 space-y-3">

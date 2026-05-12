@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -140,9 +140,14 @@ function fmtSec(s) {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function SessionExecutiveSummary({ session, timelineRows }) {
+export default function SessionExecutiveSummary({ session, timelineRows, onScoreComputed }) {
   const [collapsed, setCollapsed] = useState(true);
   const result = useMemo(() => computeScore(session, timelineRows), [session, timelineRows]);
+
+  // Notify parent of computed score so it can be cached/stored
+  useEffect(() => {
+    if (result && onScoreComputed) onScoreComputed(result.pct);
+  }, [result?.pct]);
 
   if (!result) return null;
 

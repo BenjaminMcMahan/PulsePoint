@@ -11,7 +11,10 @@ export default function SessionCard({ session, selectable, selected, onSelect })
   const date = moment(session.date).format("MMM D, YYYY");
   const methods = session.methods || [];
   const eventCount = (session.event_timeline || []).length;
-  const scorePct = computeSessionScore(session, []);
+  // Prefer the cached score computed in SessionDetail (includes HR data); fall back to score without HR
+  const scorePct = session.ai_analysis?.score != null
+    ? session.ai_analysis.score
+    : computeSessionScore(session, []);
   const gradeInfo = scorePct != null ? gradeFromPct(scorePct) : null;
   const aiSummary = session.ai_analysis?.summary;
   const hasEMG = session.emg_enabled ||
