@@ -274,15 +274,15 @@ export default function AIChat({
               {/* Input — shown after messages start */}
               <div className="flex gap-2 items-end sticky bottom-0 bg-white dark:bg-slate-900 pt-2">
                 <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
-                  placeholder={transcribing ? "Transcribing…" : recording ? "Recording… tap mic to stop" : "Type or speak your response…"}
-                  disabled={loading || transcribing}
-                  rows={2}
-                  className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-none"
-                />
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
+                    placeholder={transcribing ? "Transcribing…" : recording ? "Recording… tap mic to stop" : "Type or speak your response…"}
+                    disabled={loading || transcribing}
+                    rows={5}
+                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-none sm:rows-3"
+                  />
                 <button
                   onClick={recording ? stopRecording : startRecording}
                   disabled={loading || transcribing}
