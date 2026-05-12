@@ -71,26 +71,36 @@ export default function AIChat({
     setSpeakingIdx(null);
   };
 
+  const WHISPER_PROMPT =
+    "Session log note. Gentle strokes on the glans penis. Foreskin partially retracted. " +
+    "Stimulation paused. Perineum pressure applied. Pelvic floor contraction. " +
+    "E-stim via TENS unit. Foley catheter in place. Urethral stimulation. " +
+    "Edging — arousal near climax. Frenulum contact. Prostate stimulation. " +
+    "Ejaculation. Refractory period. Buildup plateau. Involuntary spasm. Discomfort noted.";
+
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioChunksRef.current = [];
-    const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+    const mr = new MediaRecorder(stream, { mimeType });
     mediaRecorderRef.current = mr;
     mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
     mr.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop());
       setTranscribing(true);
-      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result.split(",")[1];
-        const res = await base44.functions.invoke("whisperSTT", { audio_base64: base64, mime_type: "audio/webm" });
-        const text = res.data?.text || "";
-        if (text) setInput((prev) => (prev ? prev + " " + text : text));
-        setTranscribing(false);
-        setTimeout(() => inputRef.current?.focus(), 100);
-      };
-      reader.readAsDataURL(blob);
+      const blob = new Blob(audioChunksRef.current, { type: mimeType });
+      const ab = await blob.arrayBuffer();
+      const bytes = new Uint8Array(ab);
+      let bin = "";
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      const base64 = btoa(bin);
+      const res = await base44.functions.invoke("whisperSTT", { audio_base64: base64, mime_type: mimeType, prompt: WHISPER_PROMPT });
+      const text = res.data?.text?.trim() || "";
+      if (text) setInput((prev) => (prev ? prev + " " + text : text));
+      setTranscribing(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
     };
     mr.start();
     setRecording(true);
