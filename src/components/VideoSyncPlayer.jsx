@@ -833,7 +833,8 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
               All Events ({events.length}) — nearby highlighted
             </p>
-            {events.map((ev, i) => {
+            {[...events].reverse().map((ev) => {
+              const i = events.indexOf(ev);
               const color = EVENT_COLORS[i % EVENT_COLORS.length];
               const cats = normalizeCategoryArray(ev.category);
               const dist = Math.abs(ev.time_s - playheadS);
