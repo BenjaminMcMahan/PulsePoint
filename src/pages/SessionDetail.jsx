@@ -86,6 +86,13 @@ export default function SessionDetail() {
     return detectNearClimaxEvents(timelineRows, session.climax_offset_s, session.pre_climax_offset_s);
   }, [timelineRows, session]);
 
+  // Auto-select first event once events are available
+  useEffect(() => {
+    if (nearClimaxEvents.length > 0 && selectedNearClimaxIdx == null) {
+      setSelectedNearClimaxIdx(0);
+    }
+  }, [nearClimaxEvents.length]);
+
   const highlightRange = useMemo(() => {
     if (selectedNearClimaxIdx == null || !nearClimaxEvents[selectedNearClimaxIdx]) return null;
     const ev = nearClimaxEvents[selectedNearClimaxIdx];
