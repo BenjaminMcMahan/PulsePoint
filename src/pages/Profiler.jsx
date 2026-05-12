@@ -242,23 +242,25 @@ ${profileContext}
 SESSION DATA (${sessions.length} sessions):
 ${JSON.stringify(sessionSummaries, null, 2)}
 
-Generate a rich, holistic profile that covers:
+Generate a rich, holistic profile. Your job is NOT to restate what was already logged — the person already knows what they did. Instead, offer your own interpretations, inferences, hypotheses, and conclusions drawn FROM the data. Go beyond the surface. Make observations they may not have noticed themselves. Point out cross-session patterns, contradictions, and surprising findings. Be willing to form opinions and state them directly.
 
-1. AROUSAL PHYSIOLOGY: Your characteristic arousal curve shape, HR response patterns, build dynamics, and how your physiology behaves under different conditions. Reference actual HR data and phase timing where available. Where the data supports it, comment on likely autonomic nervous system involvement (sympathetic drive, parasympathetic braking), pelvic floor engagement patterns, and any observable neurovascular response signatures (e.g. HR acceleration curves, plateau behavior, post-peak recovery slope).
+Cover these areas:
 
-2. STIMULATION PROFILE: Which methods, combinations, and configurations produce your best outcomes. What your event timelines reveal about your response to stimulation changes. Identify what consistently works vs. what produces inconsistent results for you.
+1. AROUSAL PHYSIOLOGY: Interpret the shape and character of their arousal response — don't just describe the HR numbers, explain what those patterns suggest about their autonomic nervous system, sympathetic drive, parasympathetic braking, and pelvic floor engagement. Comment on post-peak recovery slope, plateau behavior, and what their HR acceleration curves reveal about how their body builds and releases tension. Form a view on what type of physiological responder they are.
 
-3. CLIMAX & RECOVERY PATTERNS: Your climax quality, duration patterns, ejaculate patterns, refractory observations. How your physiology winds down and what your recovery data reveals.
+2. STIMULATION PROFILE: Don't list what methods they used — interpret what the outcomes reveal about their body's actual preferences. Which method combinations appear to produce synergistic effects vs. diminishing returns? What does the pattern of their best vs. worst sessions suggest about their sensitivity and saturation points?
 
-4. CONTEXTUAL SENSITIVITIES: How mood, hydration, time of day, substances, environment, and other contextual factors influence your response. Identify what amplifies or suppresses your arousal.
+3. CLIMAX & RECOVERY PATTERNS: Go beyond describing duration and volume — interpret what the pattern of their climax data reveals about their neuromuscular release profile, ejaculatory reflex threshold, and refractory physiology. What does the recovery slope tell you about their autonomic rebound?
 
-5. DISCOMFORT & PHYSIOLOGICAL EDGE CASES: Recurring discomfort patterns, unusual sensations, and what they suggest about your anatomy or physiology. Go deeper where the data allows — consider urethral, prostatic, or pelvic floor anatomy in the context of the methods used, and what specific sensations (pressure, burning, cramping, numbness) may indicate anatomically. Note any patterns that suggest nerve adaptation, tissue sensitivity changes, or positional/technique factors.
+4. CONTEXTUAL SENSITIVITIES: Form a hypothesis about which contextual factors matter MOST for this specific person based on cross-session correlation. Don't just list factors — rank them by apparent impact and explain why.
 
-6. BEHAVIORAL & AROUSAL TENDENCIES: Patterns in how you build (gradual vs. erratic, plateau-heavy vs. continuous), your event timeline patterns, stimulation pause/resume habits, and what that reveals about your control and sensitivity.
+5. DISCOMFORT & PHYSIOLOGICAL EDGE CASES: Interpret what recurring discomfort or unusual sensations suggest anatomically — consider urethral, prostatic, pelvic floor, and neurovascular context given their specific methods. Hypothesize about tissue adaptation, nerve sensitization, or structural factors. Be specific, not generic.
 
-7. PERSONAL OPTIMIZATION RECOMMENDATIONS: Specific, actionable recommendations tailored to your unique profile — not generic advice. Reference your actual data, methods, and notes.
+6. BEHAVIORAL & AROUSAL TENDENCIES: Look for patterns in their build style, pause/resume habits, edging behavior, and event timelines that reveal something about their psychological relationship with arousal — control tendencies, anxiety responses, comfort zones. Offer a perspective on what those tendencies are likely doing to their outcomes.
 
-Write as a cohesive, intelligent personal profile — speak directly to the person, be insightful, and ground everything in their data.`,
+7. PERSONAL OPTIMIZATION RECOMMENDATIONS: Give bold, specific, opinionated recommendations — not generic advice. Reference their actual data patterns and explain the physiological or behavioral reasoning behind each suggestion.
+
+Be direct, insightful, and willing to state conclusions. Ground everything in their data but go well beyond restating it.`,
       response_json_schema: {
         type: "object",
         properties: {
