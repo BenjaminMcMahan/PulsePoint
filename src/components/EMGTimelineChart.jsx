@@ -238,7 +238,8 @@ export default function EMGTimelineChart({
       </div>
 
       <p className="text-[10px] text-muted-foreground">
-        EMG {channelMode === "dual" ? "dual-channel" : "single-channel"} · {rows.length} samples
+        EMG {channelMode === "dual" ? "dual-channel" : "single-channel"} · {rows.length.toLocaleString()} samples
+        {rows.length > 0 ? ` · ${fmtMmSs(Math.max(...rows.map(r => Number(r.time_s))))} duration` : ""}
         {viewMode === "pct" ? " · normalized 0–100%" : " · raw envelope"}
       </p>
     </div>

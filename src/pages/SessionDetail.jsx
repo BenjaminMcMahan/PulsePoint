@@ -124,10 +124,14 @@ export default function SessionDetail() {
       setTimelineRows(rows);
 
       // Fetch all EMG rows via backend (handles large 30k+ datasets via pagination)
-      const emgRes = await base44.functions.invoke("saveTimelineData", {
-        session_id: id, entity: "EMGTimeline", action: "fetch",
-      });
-      setEmgRows(emgRes.data?.rows || []);
+      try {
+        const emgRes = await base44.functions.invoke("saveTimelineData", {
+          session_id: id, entity: "EMGTimeline", action: "fetch",
+        });
+        setEmgRows(emgRes.data?.rows || []);
+      } catch (_) {
+        setEmgRows([]);
+      }
 
       // Auto-detect phase markers if not already set
       if (rows.length > 10 && s && !s.climax_offset_s) {

@@ -73,7 +73,7 @@ export default function SessionAIPanel({ session, timelineRows, emgRows = [], us
     const emgSummary = (() => {
       if (!emgRows.length) return null;
       const isDual = emgRows.some((r) => r.left_pct != null || r.right_pct != null);
-      const step = Math.max(1, Math.floor(emgRows.length / 60));
+      const step = Math.max(1, Math.floor(emgRows.length / 200));
       const sampled = emgRows.filter((_, i) => i % step === 0);
 
       if (isDual) {

@@ -89,10 +89,12 @@ Deno.serve(async (req) => {
     }
 
     const tagged = finalRows.map((r) => ({ ...r, session: session_id }));
-    const CHUNK = 500;
+    // Use larger chunks for EMG (less overhead per call), smaller for HR
+    const CHUNK = entity === 'EMGTimeline' ? 2000 : 500;
+    const DELAY = entity === 'EMGTimeline' ? 100 : 300;
     for (let i = 0; i < tagged.length; i += CHUNK) {
       await withRetry(() => db.bulkCreate(tagged.slice(i, i + CHUNK)));
-      if (i + CHUNK < tagged.length) await sleep(300);
+      if (i + CHUNK < tagged.length) await sleep(DELAY);
     }
 
     return Response.json({ ok: true, inserted: tagged.length, original: rows.length });
