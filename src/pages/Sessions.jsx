@@ -95,7 +95,7 @@ ${s.notes ? `- Notes: ${s.notes.slice(0, 200)}` : ""}`,
   };
 
   const gradeAllSessions = async () => {
-    const toGrade = sessions.filter((s) => !s.ai_analysis?.ai_score);
+    const toGrade = sessions; // Grade all sessions
     if (!toGrade.length) return;
     setGrading(true);
     setGradeProgress(0);
