@@ -244,7 +244,7 @@ ${JSON.stringify(sessionSummaries, null, 2)}
 
 Generate a rich, holistic profile that covers:
 
-1. AROUSAL PHYSIOLOGY: Your characteristic arousal curve shape, HR response patterns, build dynamics, and how your physiology behaves under different conditions. Reference actual HR data and phase timing where available.
+1. AROUSAL PHYSIOLOGY: Your characteristic arousal curve shape, HR response patterns, build dynamics, and how your physiology behaves under different conditions. Reference actual HR data and phase timing where available. Where the data supports it, comment on likely autonomic nervous system involvement (sympathetic drive, parasympathetic braking), pelvic floor engagement patterns, and any observable neurovascular response signatures (e.g. HR acceleration curves, plateau behavior, post-peak recovery slope).
 
 2. STIMULATION PROFILE: Which methods, combinations, and configurations produce your best outcomes. What your event timelines reveal about your response to stimulation changes. Identify what consistently works vs. what produces inconsistent results for you.
 
@@ -252,7 +252,7 @@ Generate a rich, holistic profile that covers:
 
 4. CONTEXTUAL SENSITIVITIES: How mood, hydration, time of day, substances, environment, and other contextual factors influence your response. Identify what amplifies or suppresses your arousal.
 
-5. DISCOMFORT & PHYSIOLOGICAL EDGE CASES: Recurring discomfort patterns, unusual sensations, and what they suggest about your anatomy or physiology.
+5. DISCOMFORT & PHYSIOLOGICAL EDGE CASES: Recurring discomfort patterns, unusual sensations, and what they suggest about your anatomy or physiology. Go deeper where the data allows — consider urethral, prostatic, or pelvic floor anatomy in the context of the methods used, and what specific sensations (pressure, burning, cramping, numbness) may indicate anatomically. Note any patterns that suggest nerve adaptation, tissue sensitivity changes, or positional/technique factors.
 
 6. BEHAVIORAL & AROUSAL TENDENCIES: Patterns in how you build (gradual vs. erratic, plateau-heavy vs. continuous), your event timeline patterns, stimulation pause/resume habits, and what that reveals about your control and sensitivity.
 
