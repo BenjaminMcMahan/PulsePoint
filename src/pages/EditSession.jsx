@@ -110,12 +110,18 @@ export default function EditSession() {
         if (res.data?.error) throw new Error(res.data.error);
       }
       if (_emg_rows && _emg_rows.length > 0) {
-        setSaving({ label: `Clearing old EMG data…`, pct: 5 });
-        // Clear existing EMG rows first
-        const clearRes = await base44.functions.invoke("saveTimelineData", {
-          session_id: id, entity: "EMGTimeline", action: "clear",
-        });
-        if (clearRes.data?.error) throw new Error(clearRes.data.error);
+        // Clear existing EMG rows in a loop (each call deletes one page to avoid timeouts)
+        let totalDeleted = 0;
+        let clearDone = false;
+        while (!clearDone) {
+          setSaving({ label: `Clearing old EMG data… (${totalDeleted} removed)`, pct: 5 });
+          const clearRes = await base44.functions.invoke("saveTimelineData", {
+            session_id: id, entity: "EMGTimeline", action: "clear",
+          });
+          if (clearRes.data?.error) throw new Error(clearRes.data.error);
+          totalDeleted += clearRes.data?.deleted || 0;
+          clearDone = clearRes.data?.done !== false;
+        }
 
         // Send EMG in chunks of 5000 rows to avoid HTTP timeouts
         const EMG_CHUNK = 5000;

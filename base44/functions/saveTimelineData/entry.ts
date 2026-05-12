@@ -59,21 +59,18 @@ Deno.serve(async (req) => {
       return Response.json({ ok: true, rows: allRows, count: allRows.length });
     }
 
-    // action=clear: just delete all existing rows for this session, no insert
+    // action=clear: delete one page of rows (call repeatedly from frontend until done=true)
+    // Each call deletes up to 200 rows to stay well within timeout limits
     if (action === 'clear') {
-      let deleted = 0;
-      while (true) {
-        const existing = await withRetry(() => db.filter({ session: session_id }, filterKey, 500));
-        if (!existing.length) break;
-        for (let i = 0; i < existing.length; i += 10) {
-          await Promise.all(existing.slice(i, i + 10).map((r) => withRetry(() => db.delete(r.id))));
-          await sleep(200);
-        }
-        deleted += existing.length;
-        if (existing.length < 500) break;
-        await sleep(300);
+      const existing = await withRetry(() => db.filter({ session: session_id }, filterKey, 200));
+      if (existing.length === 0) {
+        return Response.json({ ok: true, action: 'clear', deleted: 0, done: true });
       }
-      return Response.json({ ok: true, action: 'clear', deleted });
+      // Delete all fetched rows in parallel batches of 50
+      for (let i = 0; i < existing.length; i += 50) {
+        await Promise.all(existing.slice(i, i + 50).map((r) => withRetry(() => db.delete(r.id))));
+      }
+      return Response.json({ ok: true, action: 'clear', deleted: existing.length, done: existing.length < 200 });
     }
 
     // action=append (or default): insert rows WITHOUT deleting first
