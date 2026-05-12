@@ -103,9 +103,11 @@ ${s.notes ? `- Notes: ${s.notes.slice(0, 200)}` : ""}`,
     await Promise.all(toGrade.map(async (s) => {
       const score = await computeAISessionScore(s, []);
       if (score != null) {
+        // Auto-flag as favorite if score >= 85 and high arousal/climax quality
+        const shouldFav = score >= 85 && (s.intensity >= 8 || s.satisfaction >= 9) && !s.no_climax;
         const updated = { ...(s.ai_analysis || {}), ai_score: score };
-        await base44.entities.Session.update(s.id, { ai_analysis: updated });
-        setSessions((prev) => prev.map((p) => p.id === s.id ? { ...p, ai_analysis: updated } : p));
+        await base44.entities.Session.update(s.id, { ai_analysis: updated, is_favorite: shouldFav || s.is_favorite });
+        setSessions((prev) => prev.map((p) => p.id === s.id ? { ...p, ai_analysis: updated, is_favorite: shouldFav || s.is_favorite } : p));
       }
       done++;
       setGradeProgress(Math.round((done / toGrade.length) * 100));
