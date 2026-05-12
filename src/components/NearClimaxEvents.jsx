@@ -352,37 +352,55 @@ Return an array of near-climax events. If none exist, return an empty array.`,
             const idx = selectedIndex ?? 0;
             const ev = events[idx];
             return (
-              <div className="rounded-xl border border-border bg-muted/40 px-3 py-2.5 flex items-center gap-2">
-                <button
-                  onClick={() => onSelectIndex?.(Math.max(0, idx - 1))}
-                  disabled={idx === 0}
-                  className="p-1 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors shrink-0"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-xs font-bold font-mono truncate" style={{ color: "hsl(var(--chart-3))" }}>
-                      {ev.ai_label ? ev.ai_label : `Event ${idx + 1}`}
-                    </span>
-                    <span className="text-[9px] text-muted-foreground shrink-0">{idx + 1} / {events.length}</span>
+              <div className="rounded-xl border border-border bg-muted/40 px-3 py-3 flex flex-col gap-2">
+                {/* Navigation buttons + label */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onSelectIndex?.(Math.max(0, idx - 1))}
+                    disabled={idx === 0}
+                    className="p-1 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors shrink-0"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-xs font-bold font-mono truncate" style={{ color: "hsl(var(--chart-3))" }}>
+                        {ev.ai_label ? ev.ai_label : `Event ${idx + 1}`}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground shrink-0">{idx + 1} / {events.length}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <span className="text-[10px] font-mono text-muted-foreground">{fmtMmSs(ev.start_offset_s)} – {fmtMmSs(ev.end_offset_s)}</span>
+                      <span className="text-[10px] text-muted-foreground">· <strong className="text-foreground font-mono">{fmtSec(ev.duration_s)}</strong></span>
+                      <span className="text-[10px] text-muted-foreground"><strong className="text-foreground font-mono">{ev.base_hr}–{ev.peak_hr}</strong> bpm</span>
+                      <span className="text-[10px] font-semibold" style={{ color: "hsl(var(--chart-3))" }}>↑ +{ev.rise_bpm} bpm</span>
+                      {ev.note_corroborated && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "hsl(var(--chart-3) / 0.2)", color: "hsl(var(--chart-3))" }}>✓ corroborated</span>}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    <span className="text-[10px] font-mono text-muted-foreground">{fmtMmSs(ev.start_offset_s)} – {fmtMmSs(ev.end_offset_s)}</span>
-                    <span className="text-[10px] text-muted-foreground">· <strong className="text-foreground font-mono">{fmtSec(ev.duration_s)}</strong></span>
-                    <span className="text-[10px] text-muted-foreground">Base <strong className="text-foreground font-mono">{ev.base_hr}</strong></span>
-                    <span className="text-[10px] text-muted-foreground">Peak <strong className="text-foreground font-mono">{ev.peak_hr}</strong></span>
-                    <span className="text-[10px] font-semibold" style={{ color: "hsl(var(--chart-3))" }}>↑ +{ev.rise_bpm} bpm</span>
-                    {ev.note_corroborated && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "hsl(var(--chart-3) / 0.2)", color: "hsl(var(--chart-3))" }}>✓ corroborated</span>}
-                  </div>
+                  <button
+                    onClick={() => onSelectIndex?.(Math.min(events.length - 1, idx + 1))}
+                    disabled={idx === events.length - 1}
+                    className="p-1 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors shrink-0"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => onSelectIndex?.(Math.min(events.length - 1, idx + 1))}
-                  disabled={idx === events.length - 1}
-                  className="p-1 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors shrink-0"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                {/* Breakdown sentence */}
+                {ev.ai_interpretation && (
+                  <p className="text-sm leading-snug text-foreground/80 px-1">
+                    {ev.ai_interpretation
+                      .replace(/\b(\d+)\s*(?:seconds?|s\b)/gi, (_, n) => {
+                        const v = parseInt(n, 10);
+                        if (v >= 60) { const m = Math.floor(v / 60); const s = v % 60; return s > 0 ? `${m} minutes and ${s} seconds` : `${m} minutes`; }
+                        return `${v} seconds`;
+                      })
+                      .replace(/\b(\d+)\s*(?:minutes?|min\b)/gi, (_, n) => {
+                        const v = parseInt(n, 10);
+                        return `${v} minute${v !== 1 ? "s" : ""}`;
+                      })
+                      .replace(/\b(\d+)\s*(?:bpm\b)/gi, (_, n) => `${n} beats per minute`)}
+                  </p>
+                )}
               </div>
             );
           })()}

@@ -165,8 +165,9 @@ PRIMARY FOCUS:
 1. Walk through the session chronologically — what was happening at each key moment based on HR + events
 2. The heart rate IS the arousal signal — narrate it like a story. When did it climb? When did it plateau? When did it spike? How fast? How steep?
 3. Every event note should be contextualized: what was HR doing around it, was arousal rising or falling, how long since the previous event, what shifted
-4. Identify turning points — moments where something meaningfully changed in the arc
-5. Characterize the overall "shape" of arousal: slow burn, plateau-driven, erratic spikes, clean ramp, etc.
+4. Factor in significant or noteworthy changes in stimulation (e.g. switching methods, pausing, adjusting intensity) as key moments that affected the arousal arc
+5. Identify turning points — moments where something meaningfully changed in the arc
+6. Characterize the overall "shape" of arousal: slow burn, plateau-driven, erratic spikes, clean ramp, etc.
 
 ANATOMY / PHYSIOLOGY: Include ONLY when the HR data or events strongly suggest something physiologically notable — e.g. a sudden spike hinting at a reflex, a long plateau suggesting a specific sustained state. Do not add routine anatomy. Let the data lead.
 
