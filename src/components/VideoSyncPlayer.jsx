@@ -480,14 +480,13 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                 <CategorySelector selected={newCats} onChange={setNewCats} />
                 <div className="flex gap-1.5 items-end">
                  <textarea
-                   ref={newNoteRef}
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (newNote.trim()) { commitAdd(); if (videoRef.current) videoRef.current.play(); } } }}
-                  placeholder="Describe the event… or tap 🎤 to dictate"
-                  rows={2}
-                  className="flex-1 text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
-                />
+                   value={newNote}
+                   onChange={(e) => setNewNote(e.target.value)}
+                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (newNote.trim()) { commitAdd(); if (videoRef.current) videoRef.current.play(); } } }}
+                   placeholder="Describe the event… or tap 🎤 to dictate"
+                   rows={2}
+                   className="flex-1 text-xs bg-background border border-border rounded px-2 py-1.5 resize-none"
+                 />
                 {sttSupported && (
                   <button
                     type="button"
@@ -576,6 +575,7 @@ export default function VideoSyncPlayer({ session, timelineRows }) {
                 <CategorySelector selected={newCats} onChange={setNewCats} />
                 <div className="flex gap-1.5 items-end">
                    <textarea
+                     ref={newNoteRef}
                      value={newNote}
                      onChange={(e) => setNewNote(e.target.value)}
                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (newNote.trim()) { commitAdd(); if (videoRef.current) videoRef.current.play(); } } }}
