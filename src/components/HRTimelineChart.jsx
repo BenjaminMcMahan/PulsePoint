@@ -90,7 +90,7 @@ const WINDOWS = [
 const MARKING_PHASES = ["pre_climax", "climax", "recovery"];
 const PHASE_LABELS = { pre_climax: "Pre-Climax", climax: "Climax", recovery: "Recovery" };
 
-export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChange, highlightRange = null, noClimax = false }) {
+export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChange, highlightRange = null, noClimax = false, nearClimaxEvents = [] }) {
   const maxOffsetS = useMemo(() => Math.max(...rows.map((r) => Number(r.time_offset_s) || 0)), [rows]);
   const durationMins = maxOffsetS / 60;
 
@@ -101,6 +101,7 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
   const [visibleLines, setVisibleLines] = useState({ hr: true, smoothed: true, baseline: true });
   const toggleLine = (key) => setVisibleLines((v) => ({ ...v, [key]: !v[key] }));
   const [markingPhase, setMarkingPhase] = useState(null); // null | 'pre_climax' | 'climax' | 'recovery'
+  const [hoveredEventIdx, setHoveredEventIdx] = useState(null);
   const [localMarkers, setLocalMarkers] = useState({
     pre_climax: savedMarkers.pre_climax_offset_s ?? null,
     climax: savedMarkers.climax_offset_s ?? null,
@@ -407,7 +408,23 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
               />
             )}
 
-            {/* Near-climax event highlight */}
+            {/* Near-climax event highlights */}
+            {nearClimaxEvents.map((ev, i) => (
+              <ReferenceArea
+                key={`nce-${i}`}
+                x1={ev.start_offset_s}
+                x2={ev.end_offset_s}
+                fill={hoveredEventIdx === i ? "hsl(var(--chart-3))" : "hsl(var(--chart-3))"}
+                fillOpacity={hoveredEventIdx === i ? 0.25 : 0.08}
+                stroke={hoveredEventIdx === i ? "hsl(var(--chart-3))" : "hsl(var(--chart-3))"}
+                strokeOpacity={hoveredEventIdx === i ? 0.8 : 0.3}
+                strokeWidth={hoveredEventIdx === i ? 2 : 1}
+                onMouseEnter={() => setHoveredEventIdx(i)}
+                onMouseLeave={() => setHoveredEventIdx(null)}
+              />
+            ))}
+
+            {/* Legacy highlight range */}
             {highlightRange && (
               <ReferenceArea
                 x1={highlightRange.start}
@@ -457,6 +474,39 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Near-climax event tooltip */}
+      {hoveredEventIdx != null && nearClimaxEvents[hoveredEventIdx] && (() => {
+        const ev = nearClimaxEvents[hoveredEventIdx];
+        return (
+          <div className="mt-3 rounded-lg border border-border bg-muted/60 p-3 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold font-mono" style={{ color: "hsl(var(--chart-3))" }}>
+                {ev.ai_label || `Event ${hoveredEventIdx + 1}`}
+              </span>
+              <span className="text-[9px] text-muted-foreground">{fmtSec(ev.start_offset_s)} – {fmtSec(ev.end_offset_s)}</span>
+            </div>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <div className="flex flex-col">
+                <span className="text-[9px] text-muted-foreground">Base HR</span>
+                <span className="font-mono font-bold">{ev.base_hr} bpm</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-muted-foreground">Peak HR</span>
+                <span className="font-mono font-bold">{ev.peak_hr} bpm</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-muted-foreground">Rise</span>
+                <span className="font-mono font-bold" style={{ color: "hsl(var(--chart-3))" }}>+{ev.rise_bpm} bpm</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-muted-foreground">Duration</span>
+                <span className="font-mono font-bold">{fmtSec(ev.duration_s)}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Phase timing summary — only for climax sessions */}
       {!noClimax && (preToClimax != null || climaxToRecovery != null) && (

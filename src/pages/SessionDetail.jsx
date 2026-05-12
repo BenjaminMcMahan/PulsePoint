@@ -363,6 +363,7 @@ export default function SessionDetail() {
                   }}
                   highlightRange={highlightRange}
                   noClimax={!!s.no_climax}
+                  nearClimaxEvents={nearClimaxEvents}
                 />
               )}
               {timelineRows.length > 0 && !s.no_climax && (
