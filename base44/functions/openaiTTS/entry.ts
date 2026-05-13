@@ -19,7 +19,7 @@ async function fetchTTS(text, voice, speed) {
         "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ model: "tts-1-hd", input: text, voice, speed }),
+      body: JSON.stringify({ model: "tts-1-hd", input: text, voice }),
     });
 
     if (response.status !== 429) break;
