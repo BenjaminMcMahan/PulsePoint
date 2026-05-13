@@ -6,7 +6,7 @@
 
 const DB_NAME = "tts_audio_cache";
 const STORE_NAME = "chunks";
-const DB_VERSION = 1;
+const DB_VERSION = 2; // bumped to clear stale cache from speed-param era
 
 let dbPromise = null;
 
@@ -17,9 +17,11 @@ function openDB() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
+      // Drop old store on version upgrade (clears stale/corrupt cache entries)
+      if (db.objectStoreNames.contains(STORE_NAME)) {
+        db.deleteObjectStore(STORE_NAME);
       }
+      db.createObjectStore(STORE_NAME);
     };
     req.onsuccess = (e) => resolve(e.target.result);
     req.onerror = () => { console.warn("TTS IndexedDB open failed"); resolve(null); };

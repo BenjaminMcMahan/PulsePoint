@@ -55,6 +55,8 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const err = await response.text();
+      console.error(`OpenAI TTS error ${response.status}:`, err);
+      console.error(`Request params: voice=${voice}, text_length=${text.length}, text_preview="${text.slice(0, 100)}"`);
       return Response.json({ error: err }, { status: response.status });
     }
 
