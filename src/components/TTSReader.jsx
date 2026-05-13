@@ -13,7 +13,8 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
   const [bufferingPara, setBufferingPara] = useState(-1); // which paragraph is currently fetching
   const [voice, setVoice] = useState(() => localStorage.getItem("tts_oai_voice") || "alloy");
   const [showVoicePicker, setShowVoicePicker] = useState(false);
-  const [speed, setSpeed] = useState(() => parseFloat(localStorage.getItem("tts_speed") || "1.0"));
+  // speed slider kept for UI state but not sent to API (tts-1-hd doesn't support it)
+  const [speed, setSpeed] = useState(1.0);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
   const [requestStatus, setRequestStatus] = useState(null); // { type: "fetching"|"ok"|"error", msg: string }
@@ -590,20 +591,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
           )}
         </button>
 
-        {/* Speed slider */}
-        <div className="flex items-center gap-1.5 ml-1">
-          <span className="text-[10px] text-muted-foreground w-6 text-right">{speed.toFixed(1)}x</span>
-          <input
-            type="range"
-            min="0.5"
-            max="2.0"
-            step="0.25"
-            value={speed}
-            onChange={(e) => changeSpeed(parseFloat(e.target.value))}
-            className="w-20 h-1 accent-primary cursor-pointer"
-            style={{ accentColor: "hsl(var(--primary))" }}
-          />
-        </div>
+
 
         {/* Voice picker */}
         <div className="relative ml-auto">
