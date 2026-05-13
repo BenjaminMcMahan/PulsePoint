@@ -123,18 +123,18 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       fetchQueueRef.current = fetchQueueRef.current.then(async () => {
         try {
           // Check IndexedDB persistent cache first
-          let mp3Buffer = await idbGet(chunk, voiceRef.current, speedRef.current);
+          let mp3Buffer = await idbGet(chunk, voiceRef.current, 1.0);
 
           if (!mp3Buffer) {
             setRequestStatus({ type: "fetching", msg: "Fetching audio…" });
-            const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
+            const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
             if (response.data?.error) throw new Error(response.data.error);
             const base64 = response.data.audio;
             const binary = atob(base64);
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
             mp3Buffer = bytes.buffer;
-            idbSet(chunk, voiceRef.current, speedRef.current, mp3Buffer); // fire-and-forget
+            idbSet(chunk, voiceRef.current, 1.0, mp3Buffer); // fire-and-forget
             setRequestStatus({ type: "ok", msg: "Audio ready" });
           } else {
             setRequestStatus({ type: "ok", msg: "Audio ready (cached)" });
@@ -449,10 +449,10 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         const chunk = allChunks[i];
 
         // Check IndexedDB persistent cache first
-        let mp3Buffer = await idbGet(chunk, voiceRef.current, speedRef.current);
+        let mp3Buffer = await idbGet(chunk, voiceRef.current, 1.0);
 
         if (!mp3Buffer) {
-          const res = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
+          const res = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
           if (res.data?.error) throw new Error(res.data.error);
           if (!res.data?.audio) throw new Error(`TTS request failed (status ${res.status})`);
           const base64 = res.data.audio;
@@ -460,7 +460,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
           const bytes = new Uint8Array(binary.length);
           for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
           mp3Buffer = bytes.buffer;
-          idbSet(chunk, voiceRef.current, speedRef.current, mp3Buffer); // fire-and-forget
+          idbSet(chunk, voiceRef.current, 1.0, mp3Buffer); // fire-and-forget
         }
 
         mp3Chunks[i] = new Uint8Array(mp3Buffer);
