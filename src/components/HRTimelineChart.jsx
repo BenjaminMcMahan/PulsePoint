@@ -471,6 +471,65 @@ export default function HRTimelineChart({ rows, savedMarkers = {}, onMarkersChan
         </div>
       )}
 
+      {/* Phase marker controls — only shown when onMarkersChange is provided (form context) */}
+      {onMarkersChange && !noClimax && (
+        <div className="mt-3 space-y-2">
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {MARKING_PHASES.map((phase) => (
+              <button
+                key={phase}
+                onClick={() => setMarkingPhase(markingPhase === phase ? null : phase)}
+                className="text-[10px] px-2.5 py-1 rounded-lg font-semibold border transition-colors"
+                style={{
+                  background: markingPhase === phase ? PHASE_COLORS[phase] : "transparent",
+                  borderColor: PHASE_COLORS[phase],
+                  color: markingPhase === phase ? "#fff" : PHASE_COLORS[phase],
+                }}
+              >
+                {markingPhase === phase ? `Click chart → ${PHASE_LABELS[phase]}` : `Set ${PHASE_LABELS[phase]}`}
+              </button>
+            ))}
+            <button
+              onClick={autoDetectMarkers}
+              className="text-[10px] px-2.5 py-1 rounded-lg font-semibold border border-border text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
+            >
+              Auto-Detect
+            </button>
+            {(localMarkers.pre_climax != null || localMarkers.climax != null || localMarkers.recovery != null) && (
+              <button
+                onClick={clearMarkers}
+                className="text-[10px] px-2.5 py-1 rounded-lg font-semibold border border-destructive/50 text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {MARKING_PHASES.map((phase) => (
+              <ManualTimeInput
+                key={phase}
+                phase={phase}
+                color={PHASE_COLORS[phase]}
+                label={PHASE_LABELS[phase]}
+                currentOffset={localMarkers[phase]}
+                maxOffset={maxOffsetS}
+                onSet={(totalS) => {
+                  const updated = { ...localMarkers, [phase]: totalS };
+                  setLocalMarkers(updated);
+                  const extra = calcHRMetrics(updated);
+                  onMarkersChange({
+                    pre_climax_offset_s: updated.pre_climax,
+                    climax_offset_s: updated.climax,
+                    recovery_offset_s: updated.recovery,
+                    ...extra,
+                  });
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="flex flex-wrap gap-3 mt-1 px-1">
         <button

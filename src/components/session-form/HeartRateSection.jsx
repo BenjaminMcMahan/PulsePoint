@@ -241,6 +241,11 @@ export default function HeartRateSection({ data, onChange }) {
             <Label className="text-xs text-muted-foreground mb-2 block">HR Timeline Preview</Label>
             <HRTimelineChart
               rows={csvRows}
+              savedMarkers={{
+                pre_climax_offset_s: data.pre_climax_offset_s ?? null,
+                climax_offset_s: data.climax_offset_s ?? null,
+                recovery_offset_s: data.recovery_offset_s ?? null,
+              }}
               onMarkersChange={(markers) => update(markers)}
               noClimax={!!data.no_climax}
             />
