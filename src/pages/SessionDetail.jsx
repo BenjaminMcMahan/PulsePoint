@@ -123,14 +123,21 @@ export default function SessionDetail() {
       const rows = await base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000);
       setTimelineRows(rows);
 
-      // Fetch all EMG rows via backend (handles large 30k+ datasets via pagination)
-      try {
-        const emgRes = await base44.functions.invoke("saveTimelineData", {
-          session_id: id, entity: "EMGTimeline", action: "fetch",
-        });
-        setEmgRows(emgRes.data?.rows || []);
-      } catch (_) {
-        setEmgRows([]);
+      // Load EMG data from the stored CSV file (client-side parse — no DB rows needed)
+      if (s?.emg_data_file) {
+        try {
+          const csvResp = await fetch(s.emg_data_file);
+          const text = await csvResp.text();
+          const { parseEmgCsv } = await import("../utils/parseEmgCsv");
+          const result = parseEmgCsv(text);
+          if (!result.error) {
+            const startRow = result.rows.find((r) => r.marker === "RECORD_START");
+            const timeZero = startRow ? startRow.time_s : result.rows[0]?.time_s ?? 0;
+            setEmgRows(result.rows.map((r) => ({ ...r, time_s: parseFloat((r.time_s - timeZero).toFixed(6)) })));
+          }
+        } catch (_) {
+          setEmgRows([]);
+        }
       }
 
       // Auto-detect phase markers if not already set

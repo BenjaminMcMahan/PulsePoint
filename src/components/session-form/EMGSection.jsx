@@ -53,8 +53,9 @@ export default function EMGSection({ data, onChange }) {
   const update = (fields) => onChange({ ...data, ...fields });
 
   const emgRows = data._emg_rows || [];
-  const channelMode = data._emg_channel_mode || "single";
+  const channelMode = data._emg_channel_mode || (data.emg_channels || "single");
   const emgPhotos = data.emg_placement_photos || [];
+  const hasStoredFile = !!data.emg_data_file;
 
   const handleCSVUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -62,6 +63,7 @@ export default function EMGSection({ data, onChange }) {
     setUploading(true);
     setImportResult(null);
 
+    // Parse locally for preview + validation
     const text = await file.text();
     const result = parseEmgCsv(text);
 
@@ -73,17 +75,22 @@ export default function EMGSection({ data, onChange }) {
 
     const { rows, channelMode, skipped, total } = result;
 
-    // Find RECORD_START and zero the time axis
+    // Zero the time axis using RECORD_START marker
     const startRow = rows.find((r) => r.marker === "RECORD_START");
     const timeZero = startRow ? startRow.time_s : rows[0].time_s;
     const normalizedRows = rows.map((r) => ({ ...r, time_s: parseFloat((r.time_s - timeZero).toFixed(6)) }));
 
-    // Detect emg_enabled state and channel config automatically
+    // Upload the raw CSV file for persistent storage (no database rows needed)
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+
     update({
-      _emg_rows: normalizedRows,
-      _emg_channel_mode: channelMode,
+      // Store the file URL on the session — this is all that gets saved to the DB
+      emg_data_file: file_url,
       emg_enabled: true,
       emg_channels: channelMode,
+      // Keep parsed rows in memory for the preview chart only (not saved to DB)
+      _emg_rows: normalizedRows,
+      _emg_channel_mode: channelMode,
     });
 
     setImportResult({ imported: rows.length, total, skipped });
@@ -187,7 +194,13 @@ export default function EMGSection({ data, onChange }) {
         <label className="mt-1 flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-3 cursor-pointer hover:border-primary/50 transition-colors">
           <Upload className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
-            {uploading ? "Parsing…" : emgRows.length > 0 ? `${emgRows.length} rows imported (${channelMode}) ✓` : "Upload EMG CSV"}
+            {uploading
+              ? "Uploading…"
+              : emgRows.length > 0
+                ? `${emgRows.length} rows ready (${channelMode}) ✓`
+                : hasStoredFile
+                  ? "CSV saved ✓ — upload new to replace"
+                  : "Upload EMG CSV"}
           </span>
           <input type="file" accept=".csv" className="hidden" onChange={handleCSVUpload} disabled={uploading} />
         </label>

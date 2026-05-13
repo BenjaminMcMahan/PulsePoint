@@ -86,6 +86,7 @@ export default function EditSession() {
       const duration = calcDuration(data.start_time, data.end_time);
       // Exclude internal/computed fields that shouldn't be re-saved
       const { _csv_rows, _emg_rows, _emg_channel_mode, ai_analysis, ai_cascade, ...sessionData } = data;
+      // _emg_rows is only used for in-memory preview; emg_data_file URL is already in sessionData
 
       // Sanitize event_timeline: ensure category is always a clean array of strings
       const LEGACY = ["pause", "resume", "paused", "resumed"];
@@ -109,39 +110,7 @@ export default function EditSession() {
         });
         if (res.data?.error) throw new Error(res.data.error);
       }
-      if (_emg_rows && _emg_rows.length > 0) {
-        // Clear existing EMG rows in a loop (each call deletes one page to avoid timeouts)
-        let totalDeleted = 0;
-        let clearDone = false;
-        while (!clearDone) {
-          setSaving({ label: `Clearing old EMG data… (${totalDeleted} removed)`, pct: 5 });
-          const clearRes = await base44.functions.invoke("saveTimelineData", {
-            session_id: id, entity: "EMGTimeline", action: "clear",
-          });
-          if (clearRes.data?.error) throw new Error(clearRes.data.error);
-          totalDeleted += clearRes.data?.deleted || 0;
-          clearDone = clearRes.data?.done !== false;
-        }
-
-        // Send EMG in chunks of 5000 rows to avoid HTTP timeouts
-        const EMG_CHUNK = 5000;
-        const totalChunks = Math.ceil(_emg_rows.length / EMG_CHUNK);
-        for (let i = 0; i < _emg_rows.length; i += EMG_CHUNK) {
-          const chunk = _emg_rows.slice(i, i + EMG_CHUNK);
-          const chunkNum = Math.floor(i / EMG_CHUNK) + 1;
-          const rowsUploaded = i + chunk.length;
-          const pct = Math.round((rowsUploaded / _emg_rows.length) * 100);
-          setSaving({
-            label: `Uploading EMG chunk ${chunkNum} of ${totalChunks} (${rowsUploaded.toLocaleString()} / ${_emg_rows.length.toLocaleString()} rows)`,
-            pct,
-          });
-          const res = await base44.functions.invoke("saveTimelineData", {
-            session_id: id, entity: "EMGTimeline", action: "append", rows: chunk,
-          });
-          if (res.data?.error) throw new Error(res.data.error);
-        }
-        setSaving({ label: "Finishing…", pct: 100 });
-      }
+      // EMG data is stored as a file URL (emg_data_file) on the session — no separate upload needed
       setSaving(false);
       toast({ title: "Session updated!", duration: 2000 });
       navigate(`/sessions/${id}`);

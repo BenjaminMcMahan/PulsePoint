@@ -386,6 +386,10 @@
     "emg_left_right_flipped": {
       "type": "boolean"
     },
+    "emg_data_file": {
+      "type": "string",
+      "description": "URL to the uploaded raw EMG CSV file"
+    },
     "emg_placement_photos": {
       "type": "array",
       "description": "Electrode placement photos with tags and captions",
