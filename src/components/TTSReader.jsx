@@ -5,7 +5,7 @@ import { fmtSecondsInText } from "@/utils/formatSeconds";
 import { base44 } from "@/api/base44Client";
 import { idbGet, idbSet } from "@/lib/ttsCache";
 
-const OAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+const OAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer", "coral", "sage", "ash", "ballad", "verse"];
 
 export default function TTSReader({ paragraphs, renderParagraph, sessionId, title, sessionDate }) {
   const [state, setState] = useState("idle"); // idle | buffering | playing | paused
