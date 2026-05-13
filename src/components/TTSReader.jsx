@@ -13,7 +13,9 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
   const [bufferingPara, setBufferingPara] = useState(-1); // which paragraph is currently fetching
   const [voice, setVoice] = useState(() => {
     const saved = localStorage.getItem("tts_oai_voice") || "alloy";
-    return OAI_VOICES.includes(saved) ? saved : "alloy";
+    const valid = OAI_VOICES.includes(saved) ? saved : "alloy";
+    if (valid !== saved) localStorage.setItem("tts_oai_voice", valid);
+    return valid;
   });
   const [showVoicePicker, setShowVoicePicker] = useState(false);
   // speed slider kept for UI state but not sent to API (tts-1-hd doesn't support it)
