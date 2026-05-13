@@ -443,7 +443,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       const mp3Chunks = new Array(allChunks.length);
       setDownloadProgress({ current: 0, total: allChunks.length });
       let completed = 0;
-      const CONCURRENCY = 8;
+      const CONCURRENCY = 2;
 
       const fetchChunk = async (i) => {
         const chunk = allChunks[i];
@@ -454,6 +454,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         if (!mp3Buffer) {
           const res = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current, speed: speedRef.current });
           if (res.data?.error) throw new Error(res.data.error);
+          if (!res.data?.audio) throw new Error(`TTS request failed (status ${res.status})`);
           const base64 = res.data.audio;
           const binary = atob(base64);
           const bytes = new Uint8Array(binary.length);
@@ -468,9 +469,9 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         setRequestStatus({ type: "fetching", msg: `Fetching chunk ${completed} of ${allChunks.length}…` });
       };
 
-      // Run with concurrency limit
-      for (let i = 0; i < allChunks.length; i += CONCURRENCY) {
-        await Promise.all(allChunks.slice(i, i + CONCURRENCY).map((_, j) => fetchChunk(i + j)));
+      // Run sequentially to avoid rate limiting
+      for (let i = 0; i < allChunks.length; i++) {
+        await fetchChunk(i);
       }
 
       // Concatenate all MP3 frames
