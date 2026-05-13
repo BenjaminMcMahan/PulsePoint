@@ -5,13 +5,16 @@ import { fmtSecondsInText } from "@/utils/formatSeconds";
 import { base44 } from "@/api/base44Client";
 import { idbGet, idbSet } from "@/lib/ttsCache";
 
-const OAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+const OAI_VOICES = ["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"];
 
 export default function TTSReader({ paragraphs, renderParagraph, sessionId, title, sessionDate }) {
   const [state, setState] = useState("idle"); // idle | buffering | playing | paused
   const [currentPara, setCurrentPara] = useState(-1);
   const [bufferingPara, setBufferingPara] = useState(-1); // which paragraph is currently fetching
-  const [voice, setVoice] = useState(() => localStorage.getItem("tts_oai_voice") || "alloy");
+  const [voice, setVoice] = useState(() => {
+    const saved = localStorage.getItem("tts_oai_voice") || "alloy";
+    return OAI_VOICES.includes(saved) ? saved : "alloy";
+  });
   const [showVoicePicker, setShowVoicePicker] = useState(false);
   // speed slider kept for UI state but not sent to API (tts-1-hd doesn't support it)
   const [speed, setSpeed] = useState(1.0);
