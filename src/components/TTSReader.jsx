@@ -129,6 +129,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
           if (!mp3Buffer) {
             setRequestStatus({ type: "fetching", msg: "Fetching audio…" });
             const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+            console.log("TTS response status:", response.status, "data:", JSON.stringify(response.data)?.slice(0, 200));
             if (response.data?.error) throw new Error(response.data.error);
             const base64 = response.data.audio;
             const binary = atob(base64);
