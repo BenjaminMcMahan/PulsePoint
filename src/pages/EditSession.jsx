@@ -44,12 +44,15 @@ export default function EditSession() {
   const [saving, setSaving] = useState(false); // false | "Saving session…" | { label: string, pct: number }
 
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(new Set(["info", "subjective", "methods"]));
+  const [expanded, setExpanded] = useState(new Set(["info", "hr", "subjective", "methods"]));
   const [data, setData] = useState(null);
 
   useEffect(() => {
     (async () => {
-      const results = await base44.entities.Session.filter({ id });
+      const [results, timelineRows] = await Promise.all([
+        base44.entities.Session.filter({ id }),
+        base44.entities.HeartRateTimeline.filter({ session: id }, "time_offset_s", 10000),
+      ]);
       if (results[0]) {
         const session = results[0];
         // Auto-derive start_time from the session date if not already stored
@@ -61,6 +64,10 @@ export default function EditSession() {
             hour12: false,
           });
           session.start_time = etTime === "24:00" ? "00:00" : etTime;
+        }
+        // Pre-populate _csv_rows from stored timeline so chart + marker UI shows on edit
+        if (timelineRows.length > 0) {
+          session._csv_rows = timelineRows;
         }
         setData(session);
       }
