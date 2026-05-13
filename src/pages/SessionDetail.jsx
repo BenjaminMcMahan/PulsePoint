@@ -442,6 +442,7 @@ export default function SessionDetail() {
                   climax_offset_s: s.climax_offset_s,
                   recovery_offset_s: s.recovery_offset_s,
                 }}
+                timelineRows={timelineRows}
               />
             ) : (
               <p className="text-xs text-muted-foreground">EMG recorded but no timeline data imported yet. Edit session to upload CSV.</p>

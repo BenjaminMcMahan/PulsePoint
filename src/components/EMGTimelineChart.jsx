@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis,
-  Tooltip, CartesianGrid, ReferenceLine, Legend,
+  Tooltip, CartesianGrid, ReferenceLine,
 } from "recharts";
 
 function fmtMmSs(s) {
@@ -30,12 +30,38 @@ export default function EMGTimelineChart({
   events = [],
   savedMarkers = {},
   onMarkersChange,
+  timelineRows = [], // HR data
 }) {
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(true);
   const [showDiff, setShowDiff] = useState(false);
   const [showEvents, setShowEvents] = useState(true);
+  const [showHR, setShowHR] = useState(true);
   const [viewMode, setViewMode] = useState("pct"); // "pct" | "raw"
+
+  // Build a sorted HR lookup for interpolation
+  const hrSorted = useMemo(() =>
+    [...timelineRows]
+      .map((r) => ({ t: Number(r.time_offset_s), hr: Number(r.hr) }))
+      .filter((r) => !isNaN(r.t) && !isNaN(r.hr))
+      .sort((a, b) => a.t - b.t),
+    [timelineRows]
+  );
+
+  // Linear interpolate HR at a given time_s
+  const interpolateHR = (t) => {
+    if (!hrSorted.length) return null;
+    if (t <= hrSorted[0].t) return hrSorted[0].hr;
+    if (t >= hrSorted[hrSorted.length - 1].t) return hrSorted[hrSorted.length - 1].hr;
+    let lo = 0, hi = hrSorted.length - 1;
+    while (lo + 1 < hi) {
+      const mid = (lo + hi) >> 1;
+      if (hrSorted[mid].t <= t) lo = mid; else hi = mid;
+    }
+    const a = hrSorted[lo], b = hrSorted[hi];
+    const frac = (t - a.t) / (b.t - a.t);
+    return Math.round(a.hr + frac * (b.hr - a.hr));
+  };
 
   // Downsample to at most 2000 points for performance
   const chartData = useMemo(() => {
@@ -43,20 +69,24 @@ export default function EMGTimelineChart({
     const step = Math.max(1, Math.floor(rows.length / 2000));
     return rows
       .filter((_, i) => i % step === 0)
-      .map((r) => ({
-        t: Number(r.time_s),
-        left: channelMode === "dual"
-          ? (viewMode === "pct" ? r.left_pct : r.left_env) ?? null
-          : null,
-        right: channelMode === "dual"
-          ? (viewMode === "pct" ? r.right_pct : r.right_env) ?? null
-          : null,
-        diff: channelMode === "dual" ? r.diff_pct ?? null : null,
-        single: channelMode === "single"
-          ? (viewMode === "pct" ? r.level_pct : (r.env_smooth ?? r.raw_env)) ?? null
-          : null,
-      }));
-  }, [rows, channelMode, viewMode]);
+      .map((r) => {
+        const t = Number(r.time_s);
+        return {
+          t,
+          left: channelMode === "dual"
+            ? (viewMode === "pct" ? r.left_pct : r.left_env) ?? null
+            : null,
+          right: channelMode === "dual"
+            ? (viewMode === "pct" ? r.right_pct : r.right_env) ?? null
+            : null,
+          diff: channelMode === "dual" ? r.diff_pct ?? null : null,
+          single: channelMode === "single"
+            ? (viewMode === "pct" ? r.level_pct : (r.env_smooth ?? r.raw_env)) ?? null
+            : null,
+          hr: hrSorted.length ? interpolateHR(t) : null,
+        };
+      });
+  }, [rows, channelMode, viewMode, hrSorted]);
 
   const phaseMarkers = [
     savedMarkers.pre_climax_offset_s != null && { key: "pre_climax", t: savedMarkers.pre_climax_offset_s, label: "Pre-C", color: MARKER_COLORS.pre_climax },
@@ -74,8 +104,8 @@ export default function EMGTimelineChart({
         <p className="text-muted-foreground font-mono">{fmtMmSs(label)}</p>
         {payload.map((p) => p.value != null && (
           <p key={p.name} style={{ color: p.color }} className="font-mono font-semibold">
-            {p.name}: {typeof p.value === "number" ? p.value.toFixed(1) : p.value}
-            {viewMode === "pct" ? "%" : ""}
+            {p.name}: {typeof p.value === "number" ? p.value.toFixed(p.name === "HR" ? 0 : 1) : p.value}
+            {p.name === "HR" ? " bpm" : viewMode === "pct" ? "%" : ""}
           </p>
         ))}
         {/* Show any event at this approximate time */}
@@ -142,6 +172,18 @@ export default function EMGTimelineChart({
             Events
           </button>
         )}
+
+        {hrSorted.length > 0 && (
+          <button
+            onClick={() => setShowHR(v => !v)}
+            className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors`}
+            style={showHR
+              ? { background: "#ef444422", borderColor: "#ef4444", color: "#ef4444" }
+              : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}
+          >
+            HR
+          </button>
+        )}
       </div>
 
       {/* Chart */}
@@ -157,13 +199,17 @@ export default function EMGTimelineChart({
               tickFormatter={fmtMmSs}
               tickCount={8}
             />
-            <YAxis tick={{ fontSize: 9 }} domain={yDomain} unit={viewMode === "pct" ? "%" : ""} />
+            <YAxis yAxisId="emg" tick={{ fontSize: 9 }} domain={yDomain} unit={viewMode === "pct" ? "%" : ""} />
+            {hrSorted.length > 0 && showHR && (
+              <YAxis yAxisId="hr" orientation="right" tick={{ fontSize: 9 }} domain={["auto", "auto"]} unit=" bpm" width={42} />
+            )}
             <Tooltip content={<CustomTooltip />} />
 
             {/* Phase markers */}
             {phaseMarkers.map((pm) => (
               <ReferenceLine
                 key={pm.key}
+                yAxisId="emg"
                 x={pm.t}
                 stroke={pm.color}
                 strokeWidth={1.5}
@@ -176,6 +222,7 @@ export default function EMGTimelineChart({
             {showEvents && events.map((ev, i) => (
               <ReferenceLine
                 key={i}
+                yAxisId="emg"
                 x={ev.time_s}
                 stroke="hsl(var(--chart-4))"
                 strokeWidth={1}
@@ -186,6 +233,7 @@ export default function EMGTimelineChart({
 
             {channelMode === "single" && (
               <Line
+                yAxisId="emg"
                 type="monotone"
                 dataKey="single"
                 stroke={EMG_COLORS.single}
@@ -198,6 +246,7 @@ export default function EMGTimelineChart({
             )}
             {channelMode === "dual" && showLeft && (
               <Line
+                yAxisId="emg"
                 type="monotone"
                 dataKey="left"
                 stroke={EMG_COLORS.left}
@@ -210,6 +259,7 @@ export default function EMGTimelineChart({
             )}
             {channelMode === "dual" && showRight && (
               <Line
+                yAxisId="emg"
                 type="monotone"
                 dataKey="right"
                 stroke={EMG_COLORS.right}
@@ -222,6 +272,7 @@ export default function EMGTimelineChart({
             )}
             {channelMode === "dual" && showDiff && (
               <Line
+                yAxisId="emg"
                 type="monotone"
                 dataKey="diff"
                 stroke={EMG_COLORS.diff}
@@ -231,6 +282,22 @@ export default function EMGTimelineChart({
                 isAnimationActive={false}
                 name="Diff %"
                 connectNulls
+              />
+            )}
+
+            {/* HR overlay */}
+            {hrSorted.length > 0 && showHR && (
+              <Line
+                yAxisId="hr"
+                type="monotone"
+                dataKey="hr"
+                stroke="#ef4444"
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+                name="HR"
+                connectNulls
+                strokeOpacity={0.8}
               />
             )}
           </ComposedChart>
