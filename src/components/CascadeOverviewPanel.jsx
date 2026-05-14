@@ -303,8 +303,9 @@ For each phase write a rich prose paragraph — speak naturally and directly to 
 2. PRE-CLIMAX: final ascent, emission phase signals, HR acceleration, sensory events, EMG leading patterns
 3. CLIMAX: peak physiology, HR plateau/spike, contraction correlates from EMG, ejaculate, subjective experience
 4. RECOVERY: autonomic rebound, recovery slope interpretation, parasympathetic signals, post-climax sensations
-5. PHYSIOLOGICAL FINDINGS: interpret the computed metrics — sympathetic load, build rate, plateau duration, recovery efficiency. Are there signs of strong autonomic regulation or areas to watch?
-6. CASCADE QUALITY: holistic assessment — how well did all the signals (HR, EMG, events, subjective scores) align? What made this cascade distinctive? 1–2 actionable observations for future sessions.
+5. PHYSIOLOGICAL FINDINGS: interpret the computed metrics — sympathetic load, build rate, plateau duration, recovery efficiency. Are there signs of strong autonomic regulation or areas to watch? Then explicitly compare the subjective ratings (intensity, satisfaction, mood) to the objective physiological output — does the reported intensity match the HR rise above baseline? Does satisfaction align with plateau duration and recovery efficiency? Call out any clear divergences and suggest what they might mean.
+6. EVENT SEQUENCE ANALYSIS: Review the annotated event timeline carefully. Identify meaningful timing patterns — do specific stimulation changes consistently precede rapid HR acceleration? Are discomfort notes clustered at particular phase transitions? Are there event sequences (e.g. a pause followed by resumed stimulation) that produced notable HR responses? Name the actual events and timestamps when describing these patterns.
+7. CASCADE QUALITY: holistic assessment — how well did all the signals (HR, EMG, events, subjective scores) align? What made this cascade distinctive? 1–2 actionable observations for future sessions.
 
 Session cascade data:
 ${JSON.stringify({
@@ -352,9 +353,10 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline (with HR at each mome
           climax_phase: { type: "string" },
           recovery_phase: { type: "string" },
           physiological_findings: { type: "string" },
+          event_sequence_analysis: { type: "string" },
           cascade_quality: { type: "string" }
         },
-        required: ["summary", "build_phase", "pre_climax_phase", "climax_phase", "recovery_phase", "physiological_findings", "cascade_quality"]
+        required: ["summary", "build_phase", "pre_climax_phase", "climax_phase", "recovery_phase", "physiological_findings", "event_sequence_analysis", "cascade_quality"]
       }
     });
 
@@ -428,7 +430,8 @@ ${annotatedEvents.length > 0 ? `\nAnnotated event timeline (with HR at each mome
         { key: "pre_climax_phase", color: "#a855f7", title: "Pre-Climax", icon: <Zap className="w-3.5 h-3.5" /> },
         { key: "climax_phase", color: "#ef4444", title: "Climax", icon: <Flag className="w-3.5 h-3.5" /> },
         { key: "recovery_phase", color: "#3b82f6", title: "Recovery", icon: <TrendingUp className="w-3.5 h-3.5" style={{ transform: "scaleY(-1)" }} /> },
-        { key: "physiological_findings", color: "#10b981", title: "Physiological Findings", icon: <Brain className="w-3.5 h-3.5" /> }];
+        { key: "physiological_findings", color: "#10b981", title: "Physiological Findings", icon: <Brain className="w-3.5 h-3.5" /> },
+        { key: "event_sequence_analysis", color: "#f59e0b", title: "Event Sequence Analysis", icon: <Zap className="w-3.5 h-3.5" /> }];
 
 
         // Build flat paragraph list with metadata for rendering
