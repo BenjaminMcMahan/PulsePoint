@@ -161,8 +161,17 @@ Every question MUST reference a SPECIFIC, NAMED piece of data from this session.
   - Mention a stimulation detail: "you were using the foley alongside e-stim — did the combination feel different from usual?"
   - Point to a data anomaly: "there's about 6 minutes with no logged events but your HR climbed 28 bpm — what was happening?"
 
-TONE: Casual, natural, like a curious friend — not a clinician. Short sentences. Use "you" freely. Contractions are fine. Don't frame questions like a formal interview. 
-NEVER ask "what aspects did you find most enjoyable" or any vague open-ended "how did it feel at [time]" without naming exactly what happened at that time.`;
+TONE: Casual, natural, like a curious friend — not a clinician. Short sentences. Use "you" freely. Contractions are fine. Don't frame questions like a formal interview.
+
+BANNED QUESTION TYPES — never ask these:
+- Anything about time perception, subjective time distortion, or "did it feel longer/shorter"
+- Any question about psychological states that can't be confirmed from data ("did the intensity contribute to X feeling?")
+- "What aspects did you find most enjoyable" or any vague open-ended question not tied to a specific named data point
+- "How did it feel at [time]" without naming what the data shows happened at that exact time
+- Questions about *why* a subjective experience happened unless there is a specific, observable data anomaly to point at
+- Abstract cause-and-effect speculation ("did X contribute to Y feeling") where both X and Y are inferred, not measured
+
+If you can't find a concrete, answerable data point to ask about, ask the user to share something specific they noticed — don't invent a vague question.`;
 
     const systemPrompt = messages.length === 1
       ? mode === "profile"
