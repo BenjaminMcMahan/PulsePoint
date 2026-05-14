@@ -213,14 +213,14 @@ Use this arousal profile to personalize analysis: compare the observed build arc
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
       prompt: `You are an expert physiologist and anatomist specializing in sexual response. Analyze this session integrating arousal physiology, anatomy, heart rate data, event timeline, and subjective experience into a cohesive narrative. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
 
-PHYSIOLOGICAL & ANATOMICAL LENS — apply throughout:
-- Interpret HR trajectory as a real-time window into sympathetic nervous system activation, parasympathetic withdrawal, and autonomic arousal state
-- Reference relevant anatomy where appropriate: pelvic floor muscle engagement, smooth muscle tone in the bladder neck and urethra, prostatic engorgement, pudendal nerve pathways, bulbocavernosus/ischiocavernosus muscle activity
-- Where foley or urethral stimulation is involved, consider the urethral sensory nerve density, stretch receptor activation, and internal urethral sphincter dynamics
-- Where e-stim is involved, consider motor nerve recruitment, muscle contraction patterns, and how frequency/pulse-width affect sensory vs motor fibers
-- Connect subjective sensations (pressure, throb, tightness, wave) to their likely anatomical generators
-- Interpret discomfort entries through an anatomical lens — likely tissue, nerve, or positional cause
-- Note how stimulation pauses affect sympathetic tone and re-arousal dynamics based on HR recovery pattern
+PHYSIOLOGICAL & ANATOMICAL LENS — CONDITIONAL USE ONLY:
+- Only mention specific physiological phases (e.g. emission, expulsion, plateau) or anatomical structures (e.g. pudendal nerve, bulbocavernosus, prostatic urethra) when the session data — an event note, HR pattern, subjective metric, or logged sensation — gives you a concrete reason to do so. Never insert these as generic background explanation.
+- Interpret HR trajectory as a real-time window into sympathetic/parasympathetic balance — but only narrate a mechanism if the HR data actually shows it (e.g. a clear spike, an unexpected plateau, a slow recovery).
+- If foley or urethral stimulation is logged, discuss urethral sensory dynamics — but only in terms of what actually happened (logged sensations, HR response, notes). Skip if there's nothing to connect it to.
+- If e-stim is present, discuss fiber recruitment and frequency effects only if the e-stim notes or settings screenshots give you something specific to work with.
+- Connect subjective sensations (pressure, throb, tightness, wave) to anatomical generators ONLY if the user actually logged those sensations.
+- Interpret discomfort anatomically ONLY if discomfort entries are present.
+- The goal is a tight, evidence-driven analysis of what actually happened — not a physiology lecture. Every anatomical or physiological claim must be traceable to a specific data point in the session.
 ${emgSummary ? `
 EMG INTERPRETATION RULES — apply carefully:
 - EMG % is NORMALIZED RELATIVE ACTIVATION, NOT absolute force. Never claim EMG % equals muscle force.
