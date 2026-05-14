@@ -637,7 +637,7 @@ export default function SessionDetail() {
         )}
 
         {/* Cascade + AI — only for climax sessions */}
-        {!s.no_climax && <CascadeOverviewPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
+        {!s.no_climax && <CascadeOverviewPanel session={s} timelineRows={timelineRows} emgRows={emgRows} userProfile={userProfile} />}
         {!s.no_climax && <SessionAIPanel session={s} timelineRows={timelineRows} emgRows={emgRows} userProfile={userProfile} />}
 
         {/* Timeline & Arousal Narrative */}
