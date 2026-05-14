@@ -9,6 +9,8 @@ import { TrendingUp, Heart, Zap, Star, Activity, BarChart2, Timer, MessageSquare
 import EventSummaryCard from "../components/EventSummaryCard";
 import HRPerformanceMetrics from "../components/HRPerformanceMetrics";
 import EventHRCorrelationView from "../components/EventHRCorrelationView";
+import DashboardCustomizer from "../components/DashboardCustomizer";
+import { useDashboardWidgets } from "@/hooks/useDashboardWidgets";
 
 function StatCard({ label, value, sub, icon: Icon, color = "primary" }) {
   return (
@@ -46,6 +48,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Dashboard() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { config, toggleWidget, moveWidget, isVisible } = useDashboardWidgets();
 
   useEffect(() => {
     (async () => {
@@ -73,7 +76,6 @@ export default function Dashboard() {
     };
   }, [sessions]);
 
-  // Trend data — last 20 sessions ordered chronologically
   const trendData = useMemo(() => {
     return [...sessions]
       .filter((s) => s.intensity || s.satisfaction || s.avg_hr)
@@ -87,7 +89,6 @@ export default function Dashboard() {
       }));
   }, [sessions]);
 
-  // Monthly averages
   const monthlyData = useMemo(() => {
     const map = {};
     sessions.forEach((s) => {
@@ -108,7 +109,6 @@ export default function Dashboard() {
       }));
   }, [sessions]);
 
-  // HR trend data
   const hrTrendData = useMemo(() => {
     return [...sessions]
       .filter((s) => s.avg_hr || s.max_hr || s.hr_at_climax)
@@ -122,7 +122,6 @@ export default function Dashboard() {
       }));
   }, [sessions]);
 
-  // Method frequency
   const methodFreq = useMemo(() => {
     const map = {};
     sessions.forEach((s) => (s.methods || []).forEach((m) => { map[m] = (map[m] || 0) + 1; }));
@@ -132,63 +131,13 @@ export default function Dashboard() {
       .map(([method, count]) => ({ method, count }));
   }, [sessions]);
 
-  // Intensity vs Satisfaction scatter
   const scatterData = useMemo(() => {
     return sessions
       .filter((s) => s.intensity && s.satisfaction)
       .map((s) => ({ x: s.intensity, y: s.satisfaction }));
   }, [sessions]);
 
-  // Event timeline stats — across all sessions
-  const eventStats = useMemo(() => {
-    const allEvents = [];
-    sessions.forEach((s) => {
-      if (!s.event_timeline?.length) return;
-      // Pair each event with the session's HR data for nearest HR lookup
-      s.event_timeline.forEach((ev) => {
-        allEvents.push({ session_id: s.id, time_s: ev.time_s, note: ev.note });
-      });
-    });
-
-    if (!allEvents.length) return null;
-
-    // Sessions that have at least one event
-    const sessionsWithEvents = sessions.filter((s) => s.event_timeline?.length > 0);
-
-    // Average events per session (among those with events)
-    const avgEventsPerSession = (allEvents.length / sessionsWithEvents.length).toFixed(1);
-
-    // Spread within a session: last event time_s - first event time_s
-    const spreads = sessionsWithEvents
-      .map((s) => {
-        const times = s.event_timeline.map((e) => e.time_s).sort((a, b) => a - b);
-        return times[times.length - 1] - times[0];
-      })
-      .filter((sp) => sp > 0);
-    const avgSpreadS = spreads.length
-      ? Math.round(spreads.reduce((a, b) => a + b, 0) / spreads.length)
-      : null;
-
-    // HR during events: use hr_avg_pre_to_climax or hr_at_climax as proxy for sessions with events
-    const hrValues = sessionsWithEvents
-      .map((s) => s.hr_avg_pre_to_climax || s.hr_at_climax || s.avg_hr)
-      .filter(Boolean);
-    const avgEventHR = hrValues.length
-      ? Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length)
-      : null;
-
-    return {
-      total: allEvents.length,
-      sessionsWithEvents: sessionsWithEvents.length,
-      avgEventsPerSession,
-      avgSpreadS,
-      avgEventHR,
-    };
-  }, [sessions]);
-
-  // Physiological patterns — recovery rate and climax duration
   const physioStats = useMemo(() => {
-    // Recovery rate: (HR at climax - HR at recovery point) / time between them, in bpm/min
     const recoverySessions = sessions.filter(
       (s) => s.climax_offset_s != null && s.recovery_offset_s != null && s.hr_at_climax
     );
@@ -196,9 +145,7 @@ export default function Dashboard() {
     if (recoverySessions.length > 0) {
       const rates = recoverySessions
         .map((s) => {
-          const dt = (s.recovery_offset_s - s.climax_offset_s) / 60; // minutes
-          const dhr = (s.hr_avg_at_climax_window || s.hr_at_climax) - (s.hr_avg_pre_to_climax || 0);
-          // Simple: use HR drop = max_hr - avg_hr as proxy if no better data
+          const dt = (s.recovery_offset_s - s.climax_offset_s) / 60;
           const drop = (s.hr_at_climax || s.max_hr || 0) - (s.avg_hr || 0);
           return dt > 0 ? drop / dt : null;
         })
@@ -207,8 +154,6 @@ export default function Dashboard() {
         ? (rates.reduce((a, b) => a + b, 0) / rates.length).toFixed(1)
         : null;
     }
-
-    // Climax duration distribution
     const climaxDurations = { short: 0, medium: 0, long: 0 };
     sessions.forEach((s) => { if (s.climax_duration) climaxDurations[s.climax_duration]++; });
     const totalWithDuration = climaxDurations.short + climaxDurations.medium + climaxDurations.long;
@@ -219,8 +164,6 @@ export default function Dashboard() {
           { label: "Long", count: climaxDurations.long },
         ].filter((d) => d.count > 0)
       : [];
-
-    // Avg climax→recovery gap in seconds
     const gaps = sessions
       .filter((s) => s.climax_offset_s != null && s.recovery_offset_s != null)
       .map((s) => s.recovery_offset_s - s.climax_offset_s)
@@ -228,9 +171,167 @@ export default function Dashboard() {
     const avgGap = gaps.length
       ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length)
       : null;
-
     return { avgRecoveryRate, durationData, totalWithDuration, avgGap, count: recoverySessions.length };
   }, [sessions]);
+
+  // Build the ordered widget renderers (keyed by id)
+  const WIDGETS = {
+    stats: isVisible("stats") && (
+      <div key="stats" className="grid grid-cols-2 gap-3">
+        <StatCard label="Avg Intensity" value={stats.avgIntensity} icon={Zap} color="primary" sub="out of 10" />
+        <StatCard label="Avg Satisfaction" value={stats.avgSatisfaction} icon={TrendingUp} color="accent" sub="out of 10" />
+        <StatCard label="Avg Heart Rate" value={stats.avgHR ? `${stats.avgHR} bpm` : null} icon={Heart} color="chart-3" />
+        <StatCard label="Peak HR" value={stats.peakHR ? `${stats.peakHR} bpm` : null} icon={Activity} color="destructive" />
+      </div>
+    ),
+
+    trend: isVisible("trend") && trendData.length > 1 && (
+      <div key="trend" className="bg-card rounded-xl border border-border p-4">
+        <SectionTitle>Intensity & Satisfaction — Last {trendData.length} Sessions</SectionTitle>
+        <div className="h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="date" tick={{ fontSize: 9 }} />
+              <YAxis domain={[0, 10]} tick={{ fontSize: 9 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              <Line type="monotone" dataKey="Intensity" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+              <Line type="monotone" dataKey="Satisfaction" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    ),
+
+    hr_trend: isVisible("hr_trend") && hrTrendData.length > 1 && (
+      <div key="hr_trend" className="bg-card rounded-xl border border-border p-4">
+        <SectionTitle>Heart Rate Trends — Last {hrTrendData.length} Sessions</SectionTitle>
+        <div className="h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={hrTrendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="date" tick={{ fontSize: 9 }} />
+              <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              <Line type="monotone" dataKey="Avg HR" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+              <Line type="monotone" dataKey="Max HR" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+              <Line type="monotone" dataKey="HR @ Climax" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={{ r: 2 }} connectNulls strokeDasharray="4 2" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    ),
+
+    monthly: isVisible("monthly") && monthlyData.length > 1 && (
+      <div key="monthly" className="bg-card rounded-xl border border-border p-4">
+        <SectionTitle>Monthly Averages</SectionTitle>
+        <div className="h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthlyData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fontSize: 9 }} />
+              <YAxis domain={[0, 10]} tick={{ fontSize: 9 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              <Bar dataKey="Avg Intensity" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="Avg Satisfaction" fill="hsl(var(--accent))" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    ),
+
+    methods: isVisible("methods") && methodFreq.length > 0 && (
+      <div key="methods" className="bg-card rounded-xl border border-border p-4">
+        <SectionTitle>Method Usage</SectionTitle>
+        <div className="h-44">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={methodFreq} layout="vertical" margin={{ top: 0, right: 4, bottom: 0, left: 4 }}>
+              <XAxis type="number" tick={{ fontSize: 9 }} allowDecimals={false} />
+              <YAxis type="category" dataKey="method" tick={{ fontSize: 9 }} width={80} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="count" fill="hsl(var(--chart-2))" radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    ),
+
+    physio: isVisible("physio") && (physioStats.avgRecoveryRate || physioStats.durationData.length > 0 || physioStats.avgGap) && (
+      <div key="physio" className="bg-card rounded-xl border border-border p-4 space-y-4">
+        <SectionTitle>Physiological Patterns</SectionTitle>
+        <div className="grid grid-cols-2 gap-3">
+          {physioStats.avgGap && (
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg Climax Duration</p>
+              <p className="text-2xl font-bold font-mono text-chart-3">
+                {physioStats.avgGap >= 60
+                  ? `${Math.floor(physioStats.avgGap / 60)}m ${physioStats.avgGap % 60}s`
+                  : `${physioStats.avgGap}s`}
+              </p>
+              <p className="text-[10px] text-muted-foreground">across {physioStats.count} sessions</p>
+            </div>
+          )}
+          {physioStats.avgRecoveryRate && (
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg Recovery Rate</p>
+              <p className="text-2xl font-bold font-mono text-chart-2">{physioStats.avgRecoveryRate} <span className="text-sm font-normal">bpm/min</span></p>
+              <p className="text-[10px] text-muted-foreground">HR drop from climax</p>
+            </div>
+          )}
+        </div>
+        {physioStats.durationData.length > 0 && (
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Climax Duration Distribution</p>
+            <div className="h-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={physioStats.durationData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="count" fill="hsl(var(--chart-3))" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+      </div>
+    ),
+
+    hr_perf: isVisible("hr_perf") && <HRPerformanceMetrics key="hr_perf" sessions={sessions} />,
+
+    events: isVisible("events") && <EventSummaryCard key="events" sessions={sessions} />,
+
+    event_hr: isVisible("event_hr") && <EventHRCorrelationView key="event_hr" sessions={sessions} />,
+
+    scatter: isVisible("scatter") && scatterData.length > 2 && (
+      <div key="scatter" className="bg-card rounded-xl border border-border p-4">
+        <SectionTitle>Intensity vs. Satisfaction</SectionTitle>
+        <div className="h-44">
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="x" name="Intensity" domain={[1, 10]} tick={{ fontSize: 9 }} label={{ value: "Intensity", position: "insideBottom", fontSize: 9, offset: -2 }} />
+              <YAxis dataKey="y" name="Satisfaction" domain={[1, 10]} tick={{ fontSize: 9 }} />
+              <Tooltip cursor={{ strokeDasharray: "3 3" }} content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0]?.payload;
+                return (
+                  <div className="bg-card border border-border rounded-lg p-2 text-xs shadow-md">
+                    <p>Intensity: <strong>{d.x}</strong></p>
+                    <p>Satisfaction: <strong>{d.y}</strong></p>
+                  </div>
+                );
+              }} />
+              <Scatter data={scatterData} fill="hsl(var(--chart-4))" opacity={0.7} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    ),
+  };
 
   if (loading) {
     return (
@@ -251,176 +352,23 @@ export default function Dashboard() {
 
   return (
     <div className="px-4 py-6 pb-24 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{stats.total} sessions recorded</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{stats.total} sessions recorded</p>
+        </div>
+        <DashboardCustomizer
+          config={config}
+          onToggle={toggleWidget}
+          onReorder={moveWidget}
+        />
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Avg Intensity" value={stats.avgIntensity} icon={Zap} color="primary" sub="out of 10" />
-        <StatCard label="Avg Satisfaction" value={stats.avgSatisfaction} icon={TrendingUp} color="accent" sub="out of 10" />
-        <StatCard label="Avg Heart Rate" value={stats.avgHR ? `${stats.avgHR} bpm` : null} icon={Heart} color="chart-3" />
-        <StatCard label="Peak HR" value={stats.peakHR ? `${stats.peakHR} bpm` : null} icon={Activity} color="destructive" />
-      </div>
-
-      {/* Intensity & Satisfaction Trend */}
-      {trendData.length > 1 && (
-        <div className="bg-card rounded-xl border border-border p-4">
-          <SectionTitle>Intensity & Satisfaction — Last {trendData.length} Sessions</SectionTitle>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 9 }} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 9 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Line type="monotone" dataKey="Intensity" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-                <Line type="monotone" dataKey="Satisfaction" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Heart Rate Trend */}
-      {hrTrendData.length > 1 && (
-        <div className="bg-card rounded-xl border border-border p-4">
-          <SectionTitle>Heart Rate Trends — Last {hrTrendData.length} Sessions</SectionTitle>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={hrTrendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 9 }} />
-                <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Line type="monotone" dataKey="Avg HR" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-                <Line type="monotone" dataKey="Max HR" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-                <Line type="monotone" dataKey="HR @ Climax" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={{ r: 2 }} connectNulls strokeDasharray="4 2" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Monthly Averages */}
-      {monthlyData.length > 1 && (
-        <div className="bg-card rounded-xl border border-border p-4">
-          <SectionTitle>Monthly Averages</SectionTitle>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 9 }} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 9 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="Avg Intensity" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="Avg Satisfaction" fill="hsl(var(--accent))" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Method Frequency */}
-      {methodFreq.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-4">
-          <SectionTitle>Method Usage</SectionTitle>
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={methodFreq} layout="vertical" margin={{ top: 0, right: 4, bottom: 0, left: 4 }}>
-                <XAxis type="number" tick={{ fontSize: 9 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="method" tick={{ fontSize: 9 }} width={80} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="count" fill="hsl(var(--chart-2))" radius={[0, 3, 3, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Physiological Patterns */}
-      {(physioStats.avgRecoveryRate || physioStats.durationData.length > 0 || physioStats.avgGap) && (
-        <div className="bg-card rounded-xl border border-border p-4 space-y-4">
-          <SectionTitle>Physiological Patterns</SectionTitle>
-
-          <div className="grid grid-cols-2 gap-3">
-            {physioStats.avgGap && (
-              <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg Climax Duration</p>
-                <p className="text-2xl font-bold font-mono text-chart-3">
-                  {physioStats.avgGap >= 60
-                    ? `${Math.floor(physioStats.avgGap / 60)}m ${physioStats.avgGap % 60}s`
-                    : `${physioStats.avgGap}s`}
-                </p>
-                <p className="text-[10px] text-muted-foreground">across {physioStats.count} sessions</p>
-              </div>
-            )}
-            {physioStats.avgRecoveryRate && (
-              <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg Recovery Rate</p>
-                <p className="text-2xl font-bold font-mono text-chart-2">{physioStats.avgRecoveryRate} <span className="text-sm font-normal">bpm/min</span></p>
-                <p className="text-[10px] text-muted-foreground">HR drop from climax</p>
-              </div>
-            )}
-          </div>
-
-          {physioStats.durationData.length > 0 && (
-            <div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Climax Duration Distribution</p>
-              <div className="h-32">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={physioStats.durationData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="count" fill="hsl(var(--chart-3))" radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* HR Performance Metrics */}
-      <HRPerformanceMetrics sessions={sessions} />
-
-      {/* Event Log Summary */}
-      <EventSummaryCard sessions={sessions} />
-
-      {/* Event-HR Correlation View */}
-      <EventHRCorrelationView sessions={sessions} />
-
-      {/* Intensity vs Satisfaction Scatter */}
-      {scatterData.length > 2 && (
-        <div className="bg-card rounded-xl border border-border p-4">
-          <SectionTitle>Intensity vs. Satisfaction</SectionTitle>
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="x" name="Intensity" domain={[1, 10]} tick={{ fontSize: 9 }} label={{ value: "Intensity", position: "insideBottom", fontSize: 9, offset: -2 }} />
-                <YAxis dataKey="y" name="Satisfaction" domain={[1, 10]} tick={{ fontSize: 9 }} />
-                <Tooltip cursor={{ strokeDasharray: "3 3" }} content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null;
-                  const d = payload[0]?.payload;
-                  return (
-                    <div className="bg-card border border-border rounded-lg p-2 text-xs shadow-md">
-                      <p>Intensity: <strong>{d.x}</strong></p>
-                      <p>Satisfaction: <strong>{d.y}</strong></p>
-                    </div>
-                  );
-                }} />
-                <Scatter data={scatterData} fill="hsl(var(--chart-4))" opacity={0.7} />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+      {/* Render widgets in user-defined order */}
+      {config.map((w) => {
+        const el = WIDGETS[w.id];
+        return el || null;
+      })}
     </div>
   );
 }
