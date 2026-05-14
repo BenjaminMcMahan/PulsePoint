@@ -211,6 +211,73 @@ function AIInsightPanel({ sessions }) {
       };
     });
 
+    // Compute physiological metrics per session
+    const physiologicalMetrics = sessions.map((s) => {
+      const rows = (s._hrRows || []).sort((a, b) => Number(a.time_offset_s) - Number(b.time_offset_s));
+      if (!rows.length) return null;
+
+      const hrVals = rows.map((r) => Number(r.hr)).filter((v) => !isNaN(v));
+      const baselineHR = hrVals.slice(0, Math.min(10, Math.floor(hrVals.length * 0.1))).reduce((a, b) => a + b, 0) / Math.max(1, Math.min(10, Math.floor(hrVals.length * 0.1)));
+
+      // Successive differences for HRV-adjacent roughness (RMSSD approximation)
+      const diffs = hrVals.slice(1).map((v, i) => Math.pow(v - hrVals[i], 2));
+      const rmssd = diffs.length ? Math.round(Math.sqrt(diffs.reduce((a, b) => a + b, 0) / diffs.length) * 10) / 10 : null;
+
+      // Sympathetic drive index: mean elevation above baseline during build phase
+      let sympatheticIndex = null;
+      if (s.pre_climax_offset_s != null && s.climax_offset_s != null) {
+        const buildRows = rows.filter((r) => Number(r.time_offset_s) >= s.pre_climax_offset_s && Number(r.time_offset_s) <= s.climax_offset_s);
+        if (buildRows.length) {
+          const buildHRs = buildRows.map((r) => Number(r.hr));
+          sympatheticIndex = Math.round(buildHRs.reduce((a, b) => a + b, 0) / buildHRs.length - baselineHR);
+        }
+      }
+
+      // Recovery slope: BPM/second descent rate after climax marker
+      let recoverySlope = null;
+      if (s.climax_offset_s != null) {
+        const postClimax = rows.filter((r) => Number(r.time_offset_s) >= s.climax_offset_s && Number(r.time_offset_s) <= s.climax_offset_s + 60);
+        if (postClimax.length >= 2) {
+          const first = postClimax[0], last = postClimax[postClimax.length - 1];
+          const dt = Number(last.time_offset_s) - Number(first.time_offset_s);
+          if (dt > 0) recoverySlope = Math.round(((Number(last.hr) - Number(first.hr)) / dt) * 100) / 100; // bpm/s (negative = descent)
+        }
+      }
+
+      // HR plateau duration near climax: seconds within 5 bpm of peak
+      const peakHR = s.hr_at_climax || nearestHR(rows, s.climax_offset_s);
+      let plateauDuration = null;
+      if (peakHR && s.climax_offset_s != null) {
+        const near = rows.filter((r) => Math.abs(Number(r.hr) - peakHR) <= 5 && Math.abs(Number(r.time_offset_s) - s.climax_offset_s) <= 90);
+        if (near.length >= 2) {
+          plateauDuration = Math.round(Number(near[near.length - 1].time_offset_s) - Number(near[0].time_offset_s));
+        }
+      }
+
+      // Build rate: BPM/second during pre→climax
+      let buildRateBpmPerSec = null;
+      if (s.pre_climax_offset_s != null && s.climax_offset_s != null) {
+        const hrPre = nearestHR(rows, s.pre_climax_offset_s);
+        const hrClimaxVal = peakHR;
+        const dt = s.climax_offset_s - s.pre_climax_offset_s;
+        if (hrPre && hrClimaxVal && dt > 0) buildRateBpmPerSec = Math.round(((hrClimaxVal - hrPre) / dt) * 100) / 100;
+      }
+
+      const spokenDate = s.date ? new Date(s.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : null;
+      return {
+        date: spokenDate,
+        estimated_baseline_hr_bpm: Math.round(baselineHR),
+        peak_hr_bpm: peakHR,
+        hr_rise_above_baseline_bpm: peakHR ? Math.round(peakHR - baselineHR) : null,
+        sympathetic_activation_index_bpm: sympatheticIndex,
+        build_rate_bpm_per_second: buildRateBpmPerSec,
+        plateau_duration_near_peak_s: plateauDuration,
+        recovery_slope_bpm_per_second: recoverySlope,
+        hr_variability_roughness_rmssd: rmssd,
+        session_duration_minutes: s.duration_minutes,
+      };
+    }).filter(Boolean);
+
     const withRecovery = summary.filter((s) => s.cascade_shape?.recovery_onset_s != null);
     const avgRecoveryOnset = withRecovery.length ?
     Math.round(withRecovery.reduce((a, s) => a + s.cascade_shape.recovery_onset_s, 0) / withRecovery.length) :
@@ -237,7 +304,15 @@ Use this profile throughout the analysis — compare observed cascade patterns a
 CHRONOLOGICAL TREND DATA (sessions in date order — use this for temporal analysis):
 ${JSON.stringify(temporalTrend, null, 2)}
 
-
+COMPUTED PHYSIOLOGICAL METRICS (per session):
+- estimated_baseline_hr_bpm: resting-like HR at session start (proxy for pre-arousal state)
+- hr_rise_above_baseline_bpm: total heart rate elevation from baseline to climax peak
+- sympathetic_activation_index_bpm: mean HR elevation above baseline during the build phase (proxy for sustained sympathetic drive)
+- build_rate_bpm_per_second: speed of heart rate rise during pre-climax buildup (higher = faster ramp-up)
+- plateau_duration_near_peak_s: seconds heart rate stayed within 5 bpm of the climax peak (longer = more sustained peak)
+- recovery_slope_bpm_per_second: rate of HR descent in first 60 seconds post-climax (negative = falling; closer to 0 = slower recovery)
+- hr_variability_roughness_rmssd: beat-to-beat roughness of HR signal (proxy for autonomic variability; higher = more parasympathetic activity mixed in)
+${JSON.stringify(physiologicalMetrics, null, 2)}
 
 CRITICAL FOR TEXT-TO-SPEECH QUALITY:
 - Write all times as words: "ten minutes and thirty seconds" not "10:30"
@@ -282,7 +357,9 @@ Provide a comprehensive, multi-layered analysis covering:
 
 12. TEMPORAL EVOLUTION: How has your cascade changed over time? Is your peak heart rate trending up or down across sessions? Is your build duration getting longer or shorter? Is recovery speed changing? Are satisfaction scores correlating with any physiological trends over time? Be specific about what has improved, declined, or remained stable — and offer a hypothesis for why.
 
-13. CASCADE HEALTH SCORE: Based on all the data, give a holistic assessment of cascade health and quality. Consider: consistency of response, appropriateness of heart rate peaks, recovery efficiency, the relationship between physiological output and subjective satisfaction, and any signs of improvement or areas for attention. Conclude with 2–3 concrete, actionable observations the person could explore in future sessions.
+13. PHYSIOLOGICAL FINDINGS: Using the computed physiological metrics, interpret what is happening in the body. Discuss: the estimated sympathetic activation (how hard the autonomic nervous system is working during buildup), the cardiovascular stress load implied by the HR rise above baseline, what the build rate and plateau duration reveal about arousal physiology, and what the recovery slope says about parasympathetic rebound. Are there signs of efficient autonomic regulation or evidence of fatigue? Does HR variability roughness suggest moments of parasympathetic competition during arousal? Be accessible — explain what these metrics mean in plain terms, not clinical jargon.
+
+14. CASCADE HEALTH SCORE: Based on all the data, give a holistic assessment of cascade health and quality. Consider: consistency of response, appropriateness of heart rate peaks, recovery efficiency, the relationship between physiological output and subjective satisfaction, and any signs of improvement or areas for attention. Conclude with 2–3 concrete, actionable observations the person could explore in future sessions.
 
 Be specific and reference actual values — but always written as spoken words, never digits or abbreviations.`,
       response_json_schema: {
@@ -301,9 +378,10 @@ Be specific and reference actual values — but always written as spoken words, 
           anomalies: { type: "array", items: { type: "string" }, description: "2-3 paragraphs on unusual sessions" },
           phenotype_clusters: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on distinct response profiles" },
           temporal_evolution: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on how cascade metrics have changed over time across sessions" },
+          physiological_findings: { type: "array", items: { type: "string" }, description: "3-4 paragraphs interpreting autonomic, sympathetic, and cardiovascular physiological patterns from computed metrics" },
           cascade_health_score: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on overall cascade health, quality assessment, and actionable observations" }
         },
-        required: ["summary", "cascade_overview", "heart_rate_signature", "event_note_patterns", "build_phase_analysis", "climax_dynamics", "recovery_trajectory", "common_signatures", "contextual_correlations", "predictive_insights", "phenotype_clusters", "temporal_evolution", "cascade_health_score"]
+        required: ["summary", "cascade_overview", "heart_rate_signature", "event_note_patterns", "build_phase_analysis", "climax_dynamics", "recovery_trajectory", "common_signatures", "contextual_correlations", "predictive_insights", "phenotype_clusters", "temporal_evolution", "physiological_findings", "cascade_health_score"]
       }
     });
 
@@ -362,6 +440,7 @@ Be specific and reference actual values — but always written as spoken words, 
           { key: "anomalies", label: "Anomalies & Outliers" },
           { key: "phenotype_clusters", label: "Response Profiles" },
           { key: "temporal_evolution", label: "How You've Changed Over Time" },
+          { key: "physiological_findings", label: "Physiological Findings" },
           { key: "cascade_health_score", label: "Cascade Health Assessment" },
         ];
 
@@ -406,6 +485,7 @@ Be specific and reference actual values — but always written as spoken words, 
           anomalies: "hsl(var(--destructive))",
           phenotype_clusters: "hsl(var(--chart-2))",
           temporal_evolution: "hsl(var(--chart-4))",
+          physiological_findings: "hsl(var(--chart-5))",
           cascade_health_score: "hsl(var(--primary))",
         };
 
