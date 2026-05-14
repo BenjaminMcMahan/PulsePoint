@@ -21,6 +21,7 @@ import SessionExecutiveSummary from "../components/SessionExecutiveSummary";
 import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import ArousalEventChart from "../components/ArousalEventChart";
 import UnifiedSessionTimeline from "../components/UnifiedSessionTimeline";
+import InteractiveSessionTimeline from "../components/InteractiveSessionTimeline";
 import NoClimaxAIPanel from "../components/NoClimaxAIPanel";
 import SessionTimelineNarrative from "../components/SessionTimelineNarrative";
 import { EVENT_CATEGORIES } from "../components/session-form/EventTimelineSection";
@@ -619,6 +620,11 @@ export default function SessionDetail() {
             </div>
           );
         })()}
+
+        {/* Interactive Multi-Track Timeline */}
+        {(timelineRows.length > 0 || (s.event_timeline || []).length > 0) && (
+          <InteractiveSessionTimeline session={s} timelineRows={timelineRows} />
+        )}
 
         {/* Unified Interactive Timeline */}
         {timelineRows.length > 0 && (
