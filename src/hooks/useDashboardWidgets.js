@@ -16,7 +16,7 @@ export const ALL_WIDGETS = [
   { id: "scatter",       label: "Intensity vs. Satisfaction" },
 ];
 
-const STORAGE_KEY = "dashboard_widget_config";
+const STORAGE_KEY = "dashboard_widget_config_v2";
 
 const defaultConfig = () =>
   ALL_WIDGETS.map((w) => ({ id: w.id, visible: true }));
@@ -26,13 +26,11 @@ const loadConfig = () => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultConfig();
     const parsed = JSON.parse(raw);
-    // Merge in any new widgets not yet in saved config
-    const ids = new Set(parsed.map((w) => w.id));
-    const merged = [...parsed];
-    ALL_WIDGETS.forEach((w) => {
-      if (!ids.has(w.id)) merged.push({ id: w.id, visible: true });
-    });
-    return merged;
+    const savedMap = new Map(parsed.map((w) => [w.id, w]));
+    // Rebuild in ALL_WIDGETS order, preserving saved visibility; new widgets go at their natural position
+    return ALL_WIDGETS.map((w) =>
+      savedMap.has(w.id) ? savedMap.get(w.id) : { id: w.id, visible: true }
+    );
   } catch {
     return defaultConfig();
   }
