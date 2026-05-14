@@ -5,11 +5,14 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import moment from "moment";
-import { TrendingUp, Heart, Zap, Star, Activity, BarChart2, Timer, MessageSquare } from "lucide-react";
+import { TrendingUp, Heart, Zap, Activity, BarChart2 } from "lucide-react";
 import EventSummaryCard from "../components/EventSummaryCard";
 import HRPerformanceMetrics from "../components/HRPerformanceMetrics";
 import EventHRCorrelationView from "../components/EventHRCorrelationView";
 import DashboardCustomizer from "../components/DashboardCustomizer";
+import RecentSessionsWidget from "../components/dashboard/RecentSessionsWidget";
+import CadenceWidget from "../components/dashboard/CadenceWidget";
+import MoodContextWidget from "../components/dashboard/MoodContextWidget";
 import { useDashboardWidgets } from "@/hooks/useDashboardWidgets";
 
 function StatCard({ label, value, sub, icon: Icon, color = "primary" }) {
@@ -176,6 +179,9 @@ export default function Dashboard() {
 
   // Build the ordered widget renderers (keyed by id)
   const WIDGETS = {
+    cadence: isVisible("cadence") && <CadenceWidget key="cadence" sessions={sessions} />,
+    recent: isVisible("recent") && <RecentSessionsWidget key="recent" sessions={sessions} />,
+    mood: isVisible("mood") && <MoodContextWidget key="mood" sessions={sessions} />,
     stats: isVisible("stats") && (
       <div key="stats" className="grid grid-cols-2 gap-3">
         <StatCard label="Avg Intensity" value={stats.avgIntensity} icon={Zap} color="primary" sub="out of 10" />

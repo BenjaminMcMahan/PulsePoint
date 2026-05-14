@@ -1,10 +1,13 @@
 import { useState, useCallback } from "react";
 
 export const ALL_WIDGETS = [
+  { id: "cadence",       label: "At a Glance" },
+  { id: "recent",        label: "Recent Sessions" },
   { id: "stats",         label: "Summary Stats" },
   { id: "trend",         label: "Intensity & Satisfaction Trend" },
   { id: "hr_trend",      label: "Heart Rate Trend" },
   { id: "monthly",       label: "Monthly Averages" },
+  { id: "mood",          label: "Mood & Build Type" },
   { id: "methods",       label: "Method Usage" },
   { id: "physio",        label: "Physiological Patterns" },
   { id: "hr_perf",       label: "HR Performance Metrics" },
