@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Activity, TrendingDown, Clock, Zap, AlertCircle } from "lucide-react";
 import TTSReader from "../components/TTSReader";
+import CascadeTrendPanel from "../components/CascadeTrendPanel";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -107,6 +108,37 @@ function AIInsightPanel({ sessions }) {
       return Math.round(Number(best.hr));
     };
 
+    // Build temporal trend data to feed AI
+    const chronological = [...sessions].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const temporalTrend = chronological.map((s) => {
+      const rows = (s._hrRows || []).sort((a, b) => Number(a.time_offset_s) - Number(b.time_offset_s));
+      const nearHR = (t) => {
+        if (!rows.length || t == null) return null;
+        let best = rows[0], bestD = Infinity;
+        for (const r of rows) {
+          const d = Math.abs(Number(r.time_offset_s) - t);
+          if (d < bestD) { bestD = d; best = r; }
+          if (Number(r.time_offset_s) > t + 10) break;
+        }
+        return Math.round(Number(best.hr));
+      };
+      const peakHr = s.hr_at_climax || nearHR(s.climax_offset_s);
+      const buildDur = s.pre_climax_offset_s != null && s.climax_offset_s != null
+        ? Math.round(s.climax_offset_s - s.pre_climax_offset_s) : null;
+      const recoveryOnset = s.recovery_offset_s != null && s.climax_offset_s != null
+        ? Math.round(s.recovery_offset_s - s.climax_offset_s) : null;
+      return {
+        date: s.date ? new Date(s.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : null,
+        peak_hr_bpm: peakHr,
+        build_duration_s: buildDur,
+        recovery_onset_s: recoveryOnset,
+        satisfaction: s.satisfaction,
+        intensity: s.intensity,
+        build_type: s.build_type,
+        methods: s.methods,
+      };
+    });
+
     const summary = sessions.map((s) => {
       const rows = (s._hrRows || []).sort((a, b) => Number(a.time_offset_s) - Number(b.time_offset_s));
 
@@ -202,6 +234,11 @@ Use this profile throughout the analysis — compare observed cascade patterns a
       model: "claude_sonnet_4_6",
       prompt: `You are a physiological research assistant analyzing sexual response cascade data across ${sessions.length} sessions. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
 
+CHRONOLOGICAL TREND DATA (sessions in date order — use this for temporal analysis):
+${JSON.stringify(temporalTrend, null, 2)}
+
+
+
 CRITICAL FOR TEXT-TO-SPEECH QUALITY:
 - Write all times as words: "ten minutes and thirty seconds" not "10:30"
 - Spell out all numbers as words (e.g., "seventy-two beats per minute" not "72 bpm", "eight out of ten" not "8/10")
@@ -243,6 +280,10 @@ Provide a comprehensive, multi-layered analysis covering:
 
 11. PHENOTYPE CLUSTERS: Distinct cascade response profiles within your data. Do you have multiple "types" of sessions with meaningfully different arcs?
 
+12. TEMPORAL EVOLUTION: How has your cascade changed over time? Is your peak heart rate trending up or down across sessions? Is your build duration getting longer or shorter? Is recovery speed changing? Are satisfaction scores correlating with any physiological trends over time? Be specific about what has improved, declined, or remained stable — and offer a hypothesis for why.
+
+13. CASCADE HEALTH SCORE: Based on all the data, give a holistic assessment of cascade health and quality. Consider: consistency of response, appropriateness of heart rate peaks, recovery efficiency, the relationship between physiological output and subjective satisfaction, and any signs of improvement or areas for attention. Conclude with 2–3 concrete, actionable observations the person could explore in future sessions.
+
 Be specific and reference actual values — but always written as spoken words, never digits or abbreviations.`,
       response_json_schema: {
         type: "object",
@@ -258,9 +299,11 @@ Be specific and reference actual values — but always written as spoken words, 
           contextual_correlations: { type: "array", items: { type: "string" }, description: "3-4 paragraphs linking intensity, mood, methods to cascade shape" },
           predictive_insights: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on what predicts quality" },
           anomalies: { type: "array", items: { type: "string" }, description: "2-3 paragraphs on unusual sessions" },
-          phenotype_clusters: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on distinct response profiles" }
+          phenotype_clusters: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on distinct response profiles" },
+          temporal_evolution: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on how cascade metrics have changed over time across sessions" },
+          cascade_health_score: { type: "array", items: { type: "string" }, description: "3-4 paragraphs on overall cascade health, quality assessment, and actionable observations" }
         },
-        required: ["summary", "cascade_overview", "heart_rate_signature", "event_note_patterns", "build_phase_analysis", "climax_dynamics", "recovery_trajectory", "common_signatures", "contextual_correlations", "predictive_insights", "phenotype_clusters"]
+        required: ["summary", "cascade_overview", "heart_rate_signature", "event_note_patterns", "build_phase_analysis", "climax_dynamics", "recovery_trajectory", "common_signatures", "contextual_correlations", "predictive_insights", "phenotype_clusters", "temporal_evolution", "cascade_health_score"]
       }
     });
 
@@ -318,6 +361,8 @@ Be specific and reference actual values — but always written as spoken words, 
           { key: "predictive_insights", label: "Predictive Insights" },
           { key: "anomalies", label: "Anomalies & Outliers" },
           { key: "phenotype_clusters", label: "Response Profiles" },
+          { key: "temporal_evolution", label: "How You've Changed Over Time" },
+          { key: "cascade_health_score", label: "Cascade Health Assessment" },
         ];
 
         const paras = [];
@@ -360,6 +405,8 @@ Be specific and reference actual values — but always written as spoken words, 
           predictive_insights: "hsl(var(--primary))",
           anomalies: "hsl(var(--destructive))",
           phenotype_clusters: "hsl(var(--chart-2))",
+          temporal_evolution: "hsl(var(--chart-4))",
+          cascade_health_score: "hsl(var(--primary))",
         };
 
          return (
@@ -604,6 +651,11 @@ export default function CascadeAnalysis() {
       {eligibleSessions.length > 0 &&
       <PhaseSummary sessions={eligibleSessions} />
       }
+
+      {/* Cascade Evolution Over Time */}
+      {eligibleSessions.length >= 3 && (
+        <CascadeTrendPanel sessions={eligibleSessions} hrData={hrData} />
+      )}
 
       {/* AI Panel */}
       <AIInsightPanel sessions={(eligibleSessions.length > 0 ? eligibleSessions : sessions).map((s) => ({ ...s, _hrRows: hrData[s.id] || [] }))} />
