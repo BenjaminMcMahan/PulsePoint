@@ -649,6 +649,7 @@ export default function SessionDetail() {
         {/* Ask the AI — Session Deep Dive */}
         <AIChat
           mode="session"
+          userProfile={userProfile}
           context={[
             `Session date: ${s.date?.slice(0, 10)}`,
             `Duration: ${s.duration_minutes ?? "?"}min`,

@@ -24,6 +24,7 @@ const SESSION_CATEGORIES = [
 export default function AIChat({
   mode = "session",
   context,
+  userProfile,
   savedMessages,
   savedNotes,
   onSaveMessages,
@@ -129,28 +130,57 @@ export default function AIChat({
 
     const history = updated.map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.text}`).join("\n");
 
-    const shouldPivot = messages.length > 4 && Math.random() < 0.4; // 40% chance to pivot after some msgs
+    const shouldPivot = messages.length > 4 && Math.random() < 0.4;
 
-    const systemPrompt = messages.length === 1 // First message from user — start fresh conversation
+    // Build a profile context block if userProfile is available
+    const profileBlock = userProfile ? `
+PERSON'S PHYSIOLOGICAL & AROUSAL PROFILE (use this to personalize every question — never assume anatomy or biology not stated here):
+- Physical/Anatomical context: ${userProfile.medications || "not specified"}
+- Age: ${userProfile.age ?? "not set"}, Fitness: ${userProfile.fitness_level ?? "not set"}
+- Resting HR: ${userProfile.resting_hr ?? "not set"} bpm, Max HR: ${userProfile.max_hr ?? "not set"} bpm
+- Arousal response style: ${userProfile.arousal_response_style ?? "not set"}
+- Typical build duration: ${userProfile.typical_build_duration ?? "not set"}
+- Climax sensitivity: ${userProfile.climax_sensitivity ?? "not set"}
+- Refractory pattern: ${userProfile.refractory_pattern ?? "not set"}
+- Preferred stimulation: ${(userProfile.preferred_stimulation || []).join(", ") || "not set"}
+- Arousal notes: ${userProfile.arousal_notes || "none"}
+` : "";
+
+    const ANATOMY_RULE = `ANATOMY RULE: Use ONLY the anatomical and physiological details stated in the profile above. Never assume or infer biological sex, genitalia, or anatomy not explicitly mentioned. If anatomy is ambiguous, use neutral language (e.g. "genital stimulation", "pelvic region", "that area").`;
+
+    const SESSION_SCOPE_RULE = `SCOPE RULE: Stay anchored to THIS specific session's data. Do NOT speculate about, compare to, or reference other sessions — there is only one session in context. Every question or observation must tie directly to something in THIS session's metrics, events, or markers.`;
+
+    const TIME_RULE = `TIME FORMATTING: ALL timestamps are in seconds. Convert to minutes:seconds (e.g. 674s → "11:14"). Never say "X seconds" — say "around the 11-minute mark" or "at 13:04".`;
+
+    const systemPrompt = messages.length === 1
       ? mode === "profile"
-        ? `You're having a genuine, immersive conversation with someone about their physiology and arousal — like a knowledgeable, fascinated friend who has studied their data closely. They've just shared something. Respond naturally, ask ONE follow-up question that goes deeper into what they said. Sound curious, specific, and engaged. 2–3 sentences total. No bullet points, no clinical jargon.`
-        : `You're having an immersive, curious conversation with someone about a specific session. They've just shared something about their experience. Respond naturally, then ask ONE follow-up question that connects to their observation or something specific in the session data.
+        ? `You're having a genuine, immersive conversation with someone about their physiology and arousal — like a knowledgeable friend who has studied their data closely. They've just shared something. Respond naturally, ask ONE follow-up question that goes deeper. Curious, specific, engaged. 2–3 sentences. No bullets, no clinical jargon. ${ANATOMY_RULE}`
+        : `You're a knowledgeable, curious companion helping someone explore THIS specific session in depth. They've just shared an observation. Respond to what they said, then ask ONE precise follow-up question rooted in a specific detail from THIS session's data — a metric value, a moment in the event log, a phase transition, or a physiological reading. Avoid generic questions.
 
-  CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. Convert every timestamp to minutes:seconds (e.g. 674s → "11:14", 784s → "13:04"). NEVER say "X seconds" — always say "around the 11-minute mark" or "at 13:04". Sound genuinely fascinated. 2–3 sentences total.`
+${TIME_RULE}
+${SESSION_SCOPE_RULE}
+${ANATOMY_RULE}
+2–3 sentences total. No affirmations.`
       : shouldPivot
         ? mode === "profile"
-          ? `You're having a warm, immersive conversation about someone's physiology and arousal. They just responded. Now pivot to explore a DIFFERENT aspect of their physiology that hasn't been covered yet — look at the session data for untapped areas. Ask ONE curious follow-up about something new. Be natural, specific, engaged. No affirmations. 2–3 sentences total.`
-          : `You're having an immersive, curious conversation about this specific session. They just responded. Now pivot to explore a DIFFERENT aspect of the session data — look for untapped threads (different phase, different metric, different moment). Ask ONE follow-up about something fresh and specific. Naturally curious tone.
+          ? `You're having a warm conversation about someone's physiology. They just responded. Pivot to a DIFFERENT aspect of their profile not yet covered. ONE curious, specific question. No affirmations. 2–3 sentences. ${ANATOMY_RULE}`
+          : `You're exploring THIS session with someone. They just responded. Pivot to a DIFFERENT untapped thread in THIS session's data — a different phase, metric, event, or moment not yet discussed. ONE precise question grounded in a specific data point.
 
-  CRITICAL — TIME FORMATTING: Convert all seconds to minutes:seconds (e.g. 674s → "11:14"). No affirmations. 2–3 sentences total.`
+${TIME_RULE}
+${SESSION_SCOPE_RULE}
+${ANATOMY_RULE}
+No affirmations. 2–3 sentences.`
         : mode === "profile"
-          ? `You're having a warm, immersive conversation about someone's physiology and arousal. They just responded to your previous question or observation. Continue the conversation naturally — ask ONE follow-up that pulls another thread from what they said and goes deeper. Be curious, specific, and engaged — like you genuinely find their physiology fascinating. No affirmations like "great!" or "thanks for sharing!" — just natural flow. 2–3 sentences total.`
-          : `You're having an immersive, curious conversation about this specific session. They just responded. Continue naturally with ONE follow-up question that connects to what they said or something specific in the session data.
+          ? `Warm, immersive conversation about physiology. They just responded. Continue naturally — ONE follow-up that goes deeper on what they said. Curious, specific. No affirmations. 2–3 sentences. ${ANATOMY_RULE}`
+          : `You're exploring THIS session with someone. They just responded. Continue naturally with ONE follow-up that connects what they said to a specific data point in THIS session — a heart rate reading, a logged event, a phase timing, or a subjective metric.
 
-  CRITICAL — TIME FORMATTING: ALL timestamps in the session data are in seconds. Convert every timestamp to minutes:seconds (e.g. 674s → "11:14", 784s → "13:04"). NEVER say "X seconds" — always say "around the 11-minute mark" or "at 13:04". No affirmations or pleasantries — just natural, curious follow-up. 2–3 sentences total.`;
+${TIME_RULE}
+${SESSION_SCOPE_RULE}
+${ANATOMY_RULE}
+No affirmations or pleasantries. 2–3 sentences.`;
 
     const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `${systemPrompt}\n\nSession data:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,
+      prompt: `${systemPrompt}${profileBlock ? `\n\n${profileBlock}` : ""}\n\nSession data:\n${context}\n\nConversation:\n${history}\n\nRespond now as the AI:`,
     });
 
     const reply = typeof res === "string" ? res.trim() : res?.response?.trim() ?? "";
