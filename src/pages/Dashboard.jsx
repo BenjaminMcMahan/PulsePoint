@@ -13,6 +13,7 @@ import DashboardCustomizer from "../components/DashboardCustomizer";
 import RecentSessionsWidget from "../components/dashboard/RecentSessionsWidget";
 import CadenceWidget from "../components/dashboard/CadenceWidget";
 import MoodContextWidget from "../components/dashboard/MoodContextWidget";
+import TrendsSection from "../components/dashboard/TrendsSection";
 import { useDashboardWidgets } from "@/hooks/useDashboardWidgets";
 
 function StatCard({ label, value, sub, icon: Icon, color = "primary" }) {
@@ -305,6 +306,8 @@ export default function Dashboard() {
         )}
       </div>
     ),
+
+    trends: isVisible("trends") && <TrendsSection key="trends" sessions={sessions} />,
 
     hr_perf: isVisible("hr_perf") && <HRPerformanceMetrics key="hr_perf" sessions={sessions} />,
 

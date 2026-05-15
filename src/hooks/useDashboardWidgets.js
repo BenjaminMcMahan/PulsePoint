@@ -10,6 +10,7 @@ export const ALL_WIDGETS = [
   { id: "mood",          label: "Mood & Build Type" },
   { id: "methods",       label: "Method Usage" },
   { id: "physio",        label: "Physiological Patterns" },
+  { id: "trends",        label: "Long-Term Trends" },
   { id: "hr_perf",       label: "HR Performance Metrics" },
   { id: "events",        label: "Event Log Summary" },
   { id: "event_hr",      label: "Event-HR Correlation" },
