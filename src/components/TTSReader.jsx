@@ -118,67 +118,74 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
   };
 
   // Fetch a chunk and decode it, using the prefetch cache when available.
-  // Returns a decoded AudioBuffer or throws.
+  // Each chunk fetch runs independently (not serialized) so prefetched chunks
+  // are ready before the current one finishes — eliminating inter-chunk gaps.
   const fetchDecoded = async (chunk, gen) => {
     const cacheKey = `${gen}:${chunk}`;
     if (prefetchCacheRef.current.has(cacheKey)) {
       return prefetchCacheRef.current.get(cacheKey);
     }
-    // Serialize all TTS fetches through a single queue so only one hits the API at a time
-    const promise = new Promise((resolve, reject) => {
-      fetchQueueRef.current = fetchQueueRef.current.then(async () => {
-        try {
-          // Check IndexedDB persistent cache first
-          let mp3Buffer = await idbGet(chunk, voiceRef.current, 1.0);
+    const promise = (async () => {
+      try {
+        // Check IndexedDB persistent cache first
+        let mp3Buffer = await idbGet(chunk, voiceRef.current, 1.0);
 
-          if (!mp3Buffer) {
-            setRequestStatus({ type: "fetching", msg: "Fetching audio…" });
-            const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
-            console.log("TTS response status:", response.status, "data:", JSON.stringify(response.data)?.slice(0, 200));
-            if (response.data?.error) throw new Error(response.data.error);
-            const base64 = response.data.audio;
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            mp3Buffer = bytes.buffer;
-            idbSet(chunk, voiceRef.current, 1.0, mp3Buffer); // fire-and-forget
-            setRequestStatus({ type: "ok", msg: "Audio ready" });
-          } else {
-            setRequestStatus({ type: "ok", msg: "Audio ready (cached)" });
-          }
-
-          const ctx = getAudioCtx();
-          const decoded = await ctx.decodeAudioData(mp3Buffer.slice(0));
-          resolve(decoded);
-        } catch (err) {
-          setRequestStatus({ type: "error", msg: err.message || "TTS request failed" });
-          reject(err);
+        if (!mp3Buffer) {
+          setRequestStatus({ type: "fetching", msg: "Fetching audio…" });
+          const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+          if (response.data?.error) throw new Error(response.data.error);
+          const base64 = response.data.audio;
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          mp3Buffer = bytes.buffer;
+          idbSet(chunk, voiceRef.current, 1.0, mp3Buffer); // fire-and-forget
+          setRequestStatus({ type: "ok", msg: "Audio ready" });
+        } else {
+          setRequestStatus({ type: "ok", msg: "Audio ready (cached)" });
         }
-      });
-    });
+
+        const ctx = getAudioCtx();
+        const decoded = await ctx.decodeAudioData(mp3Buffer.slice(0));
+        return decoded;
+      } catch (err) {
+        prefetchCacheRef.current.delete(cacheKey); // allow retry on failure
+        setRequestStatus({ type: "error", msg: err.message || "TTS request failed" });
+        throw err;
+      }
+    })();
     prefetchCacheRef.current.set(cacheKey, promise);
     return promise;
   };
 
-  // Fire-and-forget: prefetch the next chunk into the cache without blocking playback.
+  // Fire-and-forget: prefetch the next 2 chunks into the cache without blocking playback.
   const prefetchNext = (gen) => {
-    // Peek at the next chunk in the queue (without shifting)
-    let nextChunk = chunkQueueRef.current[0] ?? null;
-    if (!nextChunk) {
-      // Next will come from the next paragraph
-      const nextParaIdx = remainingParasRef.current[0];
-      if (nextParaIdx == null) return;
-      const nextText = paragraphs[nextParaIdx] || "";
-      const nextChunks = splitIntoChunks(cleanTextForSpeech(nextText));
-      nextChunk = nextChunks[0] ?? null;
+    // Collect next 2 upcoming chunks
+    const upcoming = [];
+
+    // First: remaining chunks in the current paragraph's queue
+    for (const c of chunkQueueRef.current) {
+      upcoming.push(c);
+      if (upcoming.length >= 2) break;
     }
-    if (!nextChunk) return;
-    const cacheKey = `${gen}:${nextChunk}`;
-    if (!prefetchCacheRef.current.has(cacheKey)) {
-      // Kick off background fetch; ignore errors (will retry on actual playback)
-      fetchDecoded(nextChunk, gen).catch(() => {
-        prefetchCacheRef.current.delete(cacheKey);
-      });
+
+    // Then: first chunk(s) from the next paragraph(s)
+    let paraIdx = 0;
+    while (upcoming.length < 2 && paraIdx < remainingParasRef.current.length) {
+      const nextParaIdx = remainingParasRef.current[paraIdx];
+      const nextChunks = splitIntoChunks(cleanTextForSpeech(paragraphs[nextParaIdx] || ""));
+      for (const c of nextChunks) {
+        upcoming.push(c);
+        if (upcoming.length >= 2) break;
+      }
+      paraIdx++;
+    }
+
+    for (const chunk of upcoming) {
+      const cacheKey = `${gen}:${chunk}`;
+      if (!prefetchCacheRef.current.has(cacheKey)) {
+        fetchDecoded(chunk, gen).catch(() => {}); // errors cleared inside fetchDecoded
+      }
     }
   };
 
