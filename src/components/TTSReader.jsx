@@ -504,7 +504,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       const titleHasDate = title && /\d{4}|\bjan\b|\bfeb\b|\bmar\b|\bapr\b|\bmay\b|\bjun\b|\bjul\b|\baug\b|\bsep\b|\boct\b|\bnov\b|\bdec\b/i.test(title);
       const displayTitle = title
         ? (titleHasDate ? title : `${friendlyDate} – ${title}`)
-        : `${friendlyDate} – Recording`;
+        : `PhysioLog Analysis – ${friendlyDate}`;
       const fileSlug = displayTitle.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
       const fileName = `${fileSlug}.mp3`;
 

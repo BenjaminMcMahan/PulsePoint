@@ -23,6 +23,7 @@ import CorrelationMatrix from './pages/CorrelationMatrix';
 import VideoPlayer from './pages/VideoPlayer';
 import Library from './pages/Library';
 import Analytics from './pages/Analytics';
+import PredictiveModeler from './pages/PredictiveModeler';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -68,6 +69,7 @@ const AuthenticatedApp = () => {
         <Route path="/video" element={<VideoPlayer />} />
         <Route path="/library" element={<Library />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/modeler" element={<PredictiveModeler />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>
