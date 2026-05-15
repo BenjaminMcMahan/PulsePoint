@@ -168,7 +168,7 @@ function SectionCard({ icon, title, color, children, defaultCollapsed = false })
   );
 }
 
-function AIProfilePanel({ sessions, userProfile }) {
+function AIProfilePanel({ sessions, userProfile, journals }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -236,6 +236,24 @@ Medications/conditions: ${userProfile.medications || "none noted"}
 Arousal notes: ${userProfile.arousal_notes || "none"}
 ` : "";
 
+    // Build journal context from all available journal entries
+    const journalContext = (journals || []).length > 0 ? `
+
+SESSION JOURNALS (${journals.length} entries — the person's own subjective post-session reflections, ordered most recent first):
+${(journals || []).slice(0, 20).map((j, i) => {
+  const ai = j.ai_journal;
+  const date = j.session_date ? new Date(j.session_date).toISOString().slice(0, 10) : "unknown date";
+  if (!ai && !j.voice_transcript) return null;
+  return `[Session ${date}]:
+${ai?.emotional_reflection ? `  Emotional: ${ai.emotional_reflection}` : ""}
+${ai?.physiological_observations ? `  Physiological: ${ai.physiological_observations}` : ""}
+${ai?.insights ? `  Insights: ${ai.insights}` : ""}
+${ai?.next_session_intentions ? `  Intentions: ${ai.next_session_intentions}` : ""}
+${j.voice_transcript && !ai ? `  Notes: ${j.voice_transcript}` : ""}`.trim();
+}).filter(Boolean).join("\n\n")}
+
+Use the journals to surface recurring emotional themes, evolving insights, and subjective experiences that the raw session metrics alone cannot reveal. Note where the person's own reflections align with or diverge from the physiological data.` : "";
+
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       prompt: `You are an expert physiological and sexual response analyst. Based on ${sessions.length} recorded sessions and profile notes, generate a comprehensive, deeply personal physiological and arousal profile. Write directly to the person — use "you" and "your" throughout, as if speaking to them personally.
@@ -247,7 +265,7 @@ CRITICAL FOR TEXT-TO-SPEECH QUALITY:
 - Use short sentences and simple grammar optimized for audio readability
 - Avoid jargon—explain concepts clearly as if speaking aloud
 - Use commas and periods to create natural speech cadence
-${profileContext}
+${profileContext}${journalContext}
 SESSION DATA (${sessions.length} sessions):
 ${JSON.stringify(sessionSummaries, null, 2)}
 
@@ -855,16 +873,19 @@ export default function Profiler() {
   const [sessions, setSessions] = useState([]);
   const [allTimelines, setAllTimelines] = useState({});
   const [userProfile, setUserProfile] = useState(null);
+  const [journals, setJournals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const [all, me] = await Promise.all([
+      const [all, me, journalRows] = await Promise.all([
         base44.entities.Session.list("-date", 300),
         base44.auth.me(),
+        base44.entities.Journal.list("-session_date", 300),
       ]);
       setSessions(all);
       setUserProfile(me);
+      setJournals(journalRows);
 
       // Load HR timelines in small batches to avoid rate limits
       const withData = all.filter((s) => s.climax_offset_s != null || s.avg_hr != null);
@@ -901,7 +922,7 @@ export default function Profiler() {
         <p className="text-sm text-muted-foreground mt-0.5">{sessions.length} sessions · {Object.keys(allTimelines).length} with HR data</p>
       </div>
 
-      <AIProfilePanel sessions={sessions} userProfile={userProfile} />
+      <AIProfilePanel sessions={sessions} userProfile={userProfile} journals={journals} />
       <StimulationMethodsPanel sessions={sessions} userProfile={userProfile} />
       <NearClimaxPanel sessions={sessions} allTimelines={allTimelines} />
     </div>

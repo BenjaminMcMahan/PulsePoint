@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, List, PlusCircle, GitCompare, TrendingUp, Waves, ScanSearch, GitMerge, LineChart, Menu, X, UserCircle, Grid3x3, Clapperboard, Music, BarChart2, FlaskConical } from "lucide-react";
+import { LayoutDashboard, List, PlusCircle, GitCompare, TrendingUp, Waves, ScanSearch, GitMerge, LineChart, Menu, X, UserCircle, Grid3x3, Clapperboard, Music, BarChart2, FlaskConical, BookOpen } from "lucide-react";
 
 const navItems = [
 { path: "/", icon: LayoutDashboard, label: "Dashboard" },
 { path: "/sessions", icon: List, label: "Sessions" },
 { path: "/new", icon: PlusCircle, label: "New Session" },
+{ path: "/journal", icon: BookOpen, label: "Journal" },
 { path: "/compare", icon: GitCompare, label: "Compare" },
 { path: "/insights", icon: TrendingUp, label: "Insights" },
 { path: "/cascade", icon: Waves, label: "Cascade" },
@@ -13,7 +14,6 @@ const navItems = [
 { path: "/overlay", icon: GitMerge, label: "HR Overlay" },
 { path: "/trends", icon: LineChart, label: "Trends" },
 { path: "/correlations", icon: Grid3x3, label: "Correlations" },
-
 { path: "/video", icon: Clapperboard, label: "Video Sync" },
 { path: "/library", icon: Music, label: "Audio Library" },
 { path: "/analytics", icon: BarChart2, label: "Analytics" },

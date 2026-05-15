@@ -24,6 +24,7 @@ import VideoPlayer from './pages/VideoPlayer';
 import Library from './pages/Library';
 import Analytics from './pages/Analytics';
 import PredictiveModeler from './pages/PredictiveModeler';
+import JournalList from './pages/JournalList';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -70,6 +71,7 @@ const AuthenticatedApp = () => {
         <Route path="/library" element={<Library />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/modeler" element={<PredictiveModeler />} />
+        <Route path="/journal" element={<JournalList />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>
