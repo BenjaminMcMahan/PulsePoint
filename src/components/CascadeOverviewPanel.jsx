@@ -37,7 +37,7 @@ function PhaseBlock({ color, icon, title, items }) {
 
 }
 
-export default function CascadeOverviewPanel({ session, timelineRows, emgRows = [], userProfile }) {
+export default function CascadeOverviewPanel({ session, timelineRows, emgRows = [], userProfile, sessionJournal }) {
   const [collapsed, setCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(session.ai_cascade ?? null);
@@ -307,7 +307,17 @@ For each phase write a rich prose paragraph — speak naturally and directly to 
 6. EVENT SEQUENCE ANALYSIS: Review the annotated event timeline carefully. Identify meaningful timing patterns — do specific stimulation changes consistently precede rapid HR acceleration? Are discomfort notes clustered at particular phase transitions? Are there event sequences (e.g. a pause followed by resumed stimulation) that produced notable HR responses? Name the actual events and timestamps when describing these patterns.
 7. CASCADE QUALITY: holistic assessment — how well did all the signals (HR, EMG, events, subjective scores) align? What made this cascade distinctive? 1–2 actionable observations for future sessions.
 
-Session cascade data:
+${sessionJournal ? `SESSION JOURNAL (person's post-session reflections — use to connect subjective experience to cascade phases):
+Emotional: ${sessionJournal.emotional_reflection || ""}
+Physiological: ${sessionJournal.physiological_observations || ""}
+Narrative: ${sessionJournal.experience_narrative || ""}
+Insights: ${sessionJournal.insights || ""}
+${sessionJournal.key_moments?.length ? `Key moments: ${sessionJournal.key_moments.join("; ")}` : ""}
+Next intentions: ${sessionJournal.next_session_intentions || ""}
+
+Reference the journal when interpreting cascade phases — note where subjective experience matches or diverges from the physiological data.
+
+` : ""}Session cascade data:
 ${JSON.stringify({
         date: session.date ? (() => {
           const d = new Date(session.date);

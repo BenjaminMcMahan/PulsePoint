@@ -17,7 +17,7 @@ const SECTION_DEFS = [
   { key: "what_worked",          label: "What Worked",           color: "hsl(var(--chart-4))", icon: <Lightbulb className="w-3.5 h-3.5" /> },
 ];
 
-export default function SessionTimelineNarrative({ session, timelineRows, userProfile }) {
+export default function SessionTimelineNarrative({ session, timelineRows, userProfile, sessionJournal }) {
   const [collapsed, setCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(session.ai_timeline_narrative ?? null);
@@ -193,7 +193,16 @@ ${phaseStats ? `PHASE-BY-PHASE HR BREAKDOWN:\n${JSON.stringify(phaseStats, null,
 EVENT TIMELINE (fully annotated with HR, relative timing, inter-event gaps):
 ${annotatedEvents.length ? annotatedEvents.join("\n") : "No events logged"}
 
-SESSION METADATA:
+${sessionJournal ? `SESSION JOURNAL (person's own post-session reflections — use to contextualize what they felt during the timeline):
+Emotional: ${sessionJournal.emotional_reflection || ""}
+Physiological: ${sessionJournal.physiological_observations || ""}
+Narrative: ${sessionJournal.experience_narrative || ""}
+Insights: ${sessionJournal.insights || ""}
+${sessionJournal.key_moments?.length ? `Key moments: ${sessionJournal.key_moments.join("; ")}` : ""}
+
+Where the journal aligns with or diverges from the HR/event data is worth calling out in the narrative.
+
+` : ""}SESSION METADATA:
 ${JSON.stringify({
   duration_minutes: session.duration_minutes,
   intensity: session.intensity,

@@ -60,7 +60,7 @@ function Item({ text }) {
   );
 }
 
-export default function SessionAIPanel({ session, timelineRows, emgRows = [], userProfile }) {
+export default function SessionAIPanel({ session, timelineRows, emgRows = [], userProfile, sessionJournal }) {
   const [collapsed, setCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(session.ai_analysis ?? null);
@@ -208,6 +208,18 @@ ${JSON.stringify({
 
 Use this arousal profile to personalize analysis: compare the observed build arc and climax pattern against the user's known response style. Note deviations (e.g. faster/slower than typical, more/less sensitive). Reference preferred methods when interpreting session effectiveness.` : "";
 
+    const journalContext = sessionJournal ? `
+
+SESSION JOURNAL (person's own reflections after this session — treat as first-person subjective data):
+Emotional reflection: ${sessionJournal.emotional_reflection || ""}
+Physiological observations: ${sessionJournal.physiological_observations || ""}
+Experience narrative: ${sessionJournal.experience_narrative || ""}
+Insights: ${sessionJournal.insights || ""}
+Next session intentions: ${sessionJournal.next_session_intentions || ""}
+${sessionJournal.key_moments?.length ? `Key moments noted: ${sessionJournal.key_moments.join("; ")}` : ""}
+
+Factor the journal into your analysis — where the person's subjective experience aligns with or diverges from the objective physiological data is especially worth noting.` : "";
+
     const res = await base44.integrations.Core.InvokeLLM({
       model: "claude_sonnet_4_6",
       ...(estimScreenshots.length > 0 ? { file_urls: estimScreenshots } : {}),
@@ -297,6 +309,7 @@ ${JSON.stringify({
 
 ${session.discomfort_entries?.length > 0 ? "Discomfort entries present — analyze each for likely anatomical cause (nerve, tissue, positional), severity context, and whether it disrupted the arousal arc." : ""}
 ${emgSummary ? `\nEMG DATA:\n${JSON.stringify(emgSummary, null, 2)}\n\nAnalyze EMG activation patterns alongside HR. Reference timing relationships between EMG and HR changes. Check for clipping, asymmetry, noise, and relate activation bursts to event markers and phase markers when present. Describe what muscle the sensor likely captures based on placement notes and target area.` : ""}
+${journalContext}
 
 Provide a rich, physiologically-grounded analysis that tells the story of this session — from the autonomic and anatomical level up to the subjective experience.`,
       response_json_schema: {
