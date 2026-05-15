@@ -32,6 +32,7 @@ export default function JournalRecorder({ session }) {
   const [journal, setJournal] = useState(null);   // loaded or freshly generated
   const [journalId, setJournalId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef  = useRef([]);
@@ -92,6 +93,7 @@ export default function JournalRecorder({ session }) {
   const generate = async () => {
     setGenerating(true);
     setJournal(null);
+    setError(null);
 
     const sessionData = {
       date:               session.date,
@@ -130,7 +132,11 @@ export default function JournalRecorder({ session }) {
     });
 
     const ai_journal = res.data?.journal;
-    if (!ai_journal) { setGenerating(false); return; }
+    if (!ai_journal) {
+      setError(res.data?.error || "Generation failed — no journal returned.");
+      setGenerating(false);
+      return;
+    }
 
     setJournal(ai_journal);
 
@@ -327,7 +333,11 @@ export default function JournalRecorder({ session }) {
             </div>
           )}
 
-          {!journal && !generating && (
+          {error && (
+            <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          {!journal && !generating && !error && (
             <p className="text-xs text-muted-foreground">
               Click <strong>Generate</strong> to create an AI-enhanced journal entry from this session's data{transcript ? " and your notes" : ""}. Uses GPT-4o.
             </p>
