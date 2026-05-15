@@ -24,6 +24,7 @@ import UnifiedSessionTimeline from "../components/UnifiedSessionTimeline";
 import InteractiveSessionTimeline from "../components/InteractiveSessionTimeline";
 import NoClimaxAIPanel from "../components/NoClimaxAIPanel";
 import SessionTimelineNarrative from "../components/SessionTimelineNarrative";
+import JournalRecorder from "../components/JournalRecorder";
 import { EVENT_CATEGORIES } from "../components/session-form/EventTimelineSection";
 
 function getCategoryMeta(value) {
@@ -645,6 +646,9 @@ export default function SessionDetail() {
 
         {/* No-Climax AI Analysis */}
         {s.no_climax && <NoClimaxAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
+
+        {/* Session Journal */}
+        <JournalRecorder session={s} />
 
         {/* Ask the AI — Session Deep Dive */}
         <AIChat
