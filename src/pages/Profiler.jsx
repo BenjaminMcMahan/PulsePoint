@@ -600,6 +600,246 @@ Be interpretive, insightful, and speak directly to the person. Reference specifi
 
 }
 
+function StimulationMethodsPanel({ sessions, userProfile }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    base44.entities.SessionClusterAnalysis.list("-updated_date", 1).then((rows) => {
+      if (rows[0]?.stimulation_methods_result) setResult(rows[0].stimulation_methods_result);
+    });
+  }, []);
+
+  const analyze = async () => {
+    setLoading(true);
+    setResult(null);
+
+    // Build per-method aggregates
+    const methodMap = {};
+    for (const s of sessions) {
+      const methods = [...(s.methods || []), ...(s.custom_methods || [])];
+      for (const m of methods) {
+        if (!methodMap[m]) methodMap[m] = [];
+        methodMap[m].push({
+          date: s.date?.slice(0, 10),
+          intensity: s.intensity,
+          satisfaction: s.satisfaction,
+          build_quality: s.build_quality,
+          build_type: s.build_type,
+          climax_duration: s.climax_duration,
+          no_climax: s.no_climax || false,
+          avg_hr: s.avg_hr,
+          max_hr: s.max_hr,
+          hr_at_climax: s.hr_at_climax,
+          hr_avg_pre_to_climax: s.hr_avg_pre_to_climax,
+          pre_climax_offset_s: s.pre_climax_offset_s,
+          climax_offset_s: s.climax_offset_s,
+          recovery_offset_s: s.recovery_offset_s,
+          ejaculate_volume: s.ejaculate_volume,
+          discomfort_entries: s.discomfort_entries?.length ? s.discomfort_entries : undefined,
+          unusual_sensations: s.unusual_sensations || undefined,
+          mood: s.mood,
+          hydration: s.hydration,
+          duration_minutes: s.duration_minutes,
+          foley_size: s.foley_size || undefined,
+          foley_type: s.foley_type || undefined,
+          estim_notes: s.estim_notes || undefined,
+          sleeve_type: s.sleeve_type || undefined,
+          other_methods_used: methods.filter(x => x !== m),
+          event_highlights: s.event_timeline?.length
+            ? s.event_timeline.slice(0, 8).map(e => ({ time_s: e.time_s, category: Array.isArray(e.category) ? e.category : [e.category].filter(Boolean), note: e.note }))
+            : undefined,
+          notes: s.notes || undefined,
+        });
+      }
+    }
+
+    // Compute quick stats per method
+    const methodStats = Object.entries(methodMap).map(([method, sessionList]) => {
+      const withClimax = sessionList.filter(s => !s.no_climax);
+      const avg = (arr) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10 : null;
+      return {
+        method,
+        session_count: sessionList.length,
+        climax_rate_pct: sessionList.length ? Math.round((withClimax.length / sessionList.length) * 100) : 0,
+        avg_intensity: avg(sessionList.map(s => s.intensity).filter(Boolean)),
+        avg_satisfaction: avg(sessionList.map(s => s.satisfaction).filter(Boolean)),
+        avg_build_quality: avg(sessionList.map(s => s.build_quality).filter(Boolean)),
+        avg_max_hr: avg(sessionList.map(s => s.max_hr).filter(Boolean)),
+        avg_hr_at_climax: avg(withClimax.map(s => s.hr_at_climax).filter(Boolean)),
+        discomfort_rate_pct: Math.round((sessionList.filter(s => s.discomfort_entries?.length).length / sessionList.length) * 100),
+        common_combos: [...new Set(sessionList.flatMap(s => s.other_methods_used))].slice(0, 5),
+        sessions: sessionList,
+      };
+    }).sort((a, b) => b.session_count - a.session_count);
+
+    const profileContext = userProfile ? `USER PROFILE: Arousal style: ${userProfile.arousal_response_style || "—"} | Preferred stimulation: ${(userProfile.preferred_stimulation || []).join(", ") || "—"} | Climax sensitivity: ${userProfile.climax_sensitivity || "—"} | Arousal notes: ${userProfile.arousal_notes || "none"}` : "";
+
+    const res = await base44.integrations.Core.InvokeLLM({
+      model: "claude_sonnet_4_6",
+      prompt: `You are a physiological research analyst specializing in sexual response and stimulation science. Analyze how different stimulation methods affect this person's sensations and physiology based on their session data. Write directly to the person — use "you" and "your" throughout.
+
+CRITICAL FOR TEXT-TO-SPEECH QUALITY:
+- Write all times as words: "ten minutes" not "10m"
+- Spell out all numbers as words (e.g., "eight out of ten" not "8/10", "seventy-two beats per minute" not "72 bpm")
+- Write in conversational prose with natural pauses — no bullet points or markdown
+- Short sentences optimized for audio readability
+${profileContext}
+
+METHOD PERFORMANCE DATA (${sessions.length} sessions across ${methodStats.length} methods):
+${JSON.stringify(methodStats.map(m => ({ ...m, sessions: undefined, method: m.method, session_count: m.session_count, climax_rate_pct: m.climax_rate_pct, avg_intensity: m.avg_intensity, avg_satisfaction: m.avg_satisfaction, avg_build_quality: m.avg_build_quality, avg_max_hr: m.avg_max_hr, avg_hr_at_climax: m.avg_hr_at_climax, discomfort_rate_pct: m.discomfort_rate_pct, common_combos: m.common_combos })), null, 2)}
+
+FULL SESSION DATA PER METHOD (for deep analysis):
+${JSON.stringify(methodStats.map(m => ({ method: m.method, sessions: m.sessions })), null, 2)}
+
+Provide a deep, interpretive analysis. Do NOT simply restate the numbers — interpret what they reveal about this person's physiology, nerve response, and arousal dynamics. Be direct, opinionated, and specific.
+
+Cover these areas:
+1. METHOD EFFECTIVENESS PROFILE: For each method with meaningful data, form a clear opinion on its role — primary driver, arousal amplifier, or plateau extender? Rank them by their apparent physiological impact, not just by session count.
+2. PHYSIOLOGICAL EFFECTS BY METHOD: How does each method seem to engage different physiological pathways? Reference HR patterns, build quality, and climax metrics. Which methods drive the strongest autonomic activation? Which tend toward sensory saturation?
+3. COMBINATION EFFECTS: What method combinations appear in the best sessions vs. worst? Are there synergistic pairings you can identify from the data? Are any combinations associated with discomfort or diminishing returns?
+4. AROUSAL & CLIMAX FINDINGS: Across all methods, what patterns emerge about how this person's body responds? Note anything surprising — unexpected correlations, methods that seem to punch above their weight, or methods associated with no-climax sessions.
+5. DISCOMFORT & SENSITIVITY PATTERNS: Which methods correlate with discomfort entries and unusual sensations? What does this suggest about tissue sensitivity, nerve thresholds, or technique factors?
+6. PERSONALIZED RECOMMENDATIONS: Give specific, actionable suggestions based on this exact data. Be bold and direct.
+
+Each section should be 2-4 sentences of flowing, TTS-ready prose.`,
+      response_json_schema: {
+        type: "object",
+        properties: {
+          overview: { type: "string" },
+          method_effectiveness: { type: "array", items: { type: "string" } },
+          physiological_effects: { type: "array", items: { type: "string" } },
+          combination_effects: { type: "array", items: { type: "string" } },
+          arousal_and_climax_findings: { type: "array", items: { type: "string" } },
+          discomfort_and_sensitivity: { type: "array", items: { type: "string" } },
+          recommendations: { type: "array", items: { type: "string" } },
+        },
+        required: ["overview", "method_effectiveness", "physiological_effects", "combination_effects", "arousal_and_climax_findings", "recommendations"],
+      },
+    });
+
+    const raw = typeof res === "string" ? JSON.parse(res) : res;
+    const parsed = { ...raw?.response ?? raw, _method_stats: methodStats.map(m => ({ method: m.method, session_count: m.session_count, climax_rate_pct: m.climax_rate_pct, avg_satisfaction: m.avg_satisfaction, avg_intensity: m.avg_intensity, discomfort_rate_pct: m.discomfort_rate_pct })) };
+    setResult(parsed);
+
+    const existing = await base44.entities.SessionClusterAnalysis.list("-updated_date", 1);
+    if (existing[0]) {
+      await base44.entities.SessionClusterAnalysis.update(existing[0].id, { stimulation_methods_result: parsed });
+    } else {
+      await base44.entities.SessionClusterAnalysis.create({ stimulation_methods_result: parsed });
+    }
+    setLoading(false);
+  };
+
+  const SECTIONS = [
+    { key: "method_effectiveness", label: "Method Effectiveness", color: "hsl(var(--primary))" },
+    { key: "physiological_effects", label: "Physiological Effects", color: "hsl(var(--chart-3))" },
+    { key: "combination_effects", label: "Combination Effects", color: "hsl(var(--chart-2))" },
+    { key: "arousal_and_climax_findings", label: "Arousal & Climax Findings", color: "hsl(var(--chart-4))" },
+    { key: "discomfort_and_sensitivity", label: "Discomfort & Sensitivity", color: "hsl(var(--destructive))" },
+    { key: "recommendations", label: "Recommendations", color: "hsl(var(--accent))" },
+  ];
+
+  const methodStats = result?._method_stats || [];
+
+  const paras = [];
+  const paraMeta = [];
+  if (result) {
+    if (result.overview) { paras.push(result.overview); paraMeta.push({ type: "overview" }); }
+    for (const sec of SECTIONS) {
+      (result[sec.key] || []).forEach((item, itemIdx) => {
+        paras.push(item);
+        paraMeta.push({ type: "section", sec, first: itemIdx === 0 });
+      });
+    }
+  }
+
+  return (
+    <SectionCard icon={<Zap className="w-4 h-4" />} title="Stimulation Methods Analysis" color="hsl(var(--primary))">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          How each stimulation method affects your physiology, arousal, and climax outcomes across sessions.
+        </p>
+        <Button size="sm" onClick={analyze} disabled={loading || sessions.length < 2} className="h-7 text-xs gap-1.5 shrink-0 ml-2">
+          {loading
+            ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Analyzing…</>
+            : <><Brain className="w-3 h-3" />{result ? "Re-generate" : "Analyze Methods"}</>}
+        </Button>
+      </div>
+
+      {sessions.length < 2 && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5" /> Need at least 2 sessions to analyze.
+        </p>
+      )}
+
+      {/* Method stats grid */}
+      {methodStats.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Method Overview</p>
+          <div className="grid gap-2">
+            {methodStats.map((m) => (
+              <div key={m.method} className="flex flex-wrap items-center gap-2 bg-muted/40 rounded-lg px-3 py-2">
+                <span className="text-xs font-semibold text-foreground min-w-[120px]">{m.method}</span>
+                <Badge variant="outline" className="text-[9px] h-4 px-1">{m.session_count} sessions</Badge>
+                <Badge variant="outline" className="text-[9px] h-4 px-1">{m.climax_rate_pct}% climax</Badge>
+                {m.avg_satisfaction != null && <Badge variant="outline" className="text-[9px] h-4 px-1">sat {m.avg_satisfaction}/10</Badge>}
+                {m.avg_intensity != null && <Badge variant="outline" className="text-[9px] h-4 px-1">int {m.avg_intensity}/10</Badge>}
+                {m.discomfort_rate_pct > 0 && <Badge variant="outline" className="text-[9px] h-4 px-1 text-destructive border-destructive/40">{m.discomfort_rate_pct}% discomfort</Badge>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!result && !loading && sessions.length >= 2 && (
+        <p className="text-xs text-muted-foreground">Click Analyze Methods to generate a deep physiological interpretation of each stimulation method. Uses Claude Sonnet.</p>
+      )}
+
+      {result && (
+        <TTSReader
+          sessionId="profiler_stim_methods"
+          title="Stimulation Methods Analysis"
+          paragraphs={paras}
+          renderParagraph={(text, idx, isActive, isBuffering) => {
+            const meta = paraMeta[idx];
+            if (!meta) return null;
+            if (meta.type === "overview") {
+              return (
+                <p className={`text-base font-medium leading-relaxed border-l-2 pl-3 py-1 transition-all duration-200 rounded-r-md flex items-center gap-2 ${isActive ? "border-primary bg-primary/10 text-foreground" : "border-primary/50 text-foreground"}`}>
+                  {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+                  {text}
+                </p>
+              );
+            }
+            const { sec, first } = meta;
+            return (
+              <div>
+                {first && (
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mt-4 mb-1.5 pt-3 border-t border-border" style={{ color: sec.color }}>
+                    {sec.label}
+                  </p>
+                )}
+                <li
+                  className="text-sm pl-3 border-l-2 py-1 leading-relaxed list-none transition-all duration-200 rounded-r-md flex items-center gap-2"
+                  style={{
+                    borderColor: isActive ? sec.color : sec.color + "55",
+                    background: isActive ? sec.color + "18" : "transparent",
+                    color: "hsl(var(--foreground))",
+                  }}
+                >
+                  {isBuffering && <span className="shrink-0 w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: sec.color, borderTopColor: "transparent" }} />}
+                  {text}
+                </li>
+              </div>
+            );
+          }}
+        />
+      )}
+    </SectionCard>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function Profiler() {
@@ -653,6 +893,7 @@ export default function Profiler() {
       </div>
 
       <AIProfilePanel sessions={sessions} userProfile={userProfile} />
+      <StimulationMethodsPanel sessions={sessions} userProfile={userProfile} />
       <NearClimaxPanel sessions={sessions} allTimelines={allTimelines} />
     </div>
   );
