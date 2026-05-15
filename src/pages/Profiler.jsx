@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Brain, Activity, AlertCircle, Zap, TrendingUp, Heart, Lightbulb, User } from "lucide-react";
+import { Brain, Activity, AlertCircle, Zap, TrendingUp, Heart, Lightbulb, User, ChevronDown, ChevronUp } from "lucide-react";
 import TTSReader from "../components/TTSReader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -148,15 +148,24 @@ function detectNearClimaxEvents(rows, climaxOffsetS, preClimaxOffsetS, sessionEv
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function SectionCard({ icon, title, color, children }) {
+function SectionCard({ icon, title, color, children, defaultCollapsed = false }) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color }}>
-        {icon}{title}
-      </h3>
-      {children}
-    </div>);
-
+      <button
+        className="w-full flex items-center justify-between gap-1.5 text-left"
+        onClick={() => setCollapsed(v => !v)}
+      >
+        <h3 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color }}>
+          {icon}{title}
+        </h3>
+        {collapsed
+          ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          : <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />}
+      </button>
+      {!collapsed && children}
+    </div>
+  );
 }
 
 function AIProfilePanel({ sessions, userProfile }) {
@@ -314,7 +323,7 @@ Be direct, insightful, and willing to state conclusions. Ground everything in th
   }
 
   return (
-    <SectionCard icon={<Brain className="w-4 h-4" />} title="Comprehensive Physiological Profile" color="hsl(var(--primary))">
+    <SectionCard icon={<Brain className="w-4 h-4" />} title="Comprehensive Physiological Profile" color="hsl(var(--primary))" defaultCollapsed={true}>
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
           AI-generated personal physiological & arousal profile based on all sessions, event timelines, and profile notes.
@@ -493,7 +502,7 @@ Be interpretive, insightful, and speak directly to the person. Reference specifi
   const displaySessionEvents = savedSessionEvents;
 
   return (
-    <SectionCard icon={<Zap className="w-4 h-4" />} title="Near-Climax Event Analysis" color="hsl(var(--chart-3))">
+    <SectionCard icon={<Zap className="w-4 h-4" />} title="Near-Climax Event Analysis" color="hsl(var(--chart-3))" defaultCollapsed={true}>
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">Detects erratic HR spikes & reversals that resemble — but don't complete — a climax cascade.</p>
         <Button size="sm" onClick={analyze} disabled={loading} className="h-7 text-xs gap-1.5 shrink-0">
@@ -755,7 +764,7 @@ Each section should be 2-4 sentences of flowing, TTS-ready prose.`,
   }
 
   return (
-    <SectionCard icon={<Zap className="w-4 h-4" />} title="Stimulation Methods Analysis" color="hsl(var(--primary))">
+    <SectionCard icon={<Zap className="w-4 h-4" />} title="Stimulation Methods Analysis" color="hsl(var(--primary))" defaultCollapsed={true}>
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
           How each stimulation method affects your physiology, arousal, and climax outcomes across sessions.
