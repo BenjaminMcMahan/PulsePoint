@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff, Brain, BookOpen, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import TTSReader from "./TTSReader";
+import JournalPrompts from "./JournalPrompts";
 
 const WHISPER_PROMPT =
   "Post-session reflection. Physiological sensations. Arousal buildup. Climax experience. Heart rate. Muscle tension. Pelvic floor. E-stim. Foley catheter. Refractory period. Emotional state. What worked well. What to try next time.";
@@ -23,7 +24,7 @@ const SECTION_LABELS = {
   next_session_intentions:    "Next Session Intentions",
 };
 
-export default function JournalRecorder({ session }) {
+export default function JournalRecorder({ session, timelineRows = [] }) {
   const [collapsed, setCollapsed] = useState(true);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -245,6 +246,13 @@ export default function JournalRecorder({ session }) {
 
       {!collapsed && (
         <>
+          {/* AI-driven reflection prompts */}
+          <JournalPrompts
+            session={session}
+            timelineRows={timelineRows}
+            onInsertPrompt={(text) => setTranscript((prev) => prev ? prev + "\n\n" + text : text)}
+          />
+
           {/* Voice / Text note input */}
           <div className="space-y-2">
             <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">Your Notes</p>

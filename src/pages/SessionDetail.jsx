@@ -660,7 +660,7 @@ export default function SessionDetail() {
         {s.no_climax && <NoClimaxAIPanel session={s} timelineRows={timelineRows} userProfile={userProfile} />}
 
         {/* Session Journal */}
-        <JournalRecorder session={s} />
+        <JournalRecorder session={s} timelineRows={timelineRows} />
 
         {/* Ask the AI — Session Deep Dive */}
         <AIChat
