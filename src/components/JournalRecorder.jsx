@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Brain, BookOpen, ChevronDown, ChevronUp, Trash2, Play, Pause, Square } from "lucide-react";
+import { Mic, MicOff, Brain, BookOpen, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import TTSReader from "./TTSReader";
 
 const WHISPER_PROMPT =
@@ -239,9 +239,9 @@ export default function JournalRecorder({ session }) {
 
       {!collapsed && (
         <>
-          {/* Voice recorder */}
+          {/* Voice / Text note input */}
           <div className="space-y-2">
-            <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">Voice Note</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">Your Notes</p>
             <div className="flex items-center gap-2">
               <button
                 onClick={recording ? stopRecording : startRecording}
@@ -263,18 +263,13 @@ export default function JournalRecorder({ session }) {
               )}
             </div>
 
-            {transcript && (
-              <div className="bg-muted/40 rounded-lg px-3 py-2 space-y-1">
-                <p className="text-[9px] uppercase text-muted-foreground font-semibold tracking-wider">Transcript</p>
-                <p className="text-sm text-foreground leading-relaxed">{transcript}</p>
-              </div>
-            )}
-
-            {!transcript && !recording && !transcribing && (
-              <p className="text-xs text-muted-foreground">
-                Optionally record a voice note immediately after your session — your reflections will be woven into the AI journal.
-              </p>
-            )}
+            <textarea
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              placeholder="Type your reflections here, or use the voice recorder above…"
+              rows={4}
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none text-foreground placeholder:text-muted-foreground"
+            />
           </div>
 
           {/* AI journal output */}
@@ -334,7 +329,7 @@ export default function JournalRecorder({ session }) {
 
           {!journal && !generating && (
             <p className="text-xs text-muted-foreground">
-              Click <strong>Generate</strong> to create an AI-enhanced journal entry from this session's data{transcript ? " and your voice note" : ""}. Uses GPT-4o.
+              Click <strong>Generate</strong> to create an AI-enhanced journal entry from this session's data{transcript ? " and your notes" : ""}. Uses GPT-4o.
             </p>
           )}
         </>
