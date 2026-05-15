@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Brain, BookOpen, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Mic, MicOff, Brain, BookOpen, ChevronDown, ChevronUp, Trash2, Save } from "lucide-react";
 import TTSReader from "./TTSReader";
 import JournalPrompts from "./JournalPrompts";
 
@@ -34,6 +34,8 @@ export default function JournalRecorder({ session, timelineRows = [] }) {
   const [journalId, setJournalId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef  = useRef([]);
@@ -159,6 +161,21 @@ export default function JournalRecorder({ session, timelineRows = [] }) {
     setGenerating(false);
   };
 
+  // ── Save Notes ─────────────────────────────────────────────────────────────
+  const saveNotes = async () => {
+    setSavingNotes(true);
+    const payload = { session_id: session.id, session_date: session.date, voice_transcript: transcript };
+    if (journalId) {
+      await base44.entities.Journal.update(journalId, payload);
+    } else {
+      const created = await base44.entities.Journal.create(payload);
+      setJournalId(created.id);
+    }
+    setSavingNotes(false);
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2500);
+  };
+
   // ── Delete ─────────────────────────────────────────────────────────────────
   const deleteJournal = async () => {
     if (!journalId) return;
@@ -279,11 +296,26 @@ export default function JournalRecorder({ session, timelineRows = [] }) {
 
             <textarea
               value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
+              onChange={(e) => { setTranscript(e.target.value); setNotesSaved(false); }}
               placeholder="Type your reflections here, or use the voice recorder above…"
               rows={4}
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none text-foreground placeholder:text-muted-foreground"
             />
+            {transcript && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={saveNotes}
+                disabled={savingNotes}
+                className="h-7 text-xs gap-1.5 self-end"
+              >
+                {savingNotes
+                  ? <><span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />Saving…</>
+                  : notesSaved
+                  ? <><Save className="w-3 h-3 text-primary" />Saved!</>
+                  : <><Save className="w-3 h-3" />Save Notes</>}
+              </Button>
+            )}
           </div>
 
           {/* AI journal output */}
