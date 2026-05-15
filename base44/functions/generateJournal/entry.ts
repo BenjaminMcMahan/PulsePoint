@@ -1,7 +1,4 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import Anthropic from 'npm:@anthropic-ai/sdk';
-
-const anthropic = new Anthropic({ apiKey: Deno.env.get('OPENAI_API_KEY') });
 
 Deno.serve(async (req) => {
   try {
@@ -40,7 +37,7 @@ Deno.serve(async (req) => {
       s.refractory_notes ? `Refractory notes: ${s.refractory_notes}` : null,
       s.notes ? `Session notes: ${s.notes}` : null,
       s.event_timeline?.length
-        ? `Event timeline highlights: ${s.event_timeline.slice(0, 10).map(e => `[${Math.floor(e.time_s / 60)}:${String(Math.round(e.time_s % 60)).padStart(2, '0')}] ${e.note}`).join(' | ')}`
+        ? `Event timeline: ${s.event_timeline.slice(0, 10).map(e => `[${Math.floor(e.time_s / 60)}:${String(Math.round(e.time_s % 60)).padStart(2, '0')}] ${e.note}`).join(' | ')}`
         : null,
     ].filter(Boolean).join('\n');
 
@@ -48,51 +45,55 @@ Deno.serve(async (req) => {
       ? `\n\nNOTES FROM THE PERSON (written or transcribed immediately after session):\n"${voice_transcript.trim()}"`
       : '';
 
-    const prompt = `You are a compassionate, deeply perceptive physiological journal assistant. You help people reflect on their intimate physiological sessions with nuance, warmth, and scientific grounding. Write in second person ("you", "your") directly to the person. Your writing is warm yet precise, introspective yet data-grounded.
+    const prompt = `You are a compassionate physiological journal assistant. Write in second person ("you", "your") directly to the person. Your writing is warm, introspective, and data-grounded.
 
 CRITICAL FOR TEXT-TO-SPEECH:
 - Write all numbers as words (e.g., "eight out of ten", "seventy-two beats per minute")
-- Write times as words ("eleven minutes and twenty seconds")
-- Use natural spoken prose — no bullet headers, no markdown symbols
+- Use natural spoken prose — no bullet headers, no markdown
 - Short, flowing sentences with natural pauses
 
 SESSION DATA:
 ${sessionContext}
 ${transcriptSection}
 
-Respond with ONLY a valid JSON object using EXACTLY these keys:
-{
-  "title": "a short, evocative title for this journal entry (not just the date)",
-  "emotional_reflection": "2-3 sentences about the emotional tone and state during the session",
-  "physiological_observations": "2-3 sentences grounding the experience in the physiological data — heart rate, build, intensity",
-  "experience_narrative": "3-4 sentences weaving together the full arc of the session as a personal narrative",
-  "key_moments": ["one brief sentence per notable moment", "2 to 4 items total"],
-  "insights": "1-2 sentences of meaningful insight or pattern noticed",
-  "next_session_intentions": "1-2 sentences of intentions or things to try next time"
-}`;
+Write a structured journal entry using EXACTLY these JSON keys. All fields are required and must be non-empty strings (or array for key_moments):
+- title: a short evocative title (not just the date)
+- emotional_reflection: 2-3 sentences about the emotional tone
+- physiological_observations: 2-3 sentences grounding the experience in physiological data
+- experience_narrative: 3-4 sentences weaving the full arc as a personal narrative
+- key_moments: array of 2-4 brief strings, one per notable moment
+- insights: 1-2 sentences of meaningful insight
+- next_session_intentions: 1-2 sentences of intentions for next time`;
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
+    const rawResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      model: 'claude_sonnet_4_6',
+      prompt,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          emotional_reflection: { type: 'string' },
+          physiological_observations: { type: 'string' },
+          experience_narrative: { type: 'string' },
+          key_moments: { type: 'array', items: { type: 'string' } },
+          insights: { type: 'string' },
+          next_session_intentions: { type: 'string' },
+        },
+        required: ['title', 'emotional_reflection', 'physiological_observations', 'experience_narrative', 'key_moments', 'insights', 'next_session_intentions'],
+      },
     });
 
-    const raw = message.content[0].text.trim();
-
-    // Extract JSON even if Claude wraps it in markdown code fences
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON found in Claude response');
-
-    const entry = JSON.parse(jsonMatch[0]);
+    // InvokeLLM may wrap the result in a `response` key
+    const result = rawResult?.response ?? rawResult;
 
     const journal = {
-      title: entry.title || `Session Journal — ${new Date(s.date || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
-      emotional_reflection: entry.emotional_reflection || '',
-      physiological_observations: entry.physiological_observations || '',
-      experience_narrative: entry.experience_narrative || '',
-      key_moments: Array.isArray(entry.key_moments) ? entry.key_moments : [],
-      insights: entry.insights || '',
-      next_session_intentions: entry.next_session_intentions || '',
+      title: result.title || `Session Journal`,
+      emotional_reflection: result.emotional_reflection || '',
+      physiological_observations: result.physiological_observations || '',
+      experience_narrative: result.experience_narrative || '',
+      key_moments: Array.isArray(result.key_moments) ? result.key_moments : [],
+      insights: result.insights || '',
+      next_session_intentions: result.next_session_intentions || '',
     };
 
     return Response.json({ journal });
