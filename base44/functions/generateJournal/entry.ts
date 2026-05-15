@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import OpenAI from 'npm:openai';
+import Anthropic from 'npm:@anthropic-ai/sdk';
 
-const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY') });
+const anthropic = new Anthropic({ apiKey: Deno.env.get('OPENAI_API_KEY') });
 
 Deno.serve(async (req) => {
   try {
@@ -14,7 +14,6 @@ Deno.serve(async (req) => {
 
     const s = session_data || {};
 
-    // Build session context for the AI
     const sessionContext = [
       s.date ? `Date: ${new Date(s.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}` : null,
       s.duration_minutes ? `Duration: ${s.duration_minutes} minutes` : null,
@@ -46,51 +45,54 @@ Deno.serve(async (req) => {
     ].filter(Boolean).join('\n');
 
     const transcriptSection = voice_transcript?.trim()
-      ? `\n\nVOICE NOTE FROM THE PERSON (transcribed immediately after session):\n"${voice_transcript.trim()}"`
+      ? `\n\nNOTES FROM THE PERSON (written or transcribed immediately after session):\n"${voice_transcript.trim()}"`
       : '';
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a compassionate, deeply perceptive physiological journal assistant. You help people reflect on their intimate physiological sessions with nuance, warmth, and scientific grounding. You write in second person ("you", "your") directly to the person. Your writing is warm yet precise, introspective yet data-grounded. You never use clinical detachment — you write as if you truly understand and have witnessed the experience alongside them.
+    const prompt = `You are a compassionate, deeply perceptive physiological journal assistant. You help people reflect on their intimate physiological sessions with nuance, warmth, and scientific grounding. Write in second person ("you", "your") directly to the person. Your writing is warm yet precise, introspective yet data-grounded.
 
-CRITICAL FOR TEXT-TO-SPEECH QUALITY:
-- Write all numbers as words (e.g., "eight out of ten" not "8/10", "seventy-two beats per minute" not "72 bpm")
-- Write times as words ("eleven minutes and twenty seconds" not "11:20")
-- Use natural spoken prose — no bullet headers in narrative fields, no markdown
-- Short, flowing sentences with natural pauses`,
-        },
-        {
-          role: 'user',
-          content: `Generate a rich, personal journal entry for this session. Weave together the session data and the voice note (if present) into a cohesive, emotionally resonant reflection.
+CRITICAL FOR TEXT-TO-SPEECH:
+- Write all numbers as words (e.g., "eight out of ten", "seventy-two beats per minute")
+- Write times as words ("eleven minutes and twenty seconds")
+- Use natural spoken prose — no bullet headers, no markdown symbols
+- Short, flowing sentences with natural pauses
 
 SESSION DATA:
 ${sessionContext}
 ${transcriptSection}
 
-Respond with a structured JSON journal entry that captures the full emotional and physiological arc of this experience.`,
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.75,
+Respond with ONLY a valid JSON object using EXACTLY these keys:
+{
+  "title": "a short, evocative title for this journal entry (not just the date)",
+  "emotional_reflection": "2-3 sentences about the emotional tone and state during the session",
+  "physiological_observations": "2-3 sentences grounding the experience in the physiological data — heart rate, build, intensity",
+  "experience_narrative": "3-4 sentences weaving together the full arc of the session as a personal narrative",
+  "key_moments": ["one brief sentence per notable moment", "2 to 4 items total"],
+  "insights": "1-2 sentences of meaningful insight or pattern noticed",
+  "next_session_intentions": "1-2 sentences of intentions or things to try next time"
+}`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    const raw = JSON.parse(completion.choices[0].message.content);
+    const raw = message.content[0].text.trim();
 
-    // Normalise — model may or may not wrap in a key
-    const entry = raw.journal || raw.entry || raw;
+    // Extract JSON even if Claude wraps it in markdown code fences
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON found in Claude response');
 
-    // Ensure all expected fields exist
+    const entry = JSON.parse(jsonMatch[0]);
+
     const journal = {
       title: entry.title || `Session Journal — ${new Date(s.date || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
-      emotional_reflection: entry.emotional_reflection || entry.emotions || '',
-      physiological_observations: entry.physiological_observations || entry.physiology || '',
-      experience_narrative: entry.experience_narrative || entry.narrative || '',
+      emotional_reflection: entry.emotional_reflection || '',
+      physiological_observations: entry.physiological_observations || '',
+      experience_narrative: entry.experience_narrative || '',
       key_moments: Array.isArray(entry.key_moments) ? entry.key_moments : [],
       insights: entry.insights || '',
-      next_session_intentions: entry.next_session_intentions || entry.intentions || '',
+      next_session_intentions: entry.next_session_intentions || '',
     };
 
     return Response.json({ journal });
