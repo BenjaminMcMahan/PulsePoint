@@ -22,6 +22,7 @@ import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import ArousalEventChart from "../components/ArousalEventChart";
 import UnifiedSessionTimeline from "../components/UnifiedSessionTimeline";
 import InteractiveSessionTimeline from "../components/InteractiveSessionTimeline";
+import InteractiveTimelinePlayer from "../components/InteractiveTimelinePlayer";
 import NoClimaxAIPanel from "../components/NoClimaxAIPanel";
 import SessionTimelineNarrative from "../components/SessionTimelineNarrative";
 import JournalRecorder from "../components/JournalRecorder";
@@ -627,6 +628,11 @@ export default function SessionDetail() {
             </div>
           );
         })()}
+
+        {/* Interactive Timeline Player */}
+        {(timelineRows.length > 0 || (s.event_timeline || []).length > 0 || (s.ai_near_climax_events || []).length > 0) && (
+          <InteractiveTimelinePlayer session={s} timelineRows={timelineRows} />
+        )}
 
         {/* Interactive Multi-Track Timeline */}
         {(timelineRows.length > 0 || (s.event_timeline || []).length > 0) && (
