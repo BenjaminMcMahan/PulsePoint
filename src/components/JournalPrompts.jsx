@@ -113,21 +113,23 @@ export default function JournalPrompts({ session, timelineRows = [], onInsertPro
     ].filter(Boolean).join("; ");
 
     const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are a sensitive physiological journal coach helping someone reflect on a recorded session. Based on the detected HR anomalies and missing context below, generate 3-5 short, specific, first-person reflection prompts that will encourage the person to log their subjective experience in more detail. 
+      prompt: `You are a thoughtful personal journal coach helping someone reflect on an intimate session. Based on the session data and any notable physiological patterns, generate 3-5 rich, open-ended reflection prompts that invite genuine qualitative self-exploration.
 
-Each prompt should:
-- Be directly linked to a specific detected anomaly or gap (reference the timing or event)
-- Ask about the FELT, SUBJECTIVE experience — not the physiology itself
-- Be phrased as a short leading question or sentence starter (1-2 sentences max)
-- Feel personal and curious, not clinical
-- Be suitable to speak aloud or type as a voice/text note
+CRITICAL RULES:
+- Focus on AROUSAL, SENSATION, STIMULATION, and subjective experience — NOT on heart rate numbers or timestamps
+- Prompts should feel like something a curious, empathetic friend might ask — warm, personal, not clinical
+- Each prompt should invite a narrative answer, not a yes/no
+- Reference what actually happened in the session (methods, events, outcomes) in a broad, experiential way — not pinned to exact moments
+- Cover different dimensions: what was felt physically, emotionally, what surprised them, what they'd change, what lingered afterward
+- Avoid phrases like "at X minutes" or "during the spike" — speak to the ARC of the experience instead
+- If the session had notable moments (discomfort, unusual sensations, no climax, long plateaus), weave those in naturally as a starting point, not a clinical observation
 
 SESSION CONTEXT: ${sessionSummary}
 
-DETECTED ANOMALIES / GAPS:
+NOTABLE PATTERNS (use as inspiration, not as literal prompt anchors):
 ${anomalySummary}
 
-Return exactly 3-5 prompts. Each should be different in focus (emotional, sensory, timing, contextual).`,
+Return exactly 3-5 prompts. Vary the focus: physical sensation, emotional tone, stimulation quality, something unexpected, and what they'd want to remember or change.`,
       response_json_schema: {
         type: "object",
         properties: {
