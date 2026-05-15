@@ -12,6 +12,7 @@ import ArousalComparisonAIPanel from "../components/ArousalComparisonAIPanel";
 import CascadeOverviewPanel from "../components/CascadeOverviewPanel";
 import CompareCascadePanel from "../components/CompareCascadePanel";
 import SessionTimelineNarrative from "../components/SessionTimelineNarrative";
+import SessionDiffSummary from "../components/SessionDiffSummary";
 import moment from "moment";
 
 function MetricRow({ label, value, max = 10 }) {
@@ -211,6 +212,11 @@ export default function Compare() {
           </div>
         ) : (
           <div className="space-y-4">
+            {/* 2-session focused diff summary — shown first */}
+            {selectedSessions.length === 2 && (
+              <SessionDiffSummary sessionA={selectedSessions[0]} sessionB={selectedSessions[1]} />
+            )}
+
             {loadingTimelines ? (
               <div className="flex items-center justify-center h-20">
                 <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
