@@ -7,6 +7,81 @@ import { idbGet, idbSet } from "@/lib/ttsCache";
 
 const OAI_VOICES = ["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"];
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getTtsErrorMessage = (err) => {
+  const raw =
+    err?.data?.message ||
+    err?.data?.error ||
+    err?.response?.data?.message ||
+    err?.response?.data?.error ||
+    err?.message ||
+    "TTS request failed";
+
+  if (typeof raw !== "string") return JSON.stringify(raw);
+
+  // Base44/OpenAI sometimes returns a JSON string inside the error field.
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed?.error?.message || parsed?.message || raw;
+  } catch {
+    return raw;
+  }
+};
+
+const getTtsStatus = (err) => {
+  return err?.status || err?.response?.status || err?.data?.status || 500;
+};
+
+async function callTTSWithRetries(payload, attempts = 7) {
+  let lastError;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const response = await base44.functions.invoke("openaiTTS", payload);
+
+      if (response?.data?.error) {
+        const error = new Error(getTtsErrorMessage(response));
+        error.status = response.status || response?.data?.status || 502;
+        error.data = response.data;
+        throw error;
+      }
+
+      if (!response?.data?.audio) {
+        const error = new Error(`TTS returned no audio. Status: ${response?.status || "unknown"}`);
+        error.status = response?.status || 502;
+        error.data = response?.data;
+        throw error;
+      }
+
+      return response;
+    } catch (err) {
+      lastError = err;
+
+      const status = getTtsStatus(err);
+      const retryable = [408, 429, 500, 502, 503, 504].includes(status);
+
+      if (!retryable || attempt === attempts - 1) {
+        throw err;
+      }
+
+      const delay =
+        Math.min(1500 * 2 ** attempt, 20000) +
+        Math.floor(Math.random() * 1000);
+
+      console.warn(
+        `TTS failed (${status}), retry ${attempt + 1}/${attempts} in ${delay}ms:`,
+        getTtsErrorMessage(err)
+      );
+
+      await sleep(delay);
+    }
+  }
+
+  throw lastError;
+}
+
+
 export default function TTSReader({ paragraphs, renderParagraph, sessionId, title, sessionDate }) {
   const [state, setState] = useState("idle"); // idle | buffering | playing | paused
   const [currentPara, setCurrentPara] = useState(-1);
@@ -132,7 +207,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
 
         if (!mp3Buffer) {
           setRequestStatus({ type: "fetching", msg: "Fetching audio…" });
-          const response = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+          const response = await callTTSWithRetries({ text: chunk, voice: voiceRef.current });
           if (response.data?.error) throw new Error(response.data.error);
           const base64 = response.data.audio;
           const binary = atob(base64);
@@ -150,7 +225,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         return decoded;
       } catch (err) {
         prefetchCacheRef.current.delete(cacheKey); // allow retry on failure
-        setRequestStatus({ type: "error", msg: err.message || "TTS request failed" });
+        setRequestStatus({ type: "error", msg: getTtsErrorMessage(err) });
         throw err;
       }
     })();
@@ -158,25 +233,25 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
     return promise;
   };
 
-  // Fire-and-forget: prefetch the next 2 chunks into the cache without blocking playback.
+  // Fire-and-forget: prefetch the next chunk into the cache without blocking playback.
   const prefetchNext = (gen) => {
-    // Collect next 2 upcoming chunks
+    // Collect next upcoming chunk
     const upcoming = [];
 
     // First: remaining chunks in the current paragraph's queue
     for (const c of chunkQueueRef.current) {
       upcoming.push(c);
-      if (upcoming.length >= 2) break;
+      if (upcoming.length >= 1) break;
     }
 
     // Then: first chunk(s) from the next paragraph(s)
     let paraIdx = 0;
-    while (upcoming.length < 2 && paraIdx < remainingParasRef.current.length) {
+    while (upcoming.length < 1 && paraIdx < remainingParasRef.current.length) {
       const nextParaIdx = remainingParasRef.current[paraIdx];
       const nextChunks = splitIntoChunks(cleanTextForSpeech(paragraphs[nextParaIdx] || ""));
       for (const c of nextChunks) {
         upcoming.push(c);
-        if (upcoming.length >= 2) break;
+        if (upcoming.length >= 1) break;
       }
       paraIdx++;
     }
@@ -200,7 +275,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       decoded = await fetchDecoded(chunk, gen);
     } catch (err) {
       console.error("TTS fetch failed:", err);
-      setRequestStatus({ type: "error", msg: err.message || "TTS request failed" });
+      setRequestStatus({ type: "error", msg: getTtsErrorMessage(err) });
       stop();
       return;
     }
@@ -466,7 +541,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         let mp3Buffer = await idbGet(chunk, voiceRef.current, 1.0);
 
         if (!mp3Buffer) {
-          const res = await base44.functions.invoke("openaiTTS", { text: chunk, voice: voiceRef.current });
+          const res = await callTTSWithRetries({ text: chunk, voice: voiceRef.current });
           if (res.data?.error) throw new Error(res.data.error);
           if (!res.data?.audio) throw new Error(`TTS request failed (status ${res.status})`);
           const base64 = res.data.audio;
@@ -478,6 +553,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
         }
 
         mp3Chunks[i] = new Uint8Array(mp3Buffer);
+        await sleep(1500);
         completed++;
         setDownloadProgress({ current: completed, total: allChunks.length });
         setRequestStatus({ type: "fetching", msg: `Fetching chunk ${completed} of ${allChunks.length}…` });
@@ -548,7 +624,7 @@ export default function TTSReader({ paragraphs, renderParagraph, sessionId, titl
       setDownloading(false);
     } catch (err) {
       console.error("Download failed:", err);
-      setRequestStatus({ type: "error", msg: err.message || "Download failed" });
+      setRequestStatus({ type: "error", msg: getTtsErrorMessage(err) || "Download failed" });
       setDownloadProgress({ current: 0, total: 0 });
       setDownloading(false);
     }

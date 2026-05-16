@@ -138,8 +138,10 @@ Deno.serve(async (req) => {
       {
         error: "TTS generation failed",
         message,
+        retryable: true,
+        upstream: "openai"
       },
-      500
+      502
     );
   }
 });
