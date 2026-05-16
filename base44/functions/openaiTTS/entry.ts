@@ -16,13 +16,24 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function clampSpeed(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0.25 && parsed <= 4
+    ? parsed
+    : 1.0;
+}
+
 async function callOpenAITTS(text: string, voice: string, speed: number) {
   let lastStatus = 500;
   let lastMessage = "Unknown TTS error";
 
-  for (let attempt = 0; attempt < 5; attempt++) {
+  // Keep this short. Base44/serverless isolates can die if one request hangs too long.
+  const MAX_ATTEMPTS = 3;
+  const FETCH_TIMEOUT_MS = 25_000;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60_000);
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
     try {
       const response = await fetch("https://api.openai.com/v1/audio/speech", {
@@ -56,13 +67,15 @@ async function callOpenAITTS(text: string, voice: string, speed: number) {
         throw new Error(lastMessage);
       }
 
+      if (attempt === MAX_ATTEMPTS - 1) break;
+
       const retryAfter = response.headers.get("retry-after");
       const waitMs = retryAfter
-        ? Math.max(Number(retryAfter) * 1000, 1000)
-        : Math.min(1000 * 2 ** attempt, 12_000) + Math.floor(Math.random() * 500);
+        ? Math.min(Math.max(Number(retryAfter) * 1000, 1000), 4000)
+        : Math.min(750 * 2 ** attempt, 4000) + Math.floor(Math.random() * 300);
 
       console.log(
-        `OpenAI TTS ${response.status}, retry ${attempt + 1}/5 in ${waitMs}ms`
+        `OpenAI TTS ${response.status}, backend retry ${attempt + 1}/${MAX_ATTEMPTS} in ${waitMs}ms`
       );
 
       await sleep(waitMs);
@@ -71,16 +84,21 @@ async function callOpenAITTS(text: string, voice: string, speed: number) {
 
       lastMessage = error instanceof Error ? error.message : String(error);
 
-      console.log(`OpenAI TTS exception, retry ${attempt + 1}/5:`, lastMessage);
+      console.log(
+        `OpenAI TTS exception, backend retry ${attempt + 1}/${MAX_ATTEMPTS}:`,
+        lastMessage
+      );
 
-      if (attempt === 4) break;
+      if (attempt === MAX_ATTEMPTS - 1) break;
 
-      const waitMs = Math.min(1000 * 2 ** attempt, 12_000);
+      const waitMs = Math.min(750 * 2 ** attempt, 4000);
       await sleep(waitMs);
     }
   }
 
-  throw new Error(`OpenAI TTS failed after retries. Status: ${lastStatus}. ${lastMessage}`);
+  throw new Error(
+    `OpenAI TTS failed after backend retries. Status: ${lastStatus}. ${lastMessage}`
+  );
 }
 
 Deno.serve(async (req) => {
@@ -100,7 +118,7 @@ Deno.serve(async (req) => {
 
     const text = String(body.text || "").trim();
     const voice = String(body.voice || "alloy");
-    const speed = Number(body.speed || 1.0);
+    const speed = clampSpeed(body.speed);
 
     if (!text) {
       return jsonResponse({ error: "Missing text" }, 400);
@@ -139,7 +157,7 @@ Deno.serve(async (req) => {
         error: "TTS generation failed",
         message,
         retryable: true,
-        upstream: "openai"
+        upstream: "openai",
       },
       502
     );
