@@ -1,79 +1,145 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { corsHeaders } from "https://deno.land/x/base44@v0.5.0/mod.ts";
 
-// In-memory cache: hash → base64 audio string (lives as long as the Deno isolate)
-const audioCache = new Map();
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
-async function hashKey(text, voice, speed) {
-  const raw = `${voice}|${speed}|${text}`;
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchTTS(text, voice, speed) {
-  // Retry up to 3 times with backoff on 429
-  let response;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    response = await fetch("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ model: "tts-1-hd", input: text, voice }),
-    });
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
+  });
+}
 
-    if (response.status !== 429) break;
+async function callOpenAITTS(text: string, voice: string, speed: number) {
+  let lastStatus = 500;
+  let lastMessage = "Unknown TTS error";
 
-    const retryAfter = response.headers.get("retry-after");
-    const waitMs = retryAfter
-      ? Math.max(parseFloat(retryAfter) * 1000, 1000)
-      : 2000 * (attempt + 1); // 2s, 4s, 6s
-    console.log(`TTS 429 — attempt ${attempt + 1}, waiting ${Math.round(waitMs / 1000)}s`);
-    await new Promise((r) => setTimeout(r, waitMs));
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    try {
+      const response = await fetch("https://api.openai.com/v1/audio/speech", {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini-tts",
+          input: text,
+          voice,
+          response_format: "mp3",
+          speed,
+        }),
+      });
+
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        return response;
+      }
+
+      lastStatus = response.status;
+      lastMessage = await response.text();
+
+      const retryable = [408, 429, 500, 502, 503, 504].includes(response.status);
+
+      if (!retryable) {
+        throw new Error(lastMessage);
+      }
+
+      const retryAfter = response.headers.get("retry-after");
+      const waitMs = retryAfter
+        ? Math.max(Number(retryAfter) * 1000, 1000)
+        : Math.min(1000 * 2 ** attempt, 12_000) + Math.floor(Math.random() * 500);
+
+      console.log(
+        `OpenAI TTS ${response.status}, retry ${attempt + 1}/5 in ${waitMs}ms`
+      );
+
+      await sleep(waitMs);
+    } catch (error) {
+      clearTimeout(timeout);
+
+      lastMessage = error instanceof Error ? error.message : String(error);
+
+      console.log(`OpenAI TTS exception, retry ${attempt + 1}/5:`, lastMessage);
+
+      if (attempt === 4) break;
+
+      const waitMs = Math.min(1000 * 2 ** attempt, 12_000);
+      await sleep(waitMs);
+    }
   }
 
-  return response;
+  throw new Error(`OpenAI TTS failed after retries. Status: ${lastStatus}. ${lastMessage}`);
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
+  }
+
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { text, voice = "alloy", speed = 1.0 } = await req.json();
-    if (!text?.trim()) return Response.json({ error: 'No text provided' }, { status: 400 });
-
-    const key = await hashKey(text, voice, speed);
-
-    // Return from in-memory cache immediately if available
-    if (audioCache.has(key)) {
-      return Response.json({ audio: audioCache.get(key), cached: true });
+    if (!OPENAI_API_KEY) {
+      return jsonResponse({ error: "Missing OPENAI_API_KEY" }, 500);
     }
 
-    const response = await fetchTTS(text, voice, speed);
+    const body = await req.json();
 
-    if (!response.ok) {
-      const err = await response.text();
-      console.error(`OpenAI TTS error ${response.status}:`, err);
-      console.error(`Request params: voice=${voice}, text_length=${text.length}, text_preview="${text.slice(0, 100)}"`);
-      return Response.json({ error: err }, { status: response.status });
+    const text = String(body.text || "").trim();
+    const voice = String(body.voice || "alloy");
+    const speed = Number(body.speed || 1.0);
+
+    if (!text) {
+      return jsonResponse({ error: "Missing text" }, 400);
     }
 
-    const audioBuffer = await response.arrayBuffer();
-    const bytes = new Uint8Array(audioBuffer);
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    const base64 = btoa(binary);
-
-    // Cache (cap at 100 entries)
-    if (audioCache.size >= 100) {
-      audioCache.delete(audioCache.keys().next().value);
+    if (text.length > 2500) {
+      return jsonResponse(
+        {
+          error: "Text chunk too large",
+          length: text.length,
+          maxLength: 2500,
+        },
+        413
+      );
     }
-    audioCache.set(key, base64);
 
-    return Response.json({ audio: base64 });
+    const ttsResponse = await callOpenAITTS(text, voice, speed);
+    const audioBuffer = await ttsResponse.arrayBuffer();
+
+    return new Response(audioBuffer, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "audio/mpeg",
+        "Content-Length": String(audioBuffer.byteLength),
+        "Cache-Control": "no-store",
+      },
+    });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+
+    console.error("openaiTTS failed:", message);
+
+    return jsonResponse(
+      {
+        error: "TTS generation failed",
+        message,
+      },
+      500
+    );
   }
 });
